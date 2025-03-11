@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monster Truck Stadium</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="grid-background">
+        <div class="stars" id="stars"></div>
+        <div class="sun"></div>
+        <div class="grid-lines">
+            <div class="horizontal-lines" id="horizontalLines"></div>
+            <div class="vertical-lines" id="verticalLines"></div>
+        </div>
+    </div>
+
+    <div id="intro-screen" class="active">
+        <div class="intro-container">
+            <h1 class="title">MONSTER TRUCK STADIUM</h1>
+            <div class="subtitle">AN EPIC MULTIPLAYER BATTLE</div>
+
+            <div class="input-section">
+                <div class="nickname-input">
+                    <label for="nickname">YOUR CALLSIGN:</label>
+                    <input type="text" id="nickname" placeholder="Enter your nickname (3-12 chars)" maxlength="12" minlength="3">
+                </div>
+            </div>
+
+            <div class="color-selection">
+                <h3>SELECT YOUR NEON GLOW</h3>
+                <div class="color-options">
+                    <div class="color-option selected" data-color="#ff00ff" style="background-color: #ff00ff; box-shadow: 0 0 10px #ff00ff;"></div>
+                    <div class="color-option" data-color="#00ffff" style="background-color: #00ffff; box-shadow: 0 0 10px #00ffff;"></div>
+                    <div class="color-option" data-color="#ff0000" style="background-color: #ff0000; box-shadow: 0 0 10px #ff0000;"></div>
+                    <div class="color-option" data-color="#ff8800" style="background-color: #ff8800; box-shadow: 0 0 10px #ff8800;"></div>
+                    <div class="color-option" data-color="#00ff00" style="background-color: #00ff00; box-shadow: 0 0 10px #00ff00;"></div>
+                    <div class="color-option" data-color="#8800ff" style="background-color: #8800ff; box-shadow: 0 0 10px #8800ff;"></div>
+                    <div class="color-option" data-color="#0088ff" style="background-color: #0088ff; box-shadow: 0 0 10px #0088ff;"></div>
+                </div>
+            </div>
+
+            <div class="truck-selection">
+                <h2>CHOOSE YOUR MACHINE</h2>
+                <div class="truck-options">
+                    <div class="truck-option selected" id="neonCrusher">
+                        <div class="machine-icon">🚛</div>
+                        <div class="truck-name">NEON CRUSHER</div>
+                        <div class="truck-desc">Balanced performance, excellent handling</div>
+                    </div>
+                    <div class="truck-option" id="gridRipper">
+                        <div class="machine-icon">🚛</div>
+                        <div class="truck-name">GRID RIPPER</div>
+                        <div class="truck-desc">High speed, light armor</div>
+                    </div>
+                    <div class="truck-option" id="laserWheel">
+                        <div class="machine-icon">🚛</div>
+                        <div class="truck-name">LASER WHEEL</div>
+                        <div class="truck-desc">Heavy armor, powerful but slower</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="quality-settings">
+                <label for="quality">GRAPHICS QUALITY:</label>
+                <select id="quality">
+                    <option value="auto">Auto-detect</option>
+                    <option value="low">Low (Best Performance)</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High (Best Quality)</option>
+                </select>
+            </div>
+
+            <div class="selected-options">
+                <div class="selected-option">CALLSIGN: <span id="selectedNickname">Player</span></div>
+                <div class="selected-option">MACHINE: <span id="selectedTruck">NEON CRUSHER</span></div>
+                <div class="selected-option">COLOR: <span id="selectedColor" style="color: #ff00ff; text-shadow: 0 0 5px #ff00ff;">PINK</span></div>
+            </div>
+
+            <div class="controls">
+                <h2>HOW TO PLAY</h2>
+                <ul>
+                    <li><strong>Arrow Keys:</strong> Drive your machine (Up/Down for acceleration, Left/Right for steering)</li>
+                    <li><strong>SPACE:</strong> Fire weapon</li>
+                    <li><strong>W/S:</strong> Adjust camera height</li>
+                    <li><strong>A/D:</strong> Adjust camera distance</li>
+                    <li><strong>C:</strong> Toggle chat window</li>
+                    <li><strong>GOAL:</strong> Destroy blocks and collect power-ups for points!</li>
+                </ul>
+            </div>
+
+            <div class="enter-arena-container">
+                <button type="button" id="playButton" class="enter-arena-button">ENTER THE ARENA</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-container" class="hidden">
+        <canvas id="game"></canvas>
+    </div>
+
+    <script>
+        // Create dynamic stars for the background
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create stars
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.animationDelay = (Math.random() * 4) + 's';
+                starsContainer.appendChild(star);
+            }
+            
+            // Create horizontal grid lines
+            const horizontalLinesContainer = document.getElementById('horizontalLines');
+            for (let i = 0; i < 15; i++) {
+                const line = document.createElement('div');
+                line.className = 'horizontal-line';
+                line.style.bottom = (i * 8) + '%';
+                line.style.opacity = 1 - (i * 0.06);
+                line.style.animationDelay = (i * 0.3) + 's';
+                horizontalLinesContainer.appendChild(line);
+            }
+            
+            // Create vertical grid lines
+            const verticalLinesContainer = document.getElementById('verticalLines');
+            for (let i = 0; i < 12; i++) {
+                const line = document.createElement('div');
+                line.className = 'vertical-line';
+                verticalLinesContainer.appendChild(line);
+            }
+            
+            // Color name mapping
+            const colorNames = {
+                '#ff00ff': 'PINK',
+                '#00ffff': 'CYAN',
+                '#ff0000': 'RED',
+                '#ff8800': 'ORANGE',
+                '#00ff00': 'GREEN',
+                '#8800ff': 'PURPLE',
+                '#0088ff': 'BLUE'
+            };
+            
+            // Function to update all color-dependent elements
+            function updateColorScheme(color) {
+                console.log("Updating color scheme to:", color);
+                
+                // Get the color name
+                const colorName = colorNames[color] || 'CUSTOM';
+                
+                // Update the color display
+                const colorSpan = document.getElementById('selectedColor');
+                colorSpan.textContent = colorName;
+                colorSpan.style.color = color;
+                colorSpan.style.textShadow = `0 0 5px ${color}`;
+                
+                // Also update the callsign and machine displays to match
+                const nicknameSpan = document.getElementById('selectedNickname');
+                nicknameSpan.style.color = color;
+                nicknameSpan.style.textShadow = `0 0 5px ${color}`;
+                
+                const truckSpan = document.getElementById('selectedTruck');
+                truckSpan.style.color = color;
+                truckSpan.style.textShadow = `0 0 5px ${color}`;
+                
+                // Update the input field border and text color
+                const nicknameInput = document.getElementById('nickname');
+                if (nicknameInput) {
+                    nicknameInput.style.borderColor = color;
+                    nicknameInput.style.color = color;
+                    nicknameInput.style.boxShadow = `0 0 10px ${color}`;
+                }
+                
+                // Update truck preview colors
+                document.querySelectorAll('.truck-preview svg').forEach(svg => {
+                    svg.style.color = color;
+                });
+            }
+            
+            // Truck selection
+            const truckOptions = document.querySelectorAll('.truck-option');
+            truckOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    // Remove selected class from all options
+                    truckOptions.forEach(opt => opt.classList.remove('selected'));
+                    
+                    // Add selected class to clicked option
+                    this.classList.add('selected');
+                    
+                    // Update selected truck display
+                    const truckName = this.querySelector('.truck-name').textContent;
+                    document.getElementById('selectedTruck').textContent = truckName;
+                    
+                    // Store selected truck
+                    localStorage.setItem('monsterTruckType', this.id);
+                    
+                    // Apply current color scheme to maintain consistency
+                    const currentColor = document.querySelector('.color-option.selected').dataset.color;
+                    updateColorScheme(currentColor);
+                });
+            });
+            
+            // Color selection
+            const colorOptions = document.querySelectorAll('.color-option');
+            
+            colorOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    console.log("Color clicked:", this.dataset.color);
+                    
+                    // Remove selected class from all options
+                    colorOptions.forEach(opt => opt.classList.remove('selected'));
+                    
+                    // Add selected class to clicked option
+                    this.classList.add('selected');
+                    
+                    // Get selected color
+                    const color = this.dataset.color;
+                    
+                    // Update all color-dependent elements
+                    updateColorScheme(color);
+                    
+                    // Store selected color
+                    localStorage.setItem('monsterTruckColor', color);
+                });
+            });
+            
+            // Update display when nickname changes
+            const nicknameInput = document.getElementById('nickname');
+            if (nicknameInput) {
+                nicknameInput.addEventListener('input', function() {
+                    const nickname = this.value.trim();
+                    if (nickname) {
+                        document.getElementById('selectedNickname').textContent = nickname;
+                    } else {
+                        document.getElementById('selectedNickname').textContent = 'Player';
+                    }
+                    
+                    // Store nickname
+                    localStorage.setItem('monsterTruckNickname', nickname);
+                });
+            }
+            
+            // Handle the Enter the Arena button click
+            const playButton = document.getElementById('playButton');
+            if (playButton) {
+                playButton.addEventListener('click', function() {
+                    console.log('Play button clicked'); // Debug log
+                    
+                    // Get and validate nickname
+                    const nickname = document.getElementById('nickname').value.trim();
+                    if (nickname.length < 3) {
+                        alert("Callsign must be at least 3 characters long");
+                        document.getElementById('nickname').focus();
+                        return;
+                    }
+                    
+                    // Store all selections in localStorage
+                    localStorage.setItem('monsterTruckNickname', nickname);
+                    
+                    // Get and store selected truck
+                    const selectedTruck = document.querySelector('.truck-option.selected');
+                    if (selectedTruck) {
+                        localStorage.setItem('monsterTruckType', selectedTruck.id);
+                    }
+                    
+                    // Get and store selected color
+                    const selectedColor = document.querySelector('.color-option.selected');
+                    if (selectedColor) {
+                        localStorage.setItem('monsterTruckColor', selectedColor.dataset.color);
+                    }
+                    
+                    // Get and store graphics quality
+                    const quality = document.getElementById('quality').value;
+                    localStorage.setItem('monsterTruckQuality', quality);
+                    
+                    console.log('Navigating to game.html'); // Debug log
+                    
+                    // Navigate to game page
+                    window.location.href = '/game.html';
+                    
+                    // Alternative navigation methods if the above doesn't work
+                    // Try these one at a time if needed:
+                    // window.location.assign('game.html');
+                    // or
+                    // window.location.replace('game.html');
+                    // or
+                    // window.location = 'game.html';
+                });
+            }
+            
+            // Set initial values from localStorage if available
+            const savedNickname = localStorage.getItem('monsterTruckNickname');
+            if (savedNickname && nicknameInput) {
+                nicknameInput.value = savedNickname;
+                document.getElementById('selectedNickname').textContent = savedNickname;
+            }
+            
+            const savedTruckType = localStorage.getItem('monsterTruckType');
+            if (savedTruckType) {
+                const truckElement = document.getElementById(savedTruckType);
+                if (truckElement) {
+                    truckOptions.forEach(opt => opt.classList.remove('selected'));
+                    truckElement.classList.add('selected');
+                    const truckName = truckElement.querySelector('.truck-name').textContent;
+                    document.getElementById('selectedTruck').textContent = truckName;
+                }
+            }
+            
+            // Apply initial color scheme
+            const savedColor = localStorage.getItem('monsterTruckColor');
+            if (savedColor) {
+                const colorOption = Array.from(colorOptions).find(opt => opt.dataset.color === savedColor);
+                if (colorOption) {
+                    colorOptions.forEach(opt => opt.classList.remove('selected'));
+                    colorOption.classList.add('selected');
+                    updateColorScheme(savedColor);
+                }
+            } else {
+                // Default to first color if none saved
+                const firstColorOption = colorOptions[0];
+                if (firstColorOption) {
+                    updateColorScheme(firstColorOption.dataset.color);
+                }
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,708 @@
+:root {
+    --neon-pink: #ff00ff;
+    --neon-blue: #00ffff;
+    --neon-purple: #9d00ff;
+    --dark-bg: #0c0c2c;
+    --selected-color: #ff00ff; /* Default color */
+    --bg-color: #1a0933;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: white;
+    font-family: Arial, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(180deg, var(--bg-color) 0%, #000000 100%);
+}
+
+#intro-screen {
+    width: 100%;
+    min-height: 100vh;
+    overflow-y: auto;
+    position: relative;
+    padding: 20px 0;
+    box-sizing: border-box;
+}
+
+.intro-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    position: relative;
+}
+
+.title {
+    font-size: 3rem;
+    text-align: center;
+    color: var(--neon-pink);
+    text-shadow: 0 0 10px var(--neon-pink);
+    margin: 0;
+    padding: 1rem 0;
+}
+
+.subtitle {
+    text-align: center;
+    color: #fff;
+    font-size: 1rem;
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    color: var(--neon-blue);
+    text-align: center;
+    font-size: 1.2rem;
+    margin: 1.5rem 0;
+    text-shadow: 0 0 5px var(--neon-blue);
+}
+
+.input-section {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 1rem;
+    border-radius: 4px;
+    border: 1px solid var(--neon-blue);
+    margin-bottom: 1.5rem;
+}
+
+.neon-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--neon-pink);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+}
+
+.color-options {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 1rem 0;
+}
+
+.color-option {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: none;
+    box-shadow: 0 0 10px currentColor;
+}
+
+.color-option:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 15px currentColor;
+}
+
+.color-option.selected {
+    border: 2px solid #fff;
+    box-shadow: 0 0 15px currentColor;
+}
+
+.machine-options {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.machine-card {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--neon-blue);
+    border-radius: 4px;
+    padding: 1rem;
+    width: 200px;
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.machine-card.selected {
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 15px var(--neon-pink);
+}
+
+.machine-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.machine-name {
+    color: var(--neon-blue);
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.machine-desc {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 1rem;
+}
+
+.stats {
+    text-align: left;
+}
+
+.stat {
+    margin-bottom: 0.5rem;
+}
+
+.stat span {
+    font-size: 0.8rem;
+    color: var(--neon-pink);
+}
+
+.stat-bar {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    margin-top: 2px;
+}
+
+.stat-fill {
+    height: 100%;
+    background: var(--neon-blue);
+    border-radius: 2px;
+}
+
+.graphics-section {
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.neon-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--neon-blue);
+    color: white;
+    padding: 0.5rem 2rem;
+    border-radius: 4px;
+}
+
+.player-info {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--neon-blue);
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.neon-text {
+    color: var(--neon-pink);
+}
+
+.neon-text.orange {
+    color: #FFA500;
+}
+
+.controls-guide {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--neon-blue);
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 1rem 0;
+}
+
+.controls-guide ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.controls-guide li {
+    margin-bottom: 0.5rem;
+    color: #888;
+}
+
+.key {
+    color: var(--neon-blue);
+    margin-right: 0.5rem;
+}
+
+.start-button {
+    display: block;
+    width: 200px;
+    margin: 2rem auto;
+    padding: 1rem;
+    background: transparent;
+    border: 2px solid var(--neon-pink);
+    color: var(--neon-pink);
+    font-size: 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.start-button:hover {
+    background: var(--neon-pink);
+    color: black;
+    box-shadow: 0 0 20px var(--neon-pink);
+}
+
+/* Grid background effect */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        linear-gradient(transparent 0%, rgba(0, 0, 0, 0.5) 100%),
+        linear-gradient(90deg, rgba(255, 0, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(rgba(255, 0, 255, 0.1) 1px, transparent 1px);
+    background-size: 100% 100%, 40px 40px, 40px 40px;
+    transform-origin: center;
+    transform: perspective(500px) rotateX(60deg);
+    pointer-events: none;
+    z-index: -1;
+}
+
+.hidden {
+    display: none;
+}
+
+.active {
+    display: block;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .intro-container {
+        padding: 1rem;
+    }
+
+    .neon-text {
+        font-size: 2rem;
+    }
+
+    .input-group {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .neon-input, .neon-select {
+        max-width: 100%;
+    }
+
+    .color-btn {
+        width: 35px;
+        height: 35px;
+    }
+}
+
+/* Stats display */
+.stats-display {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.stat-bar {
+    flex: 1;
+    min-width: 150px;
+    background: rgba(0, 0, 0, 0.3);
+    height: 10px;
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+}
+
+.stat-fill {
+    height: 100%;
+    background: var(--selected-color);
+    transition: width 0.3s ease;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--neon-blue);
+    margin-bottom: 0.3rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Vehicle preview area */
+.vehicle-preview {
+    position: relative;
+    height: 300px;
+    margin: 2rem 0;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--selected-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.vehicle-preview canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.vehicle-preview::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-shadow: inset 0 0 50px var(--selected-color);
+    pointer-events: none;
+}
+
+/* For the truck options */
+.truck-options {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.truck-option {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--neon-blue);
+    border-radius: 4px;
+    padding: 1rem;
+    width: 200px;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.truck-option.selected {
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 15px var(--neon-pink);
+}
+
+/* For the color buttons */
+.color-options {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 1rem 0;
+}
+
+.color-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: none;
+    box-shadow: 0 0 10px currentColor;
+}
+
+.color-btn:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 15px currentColor;
+}
+
+.color-btn.selected {
+    border: 2px solid #fff;
+    box-shadow: 0 0 15px currentColor;
+}
+
+/* Selected Options Display */
+.selected-options {
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid #ff00ff;
+    border-radius: 10px;
+    padding: 20px 30px;
+    margin: 2rem auto;
+    width: 90%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    position: relative;
+    box-shadow: 
+        0 0 20px rgba(255, 0, 255, 0.3),
+        inset 0 0 30px rgba(255, 0, 255, 0.1);
+}
+
+.selected-options::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        #ff00ff,
+        transparent
+    );
+    animation: scanline 2s linear infinite;
+}
+
+.selected-options::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        #ff00ff,
+        transparent
+    );
+    animation: scanline 2s linear infinite reverse;
+}
+
+.selected-option {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    letter-spacing: 1px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.selected-option::before {
+    content: attr(data-label);
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+}
+
+.selected-option span {
+    font-weight: bold;
+    margin-left: 10px;
+    min-width: 120px;
+    text-align: right;
+}
+
+@keyframes scanline {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Add a subtle pulse animation to the box */
+@keyframes pulse {
+    0% { box-shadow: 0 0 20px rgba(255, 0, 255, 0.3), inset 0 0 30px rgba(255, 0, 255, 0.1); }
+    50% { box-shadow: 0 0 30px rgba(255, 0, 255, 0.5), inset 0 0 40px rgba(255, 0, 255, 0.2); }
+    100% { box-shadow: 0 0 20px rgba(255, 0, 255, 0.3), inset 0 0 30px rgba(255, 0, 255, 0.1); }
+}
+
+/* Update the input field styling */
+.nickname-input input {
+    background-color: rgba(20, 0, 30, 0.7);
+    color: #ff00ff;
+    padding: 10px 15px;
+    border: 1px solid #ff00ff;
+    border-radius: 4px;
+    font-size: 1rem;
+    width: calc(100% - 32px);
+    margin-top: 8px;
+    outline: none;
+    font-family: 'Orbitron', sans-serif;
+    box-sizing: border-box;
+    box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+    text-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+    transition: all 0.3s ease;
+}
+
+.nickname-input input:focus {
+    border-color: #00ffff;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+    color: #00ffff;
+    text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+}
+
+.nickname-input input::placeholder {
+    color: rgba(255, 0, 255, 0.5);
+}
+
+/* Graphics Quality Section */
+.quality-settings {
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 20px;
+    border-radius: 10px;
+    margin: 2rem auto;
+    border: 1px solid #00ffff;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+    text-align: center;
+}
+
+.quality-settings label {
+    color: #00ffff;
+    font-size: 1.2rem;
+    text-shadow: 0 0 8px #00ffff;
+    margin-right: 15px;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.quality-settings select {
+    background-color: rgba(20, 0, 30, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border: 1px solid #00ffff;
+    border-radius: 4px;
+    font-size: 1rem;
+    outline: none;
+    font-family: 'Orbitron', sans-serif;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+    transition: all 0.3s ease;
+}
+
+.quality-settings select:hover {
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+}
+
+.quality-settings select:focus {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.7);
+}
+
+/* How to Play Section */
+.controls {
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 25px;
+    border-radius: 10px;
+    margin: 2rem auto;
+    border: 1px solid #ff00ff;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 0 20px rgba(255, 0, 255, 0.2);
+}
+
+.controls h2 {
+    color: #ff00ff;
+    text-align: center;
+    font-size: 1.5rem;
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px #ff00ff;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.controls ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.controls li {
+    margin-bottom: 12px;
+    color: #fff;
+    font-size: 1rem;
+    line-height: 1.4;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.controls li strong {
+    color: #00ffff;
+    text-shadow: 0 0 5px #00ffff;
+    margin-right: 8px;
+}
+
+/* Enter the Arena Button */
+.enter-arena-container {
+    text-align: center;
+    margin: 2.5rem auto;
+    padding: 20px;
+    position: relative;
+}
+
+.enter-arena-button {
+    background: linear-gradient(45deg, #ff00ff, #aa00ff);
+    color: white;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.5rem;
+    font-weight: bold;
+    padding: 18px 50px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 
+        0 0 25px rgba(255, 0, 255, 0.6),
+        0 0 40px rgba(255, 0, 255, 0.3),
+        inset 0 0 15px rgba(255, 255, 255, 0.1);
+}
+
+.enter-arena-button:hover {
+    transform: scale(1.05) translateY(-3px);
+    box-shadow: 
+        0 0 35px rgba(255, 0, 255, 0.8),
+        0 0 50px rgba(255, 0, 255, 0.4),
+        inset 0 0 20px rgba(255, 255, 255, 0.2);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+.enter-arena-button:active {
+    transform: scale(0.98) translateY(0);
+    box-shadow: 
+        0 0 20px rgba(255, 0, 255, 0.5),
+        inset 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Add pulsing glow effect around the button */
+.enter-arena-container::before,
+.enter-arena-container::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(
+        circle,
+        rgba(255, 0, 255, 0.3) 0%,
+        transparent 70%
+    );
+    animation: pulse-glow 2s infinite alternate;
+    z-index: -1;
+}
+
+.enter-arena-container::after {
+    animation-delay: 1s;
+}
+
+@keyframes shine {
+    0% {
+        left: -200%;
+    }
+    20%, 100% {
+        left: 200%;
+    }
+}
+
+@keyframes pulse-glow {
+    0% {
+        width: 100%;
+        height: 100%;
+        opacity: 0.3;
+    }
+    100% {
+        width: 150%;
+        height: 150%;
+        opacity: 0.1;
+    }
+}
+
+@media (max-width: 600px) {
+    .enter-arena-button {
+        font-size: 1.2rem;
+        padding: 15px 30px;
+        width: 90%;
+        max-width: 300px;
+    }
+}
