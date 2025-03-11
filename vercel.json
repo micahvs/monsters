@@ -1,10 +1,6 @@
 {
   "version": 2,
-  "buildCommand": null,
-  "devCommand": null,
-  "installCommand": null,
-  "outputDirectory": ".",
-  "public": true,
+  "framework": null,
   "rewrites": [
     { "source": "/game", "destination": "/game.html" }
   ]
