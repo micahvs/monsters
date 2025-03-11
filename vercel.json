@@ -1,13 +1,8 @@
 {
   "version": 2,
-  "public": true,
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    { "source": "/game", "destination": "/game.html" }
-  ],
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/(.*)", "status": 404, "dest": "/404.html" }
+    { "src": "/game", "dest": "/game.html" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
