@@ -112,7 +112,7 @@
     </div>
     <div class="hud hud-top-right">
         <div id="health">HEALTH: 100%</div>
-        <div id="ammo">AMMO: ∞</div>
+        <div id="ammo">AMMO: 30/30</div>
     </div>
     <div class="hud hud-bottom-left">
         <div id="speed">SPEED: 0 MPH</div>
@@ -131,14 +131,13 @@
     <script type="importmap">
     {
         "imports": {
-            "three": "https://unpkg.com/three@0.159.0/build/three.module.js"
+            "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
         }
     }
     </script>
-    <script type="module">
-        import Game from './js/main.js';
-        console.log("Script loaded");
-        
+    <script type="module" src="js/main.js"></script>
+    <script>
         // Update debug info
         window.updateDebugInfo = function(position) {
             const positionInfo = document.getElementById('positionInfo');
