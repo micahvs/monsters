@@ -1,8 +1,11 @@
 {
   "version": 2,
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/game", "dest": "/game.html" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "buildCommand": false,
+  "devCommand": false,
+  "installCommand": false,
+  "outputDirectory": ".",
+  "public": true,
+  "rewrites": [
+    { "source": "/game", "destination": "/game.html" }
   ]
 }
