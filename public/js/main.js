@@ -1120,9 +1120,29 @@ class Game {
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const projectile = this.projectiles[i];
             
-            // Update position - FIXED: Correct direction application
+            // Update position using all direction components (x, y, z)
             projectile.mesh.position.x += projectile.direction.x * projectile.speed;
+            projectile.mesh.position.y += projectile.direction.y * projectile.speed; // Apply vertical movement
             projectile.mesh.position.z += projectile.direction.z * projectile.speed;
+            
+            // Rotate projectile to face direction of movement
+            if (projectile.direction.length() > 0) {
+                // Create a quaternion from the direction vector
+                const quaternion = new THREE.Quaternion();
+                const upVector = new THREE.Vector3(0, 1, 0);
+                
+                // Create a dummy object to calculate quaternion
+                const lookAt = new THREE.Object3D();
+                lookAt.position.copy(projectile.mesh.position);
+                lookAt.lookAt(
+                    projectile.mesh.position.x + projectile.direction.x,
+                    projectile.mesh.position.y + projectile.direction.y,
+                    projectile.mesh.position.z + projectile.direction.z
+                );
+                
+                // Apply the rotation
+                projectile.mesh.quaternion.copy(lookAt.quaternion);
+            }
             
             // Add tracer effect
             this.createProjectileTrail(projectile);
@@ -1198,24 +1218,39 @@ class Game {
         
         // Check collision with truck (only if not player's projectile)
         if (projectile.source !== 'player' && this.truck) {
-            // Use larger bounds for better hit detection
-            const truckDimensions = this.monsterTruck ? 
-                {width: 3, length: 5} : 
-                {width: 2, length: 3};
+            // Get vehicle dimensions and height based on type
+            let truckDimensions = {width: 2, length: 3, height: 1};
+            
+            if (this.monsterTruck) {
+                const machineType = this.monsterTruck.config.machineType;
                 
+                if (machineType === 'cyber-beast') {
+                    truckDimensions = {width: 3, length: 5, height: 2.2}; // Taller with spoiler
+                } else if (machineType === 'grid-ripper') {
+                    truckDimensions = {width: 3, length: 5, height: 1.6}; // Low-profile
+                } else { // neon-crusher
+                    truckDimensions = {width: 3, length: 5, height: 2.0}; // Medium height
+                }
+            }
+                
+            // Create a proper 3D bounding box for the vehicle
             const truckBounds = {
                 minX: this.truck.position.x - (truckDimensions.width / 2),
                 maxX: this.truck.position.x + (truckDimensions.width / 2),
+                minY: this.truck.position.y,
+                maxY: this.truck.position.y + truckDimensions.height,
                 minZ: this.truck.position.z - (truckDimensions.length / 2),
                 maxZ: this.truck.position.z + (truckDimensions.length / 2)
             };
             
+            // Expanded collision box for better hit detection (slightly larger than actual model)
             if (
-                pos.x >= truckBounds.minX && 
-                pos.x <= truckBounds.maxX &&
-                pos.z >= truckBounds.minZ && 
-                pos.z <= truckBounds.maxZ &&
-                pos.y <= this.truck.position.y + 1.5
+                pos.x >= truckBounds.minX - 0.2 && 
+                pos.x <= truckBounds.maxX + 0.2 &&
+                pos.z >= truckBounds.minZ - 0.2 && 
+                pos.z <= truckBounds.maxZ + 0.2 &&
+                pos.y >= truckBounds.minY - 0.1 &&
+                pos.y <= truckBounds.maxY + 0.3 // Extra height for hit detection
             ) {
                 // Calculate impact point for visuals
                 const impactPoint = new THREE.Vector3(pos.x, pos.y, pos.z);
@@ -1224,6 +1259,9 @@ class Game {
                 // Turret projectiles do more damage
                 const baseDamage = projectile.source === 'turret' ? 
                     projectile.damage * 1.5 : projectile.damage;
+                
+                // Log hit information
+                console.log(`Vehicle hit at Y=${pos.y}, vehicle bounds Y=${truckBounds.minY} to ${truckBounds.maxY}`);
                 
                 // Take damage
                 this.takeDamage(baseDamage);
@@ -1559,7 +1597,7 @@ class Game {
         body.position.set(0, 1.25, 0);
         base.add(body);
         
-        // Create gun barrel
+        // Create gun barrel - positioned higher to better target vehicle bodies
         const barrelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 3, 8);
         barrelGeometry.rotateX(Math.PI / 2); // Rotate to point forward
         
@@ -1569,14 +1607,20 @@ class Game {
         });
         
         const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
-        barrel.position.set(0, 0, 1.5); // Extend forward
+        barrel.position.set(0, 0.4, 1.5); // Raised position to better hit all vehicle types
         body.add(barrel);
+        
+        // Add a second barrel for wider coverage (targeting taller vehicles)
+        const upperBarrel = new THREE.Mesh(barrelGeometry, barrelMaterial.clone());
+        upperBarrel.position.set(0, 0.8, 1.3); // Higher position for taller vehicles
+        body.add(upperBarrel);
         
         // Add turret to list
         this.turrets.push({
             mesh: base,
             body: body,
             barrel: barrel,
+            upperBarrel: body.children[1], // Reference to upper barrel
             health: 100,
             maxHealth: 100,
             shootCooldown: Math.floor(Math.random() * 60), // Random initial cooldown
@@ -1676,13 +1720,46 @@ class Game {
     turretShoot(turret) {
         if (!this.scene || turret.destroyed) return;
         
-        // Calculate barrel position and direction
-        const barrelWorldPos = new THREE.Vector3();
-        turret.barrel.getWorldPosition(barrelWorldPos);
+        // Determine which barrel to use based on vehicle height
+        // This ensures we target the right part of different vehicles
+        const useUpperBarrel = this.shouldUseUpperBarrel();
         
+        // Get barrel position and direction
+        const barrelWorldPos = new THREE.Vector3();
+        
+        // Get position of the appropriate barrel
+        if (useUpperBarrel && turret.upperBarrel) {
+            // Use upper barrel for taller vehicles
+            turret.upperBarrel.getWorldPosition(barrelWorldPos);
+        } else {
+            // Use main barrel for normal/low vehicles
+            turret.barrel.getWorldPosition(barrelWorldPos);
+        }
+        
+        // Get vehicle height based on type for proper targeting
+        let vehicleHeight = 1.0; // Default height
+        let targetOffset = 0.0; // Vertical offset for targeting
+        
+        if (this.monsterTruck) {
+            const machineType = this.monsterTruck.config.machineType;
+            
+            // Different heights for different vehicle types
+            if (machineType === 'cyber-beast') {
+                vehicleHeight = 1.2; // Taller for Cyber Beast (has spoiler)
+                targetOffset = 0.6; // Target higher
+            } else if (machineType === 'grid-ripper') {
+                vehicleHeight = 0.8; // Lower for Grid Ripper (streamlined)
+                targetOffset = 0.4; // Target lower
+            } else {
+                vehicleHeight = 1.0; // Medium height for Neon Crusher
+                targetOffset = 0.5; // Target middle
+            }
+        }
+        
+        // Calculate 3D direction including height component
         const directionToPlayer = new THREE.Vector3(
             this.truck.position.x - turret.mesh.position.x,
-            0,
+            (this.truck.position.y + targetOffset) - barrelWorldPos.y, // Target specific part of vehicle
             this.truck.position.z - turret.mesh.position.z
         ).normalize();
         
@@ -1700,10 +1777,10 @@ class Game {
         // Add to scene
         this.scene.add(projectile);
         
-        // Store projectile data
+        // Store projectile data with 3D direction
         this.projectiles.push({
             mesh: projectile,
-            direction: directionToPlayer,
+            direction: directionToPlayer, // Full 3D direction
             speed: 1.5, // Slower than player projectiles
             damage: 10,
             lifetime: 100,
@@ -1712,6 +1789,21 @@ class Game {
         
         // Add muzzle flash effect
         this.createMuzzleFlash(barrelWorldPos, directionToPlayer);
+        
+        // Log targeting info for debugging
+        if (this.debugMode) {
+            console.log(`Turret targeting vehicle at y=${this.truck.position.y + targetOffset} from y=${barrelWorldPos.y}, using ${useUpperBarrel ? 'upper' : 'lower'} barrel`);
+        }
+    }
+    
+    // Helper method to determine which barrel to use based on vehicle type
+    shouldUseUpperBarrel() {
+        if (!this.monsterTruck) return false;
+        
+        const machineType = this.monsterTruck.config.machineType;
+        
+        // Use upper barrel for taller vehicles
+        return machineType === 'cyber-beast';
     }
 
     // Damage turret method
