@@ -2334,6 +2334,110 @@ class Game {
             }
         }
     }
+
+    createStadium() {
+        // Remove existing walls if they exist
+        this.scene.children = this.scene.children.filter(child => !child.isWall);
+
+        // Create the main stadium structure - a large cylinder with inward-facing bleachers
+        const bleacherGeometry = new THREE.CylinderGeometry(100, 120, 30, 96, 5, true);
+        const bleacherMaterial = new THREE.MeshPhongMaterial({
+            color: 0x444444,
+            side: THREE.DoubleSide,
+            flatShading: true
+        });
+        
+        const stadium = new THREE.Mesh(bleacherGeometry, bleacherMaterial);
+        stadium.position.y = 15;
+        this.scene.add(stadium);
+
+        // Create animated crowd
+        const crowdCount = 1000;
+        const spectatorGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+        const spectatorMaterials = [
+            new THREE.MeshPhongMaterial({ color: 0xff0000 }), // Red
+            new THREE.MeshPhongMaterial({ color: 0x00ff00 }), // Green
+            new THREE.MeshPhongMaterial({ color: 0x0000ff }), // Blue
+            new THREE.MeshPhongMaterial({ color: 0xffff00 }), // Yellow
+            new THREE.MeshPhongMaterial({ color: 0xff00ff }), // Purple
+        ];
+
+        this.spectators = [];
+        
+        for (let i = 0; i < crowdCount; i++) {
+            const angle = (Math.random() * Math.PI * 2);
+            const radius = 105 + Math.random() * 10;
+            const height = 20 + Math.random() * 8;
+            
+            const spectator = new THREE.Mesh(
+                spectatorGeometry,
+                spectatorMaterials[Math.floor(Math.random() * spectatorMaterials.length)]
+            );
+            
+            spectator.position.x = Math.cos(angle) * radius;
+            spectator.position.z = Math.sin(angle) * radius;
+            spectator.position.y = height;
+            
+            spectator.userData.animationOffset = Math.random() * Math.PI * 2;
+            spectator.userData.initialY = height;
+            
+            this.spectators.push(spectator);
+            this.scene.add(spectator);
+        }
+
+        // Add stadium lights
+        const lightPositions = [
+            { x: 80, z: 80 },
+            { x: -80, z: 80 },
+            { x: 80, z: -80 },
+            { x: -80, z: -80 }
+        ];
+
+        lightPositions.forEach(pos => {
+            const light = new THREE.SpotLight(0xffffff, 100);
+            light.position.set(pos.x, 60, pos.z);
+            light.angle = Math.PI / 6;
+            light.penumbra = 0.3;
+            light.decay = 1;
+            light.distance = 200;
+            light.target.position.set(0, 0, 0);
+            this.scene.add(light);
+            this.scene.add(light.target);
+        });
+    }
+
+    updateSpectators(deltaTime) {
+        const time = performance.now() * 0.001;
+        
+        this.spectators.forEach(spectator => {
+            const offset = spectator.userData.animationOffset;
+            const initialY = spectator.userData.initialY;
+            
+            // Animate spectators bobbing up and down
+            spectator.position.y = initialY + Math.sin(time * 2 + offset) * 0.3;
+            spectator.rotation.x = Math.sin(time * 2 + offset) * 0.1;
+            spectator.rotation.z = Math.cos(time * 3 + offset) * 0.1;
+        });
+    }
+
+    // Add to your existing update method
+    update(deltaTime) {
+        // ... existing update code ...
+        
+        this.updateSpectators(deltaTime);
+        
+        // ... rest of update code ...
+    }
+
+    // In your constructor, replace createWalls() with createStadium()
+    constructor() {
+        // ... existing constructor code ...
+        
+        // Replace createWalls() with:
+        this.createStadium();
+        
+        // ... rest of constructor code ...
+    }
 }
 
 // Initialize game when window is fully loaded
