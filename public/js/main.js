@@ -774,36 +774,47 @@ class Game {
 
     // Take damage method
     takeDamage(amount) {
-        // Force a minimum damage amount to make it noticeable
-        const minDamage = 10;
+        // Use the provided damage amount directly for better balance
+        // Minor minimum to ensure feedback but not too harsh
+        const minDamage = 5;
         const appliedAmount = Math.max(amount, minDamage);
         
         // If we have a MonsterTruck instance, use its damage method
         if (this.monsterTruck) {
-            // Force visual effects by bypassing MonsterTruck's cooldown
-            this.monsterTruck.damageTimeout = 0;
-            
-            // Apply damage through MonsterTruck
-            const actualDamage = this.monsterTruck.takeDamage(appliedAmount);
-            
-            // Sync health with monster truck
-            this.health = this.monsterTruck.health;
-            
-            // Always add screen flash effect for better feedback
-            this.addDamageScreenEffect(actualDamage);
-            
-            console.log(`DAMAGE TAKEN: ${actualDamage} damage (original: ${amount}). Health now: ${this.health}`);
+            // Respect the damage cooldown for more balanced gameplay
+            if (this.monsterTruck.damageTimeout <= 0) {
+                // Apply damage through MonsterTruck
+                const actualDamage = this.monsterTruck.takeDamage(appliedAmount);
+                
+                // Sync health with monster truck
+                this.health = this.monsterTruck.health;
+                
+                // Add screen flash effect for significant damage
+                if (actualDamage > 8) {
+                    this.addDamageScreenEffect(actualDamage);
+                }
+                
+                console.log(`Damage: ${actualDamage} points. Health: ${this.health}`);
+                
+                // Add subtle camera shake for good feedback
+                this.shakeCamera(actualDamage / 6);
+            } else {
+                // Still showing hit but not applying damage during cooldown
+                console.log("Hit during damage cooldown - reduced effect");
+            }
         } else {
             // Legacy fallback behavior
             this.health = Math.max(0, this.health - appliedAmount);
-            console.log(`LEGACY DAMAGE: ${appliedAmount} damage. Health now: ${this.health}`);
+            console.log(`Damage: ${appliedAmount} points. Health: ${this.health}`);
             
-            // Add screen effect even in legacy mode
-            this.addDamageScreenEffect(appliedAmount);
+            // Add screen effect for significant damage
+            if (appliedAmount > 8) {
+                this.addDamageScreenEffect(appliedAmount);
+            }
+            
+            // Add subtle camera shake
+            this.shakeCamera(appliedAmount / 6);
         }
-        
-        // Add camera shake for feedback
-        this.shakeCamera(appliedAmount / 4);
         
         // Update HUD
         const healthDisplay = document.getElementById('health');
@@ -820,14 +831,16 @@ class Game {
             
             healthDisplay.innerHTML = `HEALTH: <span style="color:${healthColor}">${healthPercent}%</span>`;
             
-            // Flash the HUD element for better feedback
-            healthDisplay.style.transition = 'none';
-            healthDisplay.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
-            
-            setTimeout(() => {
-                healthDisplay.style.transition = 'background-color 0.5s ease';
-                healthDisplay.style.backgroundColor = 'transparent';
-            }, 50);
+            // Subtle flash on the HUD element for feedback
+            if (this.monsterTruck && this.monsterTruck.damageTimeout <= 0) {
+                healthDisplay.style.transition = 'none';
+                healthDisplay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
+                
+                setTimeout(() => {
+                    healthDisplay.style.transition = 'background-color 0.5s ease';
+                    healthDisplay.style.backgroundColor = 'transparent';
+                }, 50);
+            }
         }
         
         // Check for game over
@@ -1258,16 +1271,16 @@ class Game {
                 }
             }
             
-            // MUCH larger collision box for more reliable hit detection
-            // This is intentionally generous to ensure hits are registered
-            const expansionFactor = 1.0; // Makes hit box significantly larger
+            // Moderately larger collision box for better hit detection but not overpowered
+            // Slightly larger than actual vehicle for more reliable hit detection
+            const expansionFactor = 0.5; // Reduced from 1.0 for more balanced gameplay
                 
-            // Create a proper 3D bounding box for the vehicle with extra margins
+            // Create a proper 3D bounding box for the vehicle with reasonable margins
             const truckBounds = {
                 minX: this.truck.position.x - (truckDimensions.width / 2) - expansionFactor,
                 maxX: this.truck.position.x + (truckDimensions.width / 2) + expansionFactor,
-                minY: this.truck.position.y - 0.5, // Extended below ground for better hits
-                maxY: this.truck.position.y + truckDimensions.height + 1.0, // Much higher for guaranteed hits
+                minY: this.truck.position.y - 0.2, // Less below-ground extension
+                maxY: this.truck.position.y + truckDimensions.height + 0.5, // Less excessive height
                 minZ: this.truck.position.z - (truckDimensions.length / 2) - expansionFactor,
                 maxZ: this.truck.position.z + (truckDimensions.length / 2) + expansionFactor
             };
@@ -1284,15 +1297,15 @@ class Game {
                 // Calculate impact point for visuals
                 const impactPoint = new THREE.Vector3(pos.x, pos.y, pos.z);
                 
-                // Increased damage from turret projectiles for better gameplay
+                // Apply damage directly from projectile without multiplier
                 const baseDamage = projectile.source === 'turret' ? 
-                    projectile.damage * 2.5 : projectile.damage; // Increased multiplier
+                    projectile.damage : projectile.damage; // No additional multiplier
                 
-                // Force minimum damage to ensure player notices
-                const actualDamage = Math.max(15, baseDamage);
+                // Ensure damage is reasonable but noticeable
+                const actualDamage = baseDamage;
                 
                 // Log hit information
-                console.log(`CONFIRMED HIT: Vehicle hit at Y=${pos.y.toFixed(2)}, vehicle bounds Y=${truckBounds.minY.toFixed(2)} to ${truckBounds.maxY.toFixed(2)}, damage=${actualDamage}`);
+                console.log(`Hit registered: Vehicle hit for ${actualDamage} damage`);
                 
                 // Take damage - ensure this works by calling directly
                 this.takeDamage(actualDamage);
@@ -1598,32 +1611,22 @@ class Game {
         
         this.turrets = [];
         
-        // Create more turrets around the arena for better gameplay
+        // Create a balanced number of turrets around the arena
         const arenaSize = 400;
         
-        // Create a grid of turrets for better coverage
+        // Reduced number of turrets for better gameplay balance
         const turretPositions = [
-            // Original positions
+            // Core positions at the corners
             { x: -150, z: -150 },
             { x: 150, z: -150 },
             { x: -150, z: 150 },
             { x: 150, z: 150 },
-            { x: 0, z: -100 },
-            { x: 0, z: 100 },
-            { x: -100, z: 0 },
-            { x: 100, z: 0 },
             
-            // Additional turrets for denser placement
-            { x: -50, z: -50 },
-            { x: 50, z: -50 },
-            { x: -50, z: 50 },
-            { x: 50, z: 50 },
-            
-            // Turrets close to the center for aggression
-            { x: 0, z: -30 },
-            { x: 0, z: 30 },
-            { x: -30, z: 0 },
-            { x: 30, z: 0 }
+            // Middle positions on edges
+            { x: 0, z: -120 },
+            { x: 0, z: 120 },
+            { x: -120, z: 0 },
+            { x: 120, z: 0 }
         ];
         
         turretPositions.forEach(pos => {
@@ -1724,17 +1727,17 @@ class Game {
                 turret.body.rotation.y += shortestRotation * 0.05;
                 
                 // Shoot at player if cooldown is ready and roughly facing player
-                // More lenient angle check and much faster shooting rate
+                // Balanced angle check and shooting rate
                 if (
                     turret.shootCooldown <= 0 && 
-                    Math.abs(shortestRotation) < 0.4 && // More forgiving angle
+                    Math.abs(shortestRotation) < 0.3 && // More balanced angle requirement
                     this.canTurretSeePlayer(turret)
                 ) {
                     this.turretShoot(turret);
                     
-                    // Much shorter cooldown for more aggressive shooting
+                    // More balanced cooldown for reasonable shooting frequency
                     // Random component to prevent all turrets firing at once
-                    turret.shootCooldown = 60 + Math.floor(Math.random() * 30); // ~1 second between shots
+                    turret.shootCooldown = 90 + Math.floor(Math.random() * 60); // ~1.5-2.5 seconds between shots
                     turret.lastShotTime = Date.now();
                 }
             }
@@ -1825,14 +1828,14 @@ class Game {
             this.truck.position.z - turret.mesh.position.z
         ).normalize();
         
-        // Create larger projectile for better visibility and hit detection
-        const projectileGeometry = new THREE.SphereGeometry(0.6, 8, 8); // Doubled size
+        // Create moderately sized projectile for better visibility but balanced damage
+        const projectileGeometry = new THREE.SphereGeometry(0.5, 8, 8); // Still visible but not huge
         const projectileMaterial = new THREE.MeshPhongMaterial({
             color: 0xff0000,
             emissive: 0xff0000,
-            emissiveIntensity: 0.8, // Brighter
+            emissiveIntensity: 0.6, // Not too bright
             transparent: true,
-            opacity: 0.9
+            opacity: 0.8
         });
         
         const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
@@ -1841,17 +1844,22 @@ class Game {
         // Add to scene
         this.scene.add(projectile);
         
-        // Add light to the projectile for better visibility
-        const projectileLight = new THREE.PointLight(0xff0000, 1, 4);
+        // Add subtler light to the projectile for better visibility
+        const projectileLight = new THREE.PointLight(0xff0000, 0.7, 3);
         projectile.add(projectileLight);
+        
+        // Calculate damage for approximately 7 shots to drain full health (assuming 100 health)
+        // For most vehicles with 100 health, 7 shots means about 14-15 damage per shot
+        // We'll use a range of 13-17 damage for variety
+        const baseDamage = 14 + Math.floor(Math.random() * 3) - 1; // Damage range 13-16
         
         // Store projectile data with 3D direction
         this.projectiles.push({
             mesh: projectile,
             direction: directionToPlayer, // Full 3D direction
-            speed: 2.2, // Faster for better gameplay
-            damage: 15, // Increased base damage
-            lifetime: 80, // Shorter lifetime due to faster speed
+            speed: 1.8, // Moderate speed for balanced gameplay
+            damage: baseDamage, // More balanced damage
+            lifetime: 90, // Slightly longer lifetime due to slower speed
             source: 'turret'
         });
         
