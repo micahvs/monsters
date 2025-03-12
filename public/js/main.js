@@ -292,11 +292,11 @@ class Game {
     
     createArena() {
         try {
-            const arenaSize = 400; // 4x larger arena
+            const arenaSize = 1600; // 16x larger than original (4x larger than current)
             console.log("Creating arena with size:", arenaSize);
             
-            // Add grid floor
-            const gridHelper = new THREE.GridHelper(arenaSize, arenaSize / 4, 0xff00ff, 0x00ffff);
+            // Add grid floor - increased spacing for better performance with larger arena
+            const gridHelper = new THREE.GridHelper(arenaSize, arenaSize / 16, 0xff00ff, 0x00ffff);
             this.scene.add(gridHelper);
             
             // Add ground plane
@@ -312,59 +312,164 @@ class Game {
             // Create boundary walls - DIRECT APPROACH
             this.createSimpleWalls(arenaSize);
             
-            console.log("Arena created");
+            // Add distance markers for scale reference
+            this.addDistanceMarkers(arenaSize);
+            
+            console.log("Mega-sized arena created");
         } catch (error) {
             console.error("Error creating arena:", error);
         }
     }
     
-    // Simplified wall creation - most direct approach possible
+    // Add distance markers to help players get a sense of scale in the larger arena
+    addDistanceMarkers(arenaSize) {
+        const markerMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffff00,
+            emissive: 0xffff00,
+            emissiveIntensity: 0.3
+        });
+        
+        // Create markers at various distances from center
+        const distances = [100, 200, 400, 600];
+        const directions = [
+            { x: 1, z: 0 },  // East
+            { x: 0, z: 1 },  // North
+            { x: -1, z: 0 }, // West
+            { x: 0, z: -1 }  // South
+        ];
+        
+        distances.forEach(distance => {
+            directions.forEach(dir => {
+                // Create marker post
+                const markerGeometry = new THREE.BoxGeometry(5, 15, 5);
+                const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                
+                // Position marker
+                marker.position.set(
+                    dir.x * distance,
+                    7.5, // Half the height
+                    dir.z * distance
+                );
+                
+                this.scene.add(marker);
+                
+                // Add a point light to make the marker more visible
+                const markerLight = new THREE.PointLight(0xffff00, 0.5, 50);
+                markerLight.position.set(
+                    dir.x * distance,
+                    15,
+                    dir.z * distance
+                );
+                this.scene.add(markerLight);
+            });
+        });
+    }
+    
+    // Enhanced wall creation for the larger arena
     createSimpleWalls(arenaSize) {
         try {
-            console.log("Creating simple walls");
+            console.log("Creating walls for mega arena");
             const halfSize = arenaSize / 2;
             
-            // Create a bright material that will be visible
-            const wallMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+            // Create more impressive walls with details
+            const wallHeight = 30; // Taller walls for the larger arena
             
-            // North Wall (back)
-            const northWall = new THREE.Mesh(
-                new THREE.BoxGeometry(arenaSize, 20, 5),
-                wallMaterial
-            );
-            northWall.position.set(0, 10, -halfSize);
-            this.scene.add(northWall);
-            console.log("North wall added at", northWall.position);
+            // Base wall material with glow effect
+            const wallMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xff00ff,
+                emissive: 0x330033,
+                shininess: 70
+            });
             
-            // South Wall (front)
-            const southWall = new THREE.Mesh(
-                new THREE.BoxGeometry(arenaSize, 20, 5),
-                wallMaterial
-            );
-            southWall.position.set(0, 10, halfSize);
-            this.scene.add(southWall);
-            console.log("South wall added at", southWall.position);
+            // Alternate material for visual variety
+            const altWallMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x00ffff,
+                emissive: 0x003333,
+                shininess: 70
+            });
             
-            // East Wall (right)
-            const eastWall = new THREE.Mesh(
-                new THREE.BoxGeometry(5, 20, arenaSize),
-                wallMaterial
-            );
-            eastWall.position.set(halfSize, 10, 0);
-            this.scene.add(eastWall);
-            console.log("East wall added at", eastWall.position);
+            // Create the main boundary walls
+            const walls = [
+                // North Wall (back)
+                {
+                    geometry: new THREE.BoxGeometry(arenaSize, wallHeight, 10),
+                    position: [0, wallHeight/2, -halfSize],
+                    material: wallMaterial,
+                    name: "North wall"
+                },
+                // South Wall (front)
+                {
+                    geometry: new THREE.BoxGeometry(arenaSize, wallHeight, 10),
+                    position: [0, wallHeight/2, halfSize],
+                    material: wallMaterial,
+                    name: "South wall"
+                },
+                // East Wall (right)
+                {
+                    geometry: new THREE.BoxGeometry(10, wallHeight, arenaSize),
+                    position: [halfSize, wallHeight/2, 0],
+                    material: wallMaterial,
+                    name: "East wall"
+                },
+                // West Wall (left)
+                {
+                    geometry: new THREE.BoxGeometry(10, wallHeight, arenaSize),
+                    position: [-halfSize, wallHeight/2, 0],
+                    material: wallMaterial,
+                    name: "West wall"
+                }
+            ];
             
-            // West Wall (left)
-            const westWall = new THREE.Mesh(
-                new THREE.BoxGeometry(5, 20, arenaSize),
-                wallMaterial
-            );
-            westWall.position.set(-halfSize, 10, 0);
-            this.scene.add(westWall);
-            console.log("West wall added at", westWall.position);
+            // Create walls with details
+            walls.forEach(wallData => {
+                const wall = new THREE.Mesh(wallData.geometry, wallData.material);
+                wall.position.set(...wallData.position);
+                this.scene.add(wall);
+                console.log(`${wallData.name} added at`, wall.position);
+                
+                // Add decorative elements along wall at intervals
+                const segmentCount = 20; // Number of segments along each wall
+                const segmentSize = arenaSize / segmentCount;
+                
+                // Add pillars along the wall
+                for (let i = 0; i < segmentCount; i++) {
+                    // Skip some pillars for variety
+                    if (i % 3 === 0) continue;
+                    
+                    // Calculate position along the wall
+                    let pillarX, pillarZ;
+                    if (wallData.name.includes("North") || wallData.name.includes("South")) {
+                        pillarX = -halfSize + (i * segmentSize) + segmentSize/2;
+                        pillarZ = wallData.position[2];
+                    } else {
+                        pillarX = wallData.position[0];
+                        pillarZ = -halfSize + (i * segmentSize) + segmentSize/2;
+                    }
+                    
+                    // Create pillar
+                    const pillar = new THREE.Mesh(
+                        new THREE.BoxGeometry(10, wallHeight + 10, 10),
+                        i % 2 === 0 ? wallMaterial : altWallMaterial
+                    );
+                    pillar.position.set(pillarX, (wallHeight + 10)/2, pillarZ);
+                    this.scene.add(pillar);
+                    
+                    // Add light on top of some pillars
+                    if (i % 4 === 0) {
+                        const light = new THREE.PointLight(0xff00ff, 1, 100);
+                        light.position.set(pillarX, wallHeight + 15, pillarZ);
+                        this.scene.add(light);
+                    }
+                }
+            });
             
-            // Add corner markers - very visible
-            const cornerMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            // Create impressive corner towers
+            const cornerMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x00ffff,
+                emissive: 0x003333,
+                shininess: 90
+            });
+            
             const cornerPositions = [
                 [-halfSize, 0, -halfSize],
                 [halfSize, 0, -halfSize],
@@ -373,16 +478,31 @@ class Game {
             ];
             
             cornerPositions.forEach((pos, index) => {
-                const cornerMarker = new THREE.Mesh(
-                    new THREE.BoxGeometry(10, 30, 10),
+                // Base tower
+                const cornerTower = new THREE.Mesh(
+                    new THREE.BoxGeometry(30, wallHeight * 2, 30),
                     cornerMaterial
                 );
-                cornerMarker.position.set(pos[0], 15, pos[2]);
-                this.scene.add(cornerMarker);
-                console.log(`Corner marker ${index} added at`, cornerMarker.position);
+                cornerTower.position.set(pos[0], wallHeight, pos[2]);
+                this.scene.add(cornerTower);
+                
+                // Tower top
+                const towerTop = new THREE.Mesh(
+                    new THREE.ConeGeometry(20, 30, 4),
+                    cornerMaterial
+                );
+                towerTop.position.set(pos[0], wallHeight * 2 + 15, pos[2]);
+                this.scene.add(towerTop);
+                
+                // Tower light
+                const towerLight = new THREE.PointLight(0x00ffff, 2, 200);
+                towerLight.position.set(pos[0], wallHeight * 2 + 30, pos[2]);
+                this.scene.add(towerLight);
+                
+                console.log(`Corner tower ${index} added at`, cornerTower.position);
             });
             
-            console.log("All walls created");
+            console.log("Enhanced walls and towers created");
         } catch (error) {
             console.error("Error creating walls:", error);
         }
@@ -478,12 +598,12 @@ class Game {
     teleportToArenaEdge() {
         if (!this.truck) return;
         
-        const arenaSize = 400;
+        const arenaSize = 1600;
         const halfSize = arenaSize / 2;
         
         // Teleport to north edge
-        this.truck.position.set(0, 0.5, -halfSize + 10);
-        this.camera.position.set(0, 5, -halfSize + 20);
+        this.truck.position.set(0, 0.5, -halfSize + 20);
+        this.camera.position.set(0, 5, -halfSize + 40);
         
         console.log("Teleported to arena edge at", this.truck.position);
     }
@@ -698,13 +818,31 @@ class Game {
     checkWallCollisions() {
         if (!this.truck) return false;
         
-        const arenaSize = 400;
+        const arenaSize = 1600; // Updated to match the larger arena
         const halfSize = arenaSize / 2;
-        const wallThickness = 5;
+        const wallThickness = 10; // Thicker walls in larger arena
         
-        // Get truck dimensions
-        const truckWidth = 2;
-        const truckLength = 3;
+        // Get truck dimensions - can be dynamic based on type
+        let truckWidth, truckLength;
+        
+        if (this.monsterTruck) {
+            const machineType = this.monsterTruck.config.machineType;
+            
+            if (machineType === 'neon-crusher') {
+                truckWidth = 3.5; // Wider for Crusher
+                truckLength = 5;
+            } else if (machineType === 'cyber-beast') {
+                truckWidth = 3;
+                truckLength = 5.2;
+            } else {
+                truckWidth = 2.5; // Grid Ripper
+                truckLength = 5;
+            }
+        } else {
+            // Fallback dimensions
+            truckWidth = 2;
+            truckLength = 3;
+        }
         
         // Calculate truck bounds with some buffer for collision detection
         const truckBounds = {
@@ -749,9 +887,95 @@ class Game {
         // Handle collision if detected
         if (collision) {
             this.handleWallCollision(collisionNormal);
+            
+            // Create more visual feedback for wall collisions in the larger arena
+            this.createWallCollisionEffect(this.truck.position, collisionNormal);
         }
         
         return collision;
+    }
+    
+    // Add enhanced wall collision effects for the larger arena
+    createWallCollisionEffect(position, normal) {
+        // Create a burst of particles at the collision point
+        const particleCount = 15;
+        const particles = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create particle
+            const size = Math.random() * 0.3 + 0.1;
+            const particleGeometry = new THREE.SphereGeometry(size, 8, 8);
+            const particleMaterial = new THREE.MeshPhongMaterial({
+                color: 0xff00ff,
+                emissive: 0xff00ff,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // Position at collision point, slightly offset
+            particle.position.set(
+                position.x + (Math.random() - 0.5) * 2,
+                position.y + Math.random() * 2,
+                position.z + (Math.random() - 0.5) * 2
+            );
+            
+            // Set velocity - away from wall
+            const speed = Math.random() * 0.2 + 0.1;
+            const velocityX = normal.x !== 0 ? normal.x * speed : (Math.random() - 0.5) * speed;
+            const velocityZ = normal.z !== 0 ? normal.z * speed : (Math.random() - 0.5) * speed;
+            
+            particle.userData = {
+                velocity: {
+                    x: velocityX,
+                    y: Math.random() * 0.2 + 0.1, // Up
+                    z: velocityZ
+                },
+                life: 1.0
+            };
+            
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Animate and remove particles
+        const animateParticles = () => {
+            let allDead = true;
+            
+            for (let i = 0; i < particles.length; i++) {
+                const particle = particles[i];
+                
+                if (particle.userData.life > 0) {
+                    // Update position
+                    particle.position.x += particle.userData.velocity.x;
+                    particle.position.y += particle.userData.velocity.y;
+                    particle.position.z += particle.userData.velocity.z;
+                    
+                    // Apply gravity
+                    particle.userData.velocity.y -= 0.01;
+                    
+                    // Update life and opacity
+                    particle.userData.life -= 0.05;
+                    particle.material.opacity = particle.userData.life;
+                    
+                    // Shrink particle
+                    particle.scale.multiplyScalar(0.95);
+                    
+                    allDead = false;
+                } else if (particle.parent) {
+                    // Remove dead particles
+                    this.scene.remove(particle);
+                }
+            }
+            
+            if (!allDead) {
+                requestAnimationFrame(animateParticles);
+            }
+        };
+        
+        animateParticles();
     }
 
     // Handle wall collision with damage and bounce effect
@@ -1248,9 +1472,9 @@ class Game {
         const pos = projectile.mesh.position;
         
         // Check collision with walls
-        const arenaSize = 400;
+        const arenaSize = 1600;
         const halfSize = arenaSize / 2;
-        const wallThickness = 5;
+        const wallThickness = 10;
         
         // Wall collision
         if (
@@ -1619,22 +1843,32 @@ class Game {
         
         this.turrets = [];
         
-        // Create a balanced number of turrets around the arena
-        const arenaSize = 400;
+        // Create a balanced number of turrets around the much larger arena
+        const arenaSize = 1600; // Matches the new arena size
+        const innerRadius = 300; // Distance from center for inner turrets
+        const midRadius = 600;   // Distance from center for mid turrets
+        const outerRadius = 750; // Distance from center for outer perimeter turrets
         
-        // Reduced number of turrets for better gameplay balance
+        // Turret positioning for better coverage in the large arena
+        // Strategic placement to create defended zones and safe zones
         const turretPositions = [
-            // Core positions at the corners
-            { x: -150, z: -150 },
-            { x: 150, z: -150 },
-            { x: -150, z: 150 },
-            { x: 150, z: 150 },
+            // Inner defense ring - covers the center area
+            { x: innerRadius, z: 0 },
+            { x: -innerRadius, z: 0 },
+            { x: 0, z: innerRadius },
+            { x: 0, z: -innerRadius },
             
-            // Middle positions on edges
-            { x: 0, z: -120 },
-            { x: 0, z: 120 },
-            { x: -120, z: 0 },
-            { x: 120, z: 0 }
+            // Mid-distance turrets at 45 degree angles
+            { x: midRadius * 0.7, z: midRadius * 0.7 },
+            { x: midRadius * 0.7, z: -midRadius * 0.7 },
+            { x: -midRadius * 0.7, z: midRadius * 0.7 },
+            { x: -midRadius * 0.7, z: -midRadius * 0.7 },
+            
+            // Outer defense perimeter
+            { x: outerRadius, z: outerRadius },
+            { x: -outerRadius, z: outerRadius },
+            { x: outerRadius, z: -outerRadius },
+            { x: -outerRadius, z: -outerRadius }
         ];
         
         turretPositions.forEach(pos => {
@@ -1717,7 +1951,8 @@ class Game {
             const distanceToPlayer = directionToPlayer.length();
             
             // Only track and shoot if player is within range
-            if (distanceToPlayer < 100) {
+            // Increased range to match larger arena, but still limited for gameplay balance
+            if (distanceToPlayer < 300) {
                 // Normalize direction
                 directionToPlayer.normalize();
                 
