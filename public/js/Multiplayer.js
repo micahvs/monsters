@@ -38,7 +38,7 @@ export class MultiplayerManager {
             if (isDev) {
                 socketUrl = 'http://localhost:3000';
             } else {
-                // Replace with your actual Fly.io app URL
+                // Use the deployed Fly.io server URL
                 socketUrl = 'https://monster-truck-game-server.fly.dev';
             }
             
@@ -89,6 +89,12 @@ export class MultiplayerManager {
         // When a connection error occurs
         this.socket.on('connect_error', (error) => {
             console.error('Connection error:', error);
+            console.log('Connection error details:', {
+                errorMessage: error.message,
+                errorType: error.type,
+                errorDescription: error.description,
+                socketUrl: socketUrl
+            });
             this.showNotification('Connection error, retrying...', 'error');
         });
         

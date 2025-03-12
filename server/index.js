@@ -8,14 +8,28 @@ import cors from 'cors';
 const app = express();
 const httpServer = createServer(app);
 
-// Enable CORS
-app.use(cors());
+// Enable CORS with specific origins
+app.use(cors({
+  origin: [
+    "https://monsters-kappa.vercel.app", // Your Vercel app URL
+    "https://monsters-micahvs.vercel.app", // Alternative Vercel URL if any
+    "http://localhost:3000",
+    "http://localhost:5000"
+  ],
+  credentials: true
+}));
 
 // Create Socket.IO server
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // Allow all origins in development
-    methods: ["GET", "POST"]
+    origin: [
+      "https://monsters-kappa.vercel.app", // Your Vercel app URL
+      "https://monsters-micahvs.vercel.app", // Alternative Vercel URL if any
+      "http://localhost:3000",
+      "http://localhost:5000"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -196,6 +210,16 @@ setInterval(() => {
 // Basic route for healthcheck
 app.get('/', (req, res) => {
   res.send('Monster Truck Game Server is running');
+});
+
+// Healthcheck endpoint for monitoring
+app.get('/healthcheck', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: Date.now(),
+    playersCount: Object.keys(gameState.players).length
+  });
 });
 
 // Start server
