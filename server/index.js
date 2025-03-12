@@ -13,6 +13,7 @@ app.use(cors({
   origin: [
     "https://monsters-kappa.vercel.app", // Your Vercel app URL
     "https://monsters-micahvs.vercel.app", // Alternative Vercel URL if any
+    "https://monsters-drab.vercel.app", // Added new Vercel URL
     "http://localhost:3000",
     "http://localhost:5000"
   ],
@@ -25,6 +26,7 @@ const io = new Server(httpServer, {
     origin: [
       "https://monsters-kappa.vercel.app", // Your Vercel app URL
       "https://monsters-micahvs.vercel.app", // Alternative Vercel URL if any
+      "https://monsters-drab.vercel.app", // Added new Vercel URL
       "http://localhost:3000",
       "http://localhost:5000"
     ],

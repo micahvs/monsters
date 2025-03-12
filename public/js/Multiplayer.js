@@ -92,8 +92,7 @@ export class MultiplayerManager {
             console.log('Connection error details:', {
                 errorMessage: error.message,
                 errorType: error.type,
-                errorDescription: error.description,
-                socketUrl: socketUrl
+                errorDescription: error.description
             });
             this.showNotification('Connection error, retrying...', 'error');
         });
