@@ -84,7 +84,12 @@ export class MonsterTruck {
             shininess: 30
         });
         
-        // Add different geometries based on machine type
+        // First create the body
+        this.body = new THREE.Mesh(geometry, material);
+        this.body.position.copy(position);
+        
+        // THEN add different geometries based on machine type
+        // (after this.body is defined)
         switch(this.config.machineType) {
             case 'neon-crusher':
                 // Add extra armor plates and bulkier design
@@ -98,9 +103,6 @@ export class MonsterTruck {
                 // Basic grid-ripper design
                 this.addExtraGeometry('ripper');
         }
-        
-        this.body = new THREE.Mesh(geometry, material);
-        this.body.position.copy(position);
         
         // Add wheels with suspension
         this.wheels = [];
