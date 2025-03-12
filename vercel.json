@@ -2,8 +2,7 @@
   "version": 2,
   "framework": null,
   "rewrites": [
-    { "source": "/game", "destination": "/game.html" },
-    { "source": "/api/socket", "destination": "/api/socket" }
+    { "source": "/game", "destination": "/game.html" }
   ],
   "headers": [
     {
@@ -24,11 +23,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "api/**": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  }
+  ]
 }

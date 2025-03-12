@@ -30,15 +30,21 @@ export class MultiplayerManager {
             // Dynamically import socket.io-client
             const io = await import('https://cdn.socket.io/4.7.2/socket.io.esm.min.js');
             
-            // Determine the correct WebSocket URL (handle both dev and prod)
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.host;
-            const socketUrl = `${window.location.protocol}//${host}`;
+            // Connect to Fly.io hosted WebSocket server
+            // In development, you can use localhost
+            const isDev = window.location.hostname === 'localhost';
+            
+            let socketUrl;
+            if (isDev) {
+                socketUrl = 'http://localhost:3000';
+            } else {
+                // Replace with your actual Fly.io app URL
+                socketUrl = 'https://monster-truck-game-server.fly.dev';
+            }
             
             // Initialize socket connection
             console.log(`Connecting to socket.io at ${socketUrl}`);
             this.socket = io.connect(socketUrl, {
-                path: '/api/socket',
                 reconnection: true,
                 reconnectionDelay: 1000,
                 reconnectionAttempts: 5
