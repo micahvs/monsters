@@ -655,15 +655,23 @@ class Game {
     updateCamera() {
         if (!this.camera || !this.truck) return;
         
-        // Basic follow camera
-        const cameraDistance = 5;
-        const cameraHeight = 3;
+        // Zoomed out follow camera for better visibility
+        const cameraDistance = 8; // Increased from 5 for wider view
+        const cameraHeight = 5;   // Increased from 3 for higher perspective
         
         this.camera.position.x = this.truck.position.x - Math.sin(this.truck.rotation.y) * cameraDistance;
         this.camera.position.z = this.truck.position.z - Math.cos(this.truck.rotation.y) * cameraDistance;
         this.camera.position.y = cameraHeight;
         
-        this.camera.lookAt(this.truck.position);
+        // Look at a point slightly ahead of the truck instead of directly at it
+        // This gives better visibility of what's in front of the player
+        const lookAtPoint = new THREE.Vector3(
+            this.truck.position.x + Math.sin(this.truck.rotation.y) * 2,
+            this.truck.position.y,
+            this.truck.position.z + Math.cos(this.truck.rotation.y) * 2
+        );
+        
+        this.camera.lookAt(lookAtPoint);
     }
     
     animate() {
@@ -1723,14 +1731,15 @@ class Game {
                 // Handle angle wrapping
                 let shortestRotation = ((rotationDiff + Math.PI) % (Math.PI * 2)) - Math.PI;
                 
-                // Apply rotation with smoothing
-                turret.body.rotation.y += shortestRotation * 0.05;
+                // Apply rotation with less aggressive smoothing
+                // Reduced rotation speed to give player more time to react
+                turret.body.rotation.y += shortestRotation * 0.02; // Reduced from 0.05
                 
-                // Shoot at player if cooldown is ready and roughly facing player
-                // Balanced angle check and shooting rate
+                // Shoot at player if cooldown is ready and more precisely facing player
+                // Stricter angle check to compensate for slower turning
                 if (
                     turret.shootCooldown <= 0 && 
-                    Math.abs(shortestRotation) < 0.3 && // More balanced angle requirement
+                    Math.abs(shortestRotation) < 0.2 && // More precise angle requirement (reduced from 0.3)
                     this.canTurretSeePlayer(turret)
                 ) {
                     this.turretShoot(turret);
