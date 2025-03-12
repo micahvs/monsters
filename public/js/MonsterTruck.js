@@ -12,13 +12,19 @@ export class MonsterTruck {
         this.velocity = new THREE.Vector3();
         this.speed = 0;
         this.rotation = 0;
-        this.health = 100;
+        
+        // Get machine-specific values
+        const machineType = config.machineType || 'neon-crusher';
+        this.maxHealth = this.getMaxHealthForMachine(machineType);
+        this.armorRating = this.getArmorRatingForMachine(machineType);
+        this.health = this.maxHealth;
         this.ammo = 30;
+        this.damageTimeout = 0; // Cooldown for damage visual effects
         
         // Physics constants
-        this.maxSpeed = this.getMaxSpeedForMachine(config.machineType);
-        this.acceleration = this.getAccelerationForMachine(config.machineType);
-        this.turnSpeed = this.getTurnSpeedForMachine(config.machineType);
+        this.maxSpeed = this.getMaxSpeedForMachine(machineType);
+        this.acceleration = this.getAccelerationForMachine(machineType);
+        this.turnSpeed = this.getTurnSpeedForMachine(machineType);
         
         this.createTruck(position);
     }
@@ -48,6 +54,24 @@ export class MonsterTruck {
             'cyber-beast': 0.035
         };
         return turnSpeeds[machineType] || 0.03;
+    }
+    
+    getMaxHealthForMachine(machineType) {
+        const healthValues = {
+            'grid-ripper': 80,    // Fast but fragile
+            'neon-crusher': 100,  // Balanced
+            'cyber-beast': 120    // Slow but tough
+        };
+        return healthValues[machineType] || 100;
+    }
+    
+    getArmorRatingForMachine(machineType) {
+        const armorValues = {
+            'grid-ripper': 0.8,    // 20% less damage resistance
+            'neon-crusher': 1.0,   // Base damage resistance
+            'cyber-beast': 1.2     // 20% more damage resistance
+        };
+        return armorValues[machineType] || 1.0;
     }
     
     createTruck(position) {
@@ -220,5 +244,115 @@ export class MonsterTruck {
         // Add to scene and handle projectile logic
         this.scene.add(projectile);
         this.ammo--;
+    }
+    
+    takeDamage(amount) {
+        // If we're already showing damage effect, skip
+        if (this.damageTimeout > 0) return;
+        
+        // Apply armor rating to reduce damage (higher armor = less damage)
+        const actualDamage = Math.floor(amount / this.armorRating);
+        this.health = Math.max(0, this.health - actualDamage);
+        
+        // Visual effect for damage - flash the vehicle
+        const originalMaterials = [];
+        const flashMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff0000,
+            emissive: 0xff0000,
+            emissiveIntensity: 0.5,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        // Store original materials and apply flash
+        this.body.traverse(child => {
+            if (child.isMesh) {
+                originalMaterials.push({
+                    mesh: child,
+                    material: child.material
+                });
+                child.material = flashMaterial;
+            }
+        });
+        
+        // Reset cooldown
+        this.damageTimeout = 15; // 15 frames
+        
+        // Reset materials after flash
+        setTimeout(() => {
+            originalMaterials.forEach(item => {
+                item.mesh.material = item.material;
+            });
+            this.damageTimeout = 0;
+        }, 200);
+        
+        // Create spark particles from impact
+        this.createDamageParticles(actualDamage);
+        
+        return actualDamage;
+    }
+    
+    createDamageParticles(amount) {
+        // Number of particles based on damage amount
+        const particleCount = Math.min(20, Math.max(5, amount / 5));
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create small spark geometry
+            const sparkGeometry = new THREE.SphereGeometry(0.1, 4, 4);
+            const sparkMaterial = new THREE.MeshBasicMaterial({
+                color: 0xff3300,
+                emissive: 0xff3300,
+                transparent: true,
+                opacity: 1
+            });
+            
+            const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
+            
+            // Position at random point on truck body
+            spark.position.copy(this.body.position);
+            spark.position.x += (Math.random() - 0.5) * 2;
+            spark.position.y += (Math.random() * 2);
+            spark.position.z += (Math.random() - 0.5) * 3;
+            
+            // Add to scene
+            this.scene.add(spark);
+            
+            // Animate and remove spark
+            const velocityX = (Math.random() - 0.5) * 0.15;
+            const velocityY = Math.random() * 0.1 + 0.05;
+            const velocityZ = (Math.random() - 0.5) * 0.15;
+            
+            let life = 1.0;
+            
+            const animateSpark = () => {
+                if (life <= 0) {
+                    this.scene.remove(spark);
+                    return;
+                }
+                
+                // Move spark
+                spark.position.x += velocityX;
+                spark.position.y += velocityY;
+                spark.position.z += velocityZ;
+                
+                // Apply gravity
+                spark.position.y -= 0.01;
+                
+                // Fade out
+                life -= 0.05;
+                spark.material.opacity = life;
+                
+                requestAnimationFrame(animateSpark);
+            };
+            
+            animateSpark();
+        }
+    }
+    
+    update() {
+        // Update damage cooldown
+        if (this.damageTimeout > 0) {
+            this.damageTimeout--;
+        }
     }
 }

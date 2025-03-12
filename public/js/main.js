@@ -390,23 +390,45 @@ class Game {
     
     createSimpleTruck() {
         try {
-            // Create a simple truck with a box
-            const geometry = new THREE.BoxGeometry(2, 1, 3);
-            const material = new THREE.MeshPhongMaterial({
-                color: 0xff00ff,
-                emissive: 0x330033
+            // Get saved settings from localStorage
+            const truckType = localStorage.getItem('monsterTruckType') || 'neonCrusher';
+            let machineTypeId;
+            
+            switch(truckType) {
+                case 'gridRipper':
+                    machineTypeId = 'grid-ripper';
+                    break;
+                case 'laserWheel':
+                    machineTypeId = 'cyber-beast';
+                    break;
+                default:
+                    machineTypeId = 'neon-crusher';
+            }
+            
+            const color = localStorage.getItem('monsterTruckColor') || '#ff00ff';
+            
+            // Create the monster truck with selected settings
+            this.monsterTruck = new MonsterTruck(this.scene, new THREE.Vector3(0, 0.5, 0), {
+                machineType: machineTypeId,
+                color: color
             });
             
-            this.truck = new THREE.Mesh(geometry, material);
-            this.truck.position.set(0, 0.5, 0);
-            
-            // Add physics properties
+            // For compatibility with existing code
+            this.truck = this.monsterTruck.body;
             this.truck.velocity = 0;
             this.truck.acceleration = 0;
             this.truck.turning = 0;
             
-            this.scene.add(this.truck);
+            // Initialize health based on truck settings
+            this.health = this.monsterTruck.health;
+            this.maxHealth = this.monsterTruck.maxHealth;
+            
             console.log("Truck created at", this.truck.position);
+            console.log("Truck specs:", {
+                type: machineTypeId,
+                health: this.health,
+                armor: this.monsterTruck.armorRating
+            });
         } catch (error) {
             console.error("Error creating truck:", error);
         }
@@ -491,6 +513,14 @@ class Game {
             
             // Update truck position
             this.updateTruck();
+            
+            // Update monster truck (handles damage visual effects, etc.)
+            if (this.monsterTruck) {
+                this.monsterTruck.update();
+                
+                // Sync health from MonsterTruck to Game
+                this.health = this.monsterTruck.health;
+            }
             
             // Check for wall collisions
             if (typeof this.checkWallCollisions === 'function') {
@@ -744,30 +774,75 @@ class Game {
 
     // Take damage method
     takeDamage(amount) {
-        // Update health
-        this.health = Math.max(0, this.health - amount);
-        
-        console.log(`Taking ${amount} damage. Health now: ${this.health}`);
+        // If we have a MonsterTruck instance, use its damage method
+        if (this.monsterTruck) {
+            const actualDamage = this.monsterTruck.takeDamage(amount);
+            this.health = this.monsterTruck.health; // Sync health with monster truck
+            
+            // Add screen flash effect for significant damage
+            if (actualDamage > 10) {
+                this.addDamageScreenEffect(actualDamage);
+            }
+            
+            console.log(`Taking ${actualDamage} damage (original: ${amount}). Health now: ${this.health}`);
+        } else {
+            // Legacy fallback behavior
+            this.health = Math.max(0, this.health - amount);
+            console.log(`Taking ${amount} damage. Health now: ${this.health}`);
+        }
         
         // Update HUD
         const healthDisplay = document.getElementById('health');
         if (healthDisplay) {
-            // Color coding based on health
+            // Color coding based on health percentage
+            const healthPercent = Math.floor((this.health / this.maxHealth) * 100);
             let healthColor = '#00ff00'; // Green
             
-            if (this.health < 30) {
+            if (healthPercent < 30) {
                 healthColor = '#ff0000'; // Red
-            } else if (this.health < 70) {
+            } else if (healthPercent < 70) {
                 healthColor = '#ffff00'; // Yellow
             }
             
-            healthDisplay.innerHTML = `HEALTH: <span style="color:${healthColor}">${this.health}%</span>`;
+            healthDisplay.innerHTML = `HEALTH: <span style="color:${healthColor}">${healthPercent}%</span>`;
         }
         
         // Check for game over
         if (this.health <= 0) {
             this.gameOver();
         }
+    }
+    
+    // Add screen flash effect for damage
+    addDamageScreenEffect(amount) {
+        // Create a red flash overlay that fades out
+        const overlay = document.createElement('div');
+        const opacity = Math.min(0.8, amount / 50); // Scale opacity with damage
+        
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 0, 0, ${opacity});
+            pointer-events: none;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        // Fade out and remove
+        setTimeout(() => {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+                overlay.remove();
+            }, 500);
+        }, 100);
+        
+        // Add camera shake proportional to damage
+        this.shakeCamera(amount / 5);
     }
 
     // Show collision effect
@@ -1123,11 +1198,16 @@ class Game {
         
         // Check collision with truck (only if not player's projectile)
         if (projectile.source !== 'player' && this.truck) {
+            // Use larger bounds for better hit detection
+            const truckDimensions = this.monsterTruck ? 
+                {width: 3, length: 5} : 
+                {width: 2, length: 3};
+                
             const truckBounds = {
-                minX: this.truck.position.x - 1,
-                maxX: this.truck.position.x + 1,
-                minZ: this.truck.position.z - 1.5,
-                maxZ: this.truck.position.z + 1.5
+                minX: this.truck.position.x - (truckDimensions.width / 2),
+                maxX: this.truck.position.x + (truckDimensions.width / 2),
+                minZ: this.truck.position.z - (truckDimensions.length / 2),
+                maxZ: this.truck.position.z + (truckDimensions.length / 2)
             };
             
             if (
@@ -1135,10 +1215,22 @@ class Game {
                 pos.x <= truckBounds.maxX &&
                 pos.z >= truckBounds.minZ && 
                 pos.z <= truckBounds.maxZ &&
-                pos.y <= this.truck.position.y + 1
+                pos.y <= this.truck.position.y + 1.5
             ) {
-                // Player hit by projectile
-                this.takeDamage(projectile.damage);
+                // Calculate impact point for visuals
+                const impactPoint = new THREE.Vector3(pos.x, pos.y, pos.z);
+                
+                // Player hit by projectile - damage varies based on projectile type
+                // Turret projectiles do more damage
+                const baseDamage = projectile.source === 'turret' ? 
+                    projectile.damage * 1.5 : projectile.damage;
+                
+                // Take damage
+                this.takeDamage(baseDamage);
+                
+                // Create impact effect at hit position
+                this.createProjectileImpactOnVehicle(impactPoint);
+                
                 return 'player';
             }
         }
@@ -1247,6 +1339,148 @@ class Game {
         };
         
         animateImpact();
+    }
+    
+    // Create impact effect specifically for vehicle hits
+    createProjectileImpactOnVehicle(position) {
+        if (!this.scene) return;
+        
+        // Create a more intense impact for vehicle hits
+        
+        // 1. Add intense flash
+        const impactLight = new THREE.PointLight(0xff3300, 2, 8);
+        impactLight.position.copy(position);
+        this.scene.add(impactLight);
+        
+        // 2. Add sparks, smoke and fire effect
+        const particleCount = 20;
+        const particles = [];
+        
+        // Create smoke and fire particles
+        for (let i = 0; i < particleCount; i++) {
+            // Alternating colors for fire and smoke effect
+            const isFire = i % 3 === 0;
+            const isSmoke = i % 3 === 1;
+            const isSpark = i % 3 === 2;
+            
+            const size = isSpark ? 0.08 : (Math.random() * 0.2 + 0.1);
+            const particleGeometry = new THREE.SphereGeometry(size, 6, 6);
+            
+            const particleColor = isFire ? 0xff5500 : (isSmoke ? 0x333333 : 0xff0000);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: particleColor,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.position.copy(position);
+            
+            // Random velocities
+            const speed = isSpark ? 0.3 : 0.15;
+            particle.velocity = {
+                x: (Math.random() - 0.5) * speed,
+                y: Math.random() * 0.2 + (isSpark ? 0.15 : 0.05),
+                z: (Math.random() - 0.5) * speed
+            };
+            
+            // Add unique properties
+            particle.isFire = isFire;
+            particle.isSmoke = isSmoke;
+            particle.isSpark = isSpark;
+            particle.fadeRate = isSpark ? 0.1 : (isFire ? 0.04 : 0.02);
+            particle.gravity = isSpark ? 0.02 : (isFire ? 0.005 : 0.001);
+            
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // 3. Add metal debris
+        const debrisCount = 5;
+        for (let i = 0; i < debrisCount; i++) {
+            const debrisGeometry = new THREE.BoxGeometry(0.15, 0.15, 0.15);
+            const debrisMaterial = new THREE.MeshPhongMaterial({
+                color: 0x777777,
+                shininess: 80
+            });
+            
+            const debris = new THREE.Mesh(debrisGeometry, debrisMaterial);
+            debris.position.copy(position);
+            
+            // Higher velocity for debris
+            debris.velocity = {
+                x: (Math.random() - 0.5) * 0.4,
+                y: Math.random() * 0.3 + 0.2,
+                z: (Math.random() - 0.5) * 0.4
+            };
+            
+            // Add rotation
+            debris.rotationSpeed = {
+                x: (Math.random() - 0.5) * 0.2,
+                y: (Math.random() - 0.5) * 0.2,
+                z: (Math.random() - 0.5) * 0.2
+            };
+            
+            this.scene.add(debris);
+            particles.push(debris);
+        }
+        
+        // 4. Animate everything
+        let impactLife = 30;
+        const animateVehicleImpact = () => {
+            impactLife--;
+            
+            if (impactLife > 0) {
+                // Update light
+                impactLight.intensity = (impactLife / 30) * 2;
+                
+                // Update particles
+                for (const particle of particles) {
+                    // Update position
+                    particle.position.x += particle.velocity.x;
+                    particle.position.y += particle.velocity.y;
+                    particle.position.z += particle.velocity.z;
+                    
+                    // Apply gravity
+                    particle.velocity.y -= particle.gravity || 0.01;
+                    
+                    // Update rotation for debris
+                    if (particle.rotationSpeed) {
+                        particle.rotation.x += particle.rotationSpeed.x;
+                        particle.rotation.y += particle.rotationSpeed.y;
+                        particle.rotation.z += particle.rotationSpeed.z;
+                    }
+                    
+                    // Handle fading
+                    if (particle.material && particle.material.opacity) {
+                        particle.material.opacity -= particle.fadeRate || 0.03;
+                    }
+                    
+                    // Fire particles should change color as they cool down
+                    if (particle.isFire && impactLife < 20) {
+                        const r = 1;
+                        const g = Math.max(0, (impactLife / 20) * 0.8);
+                        const b = 0;
+                        particle.material.color.setRGB(r, g, b);
+                    }
+                    
+                    // Smoke particles should expand
+                    if (particle.isSmoke) {
+                        particle.scale.multiplyScalar(1.03);
+                    }
+                }
+                
+                requestAnimationFrame(animateVehicleImpact);
+            } else {
+                // Remove everything
+                this.scene.remove(impactLight);
+                for (const particle of particles) {
+                    this.scene.remove(particle);
+                }
+            }
+        };
+        
+        animateVehicleImpact();
     }
 
     // Update ammo display
