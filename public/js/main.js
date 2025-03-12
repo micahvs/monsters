@@ -206,6 +206,28 @@ class Game {
         
         // Start initialization
         this.init();
+
+        // Update the socket connection with error handling
+        try {
+            this.socket = io('https://monster-truck-game-server.fly.dev', {
+                withCredentials: true,
+                transports: ['websocket'],
+                timeout: 10000,
+                reconnection: true,
+                reconnectionAttempts: 5
+            });
+
+            this.socket.on('connect_error', (error) => {
+                console.log('Connection Error:', error);
+                // Handle connection error gracefully
+            });
+
+            this.socket.on('connect', () => {
+                console.log('Connected to game server');
+            });
+        } catch (error) {
+            console.log('Socket initialization error:', error);
+        }
     }
     
     init() {
