@@ -246,13 +246,13 @@ class Game {
             // Add grid and ground
             this.createArena();
             
-            // Add stadium around the arena
-            this.createStadium();
-            
             // Create a simple truck
             this.createSimpleTruck();
             
-            // Create turrets
+            // Add stadium around the arena (after truck but before turrets)
+            this.createStadium();
+            
+            // Create turrets (after stadium is created)
             this.createTurrets();
             
             // Initialize HUD
@@ -1850,7 +1850,11 @@ class Game {
         
         console.log("Creating turrets");
         
+        // Reset turrets array
         this.turrets = [];
+        
+        // Debug - log scene children count
+        console.log(`Scene has ${this.scene.children.length} objects before creating turrets`);
         
         // Create a balanced number of turrets around the much larger arena
         const arenaSize = 1600; // Matches the new arena size
@@ -1883,6 +1887,9 @@ class Game {
         turretPositions.forEach(pos => {
             this.createTurret(pos.x, pos.z);
         });
+        
+        // Debug - log total turrets created
+        console.log(`Created ${this.turrets.length} turrets`);
     }
 
     // Create a single turret
@@ -1896,6 +1903,7 @@ class Game {
         
         const base = new THREE.Mesh(baseGeometry, baseMaterial);
         base.position.set(x, 0.5, z);
+        base.name = "turret_base"; // Explicitly name it to avoid confusion with walls
         this.scene.add(base);
         
         // Create turret body
@@ -1943,7 +1951,13 @@ class Game {
 
     // Update turrets
     updateTurrets() {
-        if (!this.turrets || !this.truck) return;
+        if (!this.turrets || !this.truck) {
+            console.log("No turrets or truck found in updateTurrets");
+            return;
+        }
+        
+        // Debug - log how many turrets we're updating
+        console.log(`Updating ${this.turrets.length} turrets`);
         
         for (const turret of this.turrets) {
             // Skip destroyed turrets
