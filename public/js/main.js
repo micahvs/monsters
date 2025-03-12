@@ -2378,21 +2378,11 @@ class Game {
     }
 
     createStadium() {
-        // Remove existing walls if they exist (safer approach)
-        // First collect all the wall objects
-        const wallsToRemove = [];
-        this.scene.children.forEach(child => {
-            if (child.name && child.name.toLowerCase().includes('wall')) {
-                wallsToRemove.push(child);
-            }
-        });
-        
-        // Then remove them
-        wallsToRemove.forEach(wall => {
-            this.scene.remove(wall);
-        });
+        // Remove existing obstacles and walls
+        this.scene.children = this.scene.children.filter(child => 
+            !child.isWall && !child.isObstacle
+        );
 
-        // Create the main stadium structure - a large cylinder with inward-facing bleachers
         const bleacherGeometry = new THREE.CylinderGeometry(100, 120, 30, 96, 5, true);
         const bleacherMaterial = new THREE.MeshPhongMaterial({
             color: 0x444444,
