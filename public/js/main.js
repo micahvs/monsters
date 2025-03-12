@@ -176,6 +176,7 @@ class Game {
         this.camera = null;
         this.renderer = null;
         this.truck = null;
+        this.multiplayer = null; // Add multiplayer manager
         this.isInitialized = false;
         this.debugMode = true; // Enable debug mode
         this.isGameOver = false;
@@ -266,6 +267,9 @@ class Game {
             
             // Remove loading screen
             this.removeLoadingScreen();
+            
+            // Initialize multiplayer
+            this.initMultiplayer();
             
             console.log("Game initialized, starting animation loop");
             
@@ -676,6 +680,11 @@ class Game {
             
             // Update HUD
             this.updateHUD();
+            
+            // Update multiplayer
+            if (this.multiplayer) {
+                this.multiplayer.update();
+            }
             
             // Debug info - update position display
             if (this.truck && window.updateDebugInfo) {
@@ -1348,6 +1357,11 @@ class Game {
             source: 'player'
         });
         
+        // Notify multiplayer system about the projectile
+        if (this.multiplayer && this.multiplayer.isConnected) {
+            this.multiplayer.sendProjectileCreated(this.projectiles[this.projectiles.length - 1]);
+        }
+        
         // Add muzzle flash effect
         this.createMuzzleFlash(projectile.position.clone(), truckDirection);
         
@@ -1598,6 +1612,13 @@ class Game {
                         return 'turret';
                     }
                 }
+            }
+        }
+        
+        // Check for collisions with multiplayer players
+        if (this.multiplayer && this.multiplayer.isConnected) {
+            if (projectile.source === 'player' && this.multiplayer.checkProjectileHits(projectile)) {
+                return 'remote-player';
             }
         }
         
@@ -2469,6 +2490,25 @@ class Game {
     initStadium() {
         // Replace standard walls with stadium
         this.createStadium();
+    }
+    
+    // Initialize multiplayer functionality
+    initMultiplayer() {
+        // Import and initialize the multiplayer manager
+        import('./Multiplayer.js').then(module => {
+            this.multiplayer = new module.MultiplayerManager(this);
+            
+            // Connect to multiplayer server
+            this.multiplayer.connect().then(success => {
+                if (success) {
+                    console.log("Connected to multiplayer server");
+                } else {
+                    console.warn("Failed to connect to multiplayer server");
+                }
+            });
+        }).catch(error => {
+            console.error("Error loading multiplayer module:", error);
+        });
     }
 }
 
