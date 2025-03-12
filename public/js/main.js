@@ -246,6 +246,9 @@ class Game {
             // Add grid and ground
             this.createArena();
             
+            // Add stadium around the arena
+            this.createStadium();
+            
             // Create a simple truck
             this.createSimpleTruck();
             
@@ -424,6 +427,7 @@ class Game {
             walls.forEach(wallData => {
                 const wall = new THREE.Mesh(wallData.geometry, wallData.material);
                 wall.position.set(...wallData.position);
+                wall.name = wallData.name; // Set the name property so we can filter out walls later
                 this.scene.add(wall);
                 console.log(`${wallData.name} added at`, wall.position);
                 
@@ -660,6 +664,11 @@ class Game {
             // Update visual effects
             if (typeof this.updateSparks === 'function' && this.sparks && this.sparks.length > 0) {
                 this.updateSparks();
+            }
+            
+            // Update stadium spectators
+            if (typeof this.updateSpectators === 'function' && this.spectators) {
+                this.updateSpectators();
             }
             
             // Update camera to follow truck
@@ -2334,10 +2343,40 @@ class Game {
             }
         }
     }
+    
+    // Animate stadium spectators
+    updateSpectators() {
+        if (!this.spectators || this.spectators.length === 0) return;
+        
+        const time = performance.now() * 0.001;
+        
+        this.spectators.forEach(spectator => {
+            if (!spectator.userData) return;
+            
+            const offset = spectator.userData.animationOffset || 0;
+            const initialY = spectator.userData.initialY || spectator.position.y;
+            
+            // Animate spectators bobbing up and down
+            spectator.position.y = initialY + Math.sin(time * 2 + offset) * 0.3;
+            spectator.rotation.x = Math.sin(time * 2 + offset) * 0.1;
+            spectator.rotation.z = Math.cos(time * 3 + offset) * 0.1;
+        });
+    }
 
     createStadium() {
-        // Remove existing walls if they exist
-        this.scene.children = this.scene.children.filter(child => !child.isWall);
+        // Remove existing walls if they exist (safer approach)
+        // First collect all the wall objects
+        const wallsToRemove = [];
+        this.scene.children.forEach(child => {
+            if (child.name && child.name.toLowerCase().includes('wall')) {
+                wallsToRemove.push(child);
+            }
+        });
+        
+        // Then remove them
+        wallsToRemove.forEach(wall => {
+            this.scene.remove(wall);
+        });
 
         // Create the main stadium structure - a large cylinder with inward-facing bleachers
         const bleacherGeometry = new THREE.CylinderGeometry(100, 120, 30, 96, 5, true);
@@ -2420,23 +2459,12 @@ class Game {
         });
     }
 
-    // Add to your existing update method
-    update(deltaTime) {
-        // ... existing update code ...
-        
-        this.updateSpectators(deltaTime);
-        
-        // ... rest of update code ...
-    }
+    // NOTE: This was duplicate code, removed as it's implemented elsewhere
 
-    // In your constructor, replace createWalls() with createStadium()
-    constructor() {
-        // ... existing constructor code ...
-        
-        // Replace createWalls() with:
+    // Note: This is just a method, not a second constructor
+    initStadium() {
+        // Replace standard walls with stadium
         this.createStadium();
-        
-        // ... rest of constructor code ...
     }
 }
 
