@@ -175,6 +175,12 @@
         <i class="fas fa-volume-up"></i>
     </div>
     
+    <!-- Play Music Button (appears when autoplay is blocked) -->
+    <div id="playMusicButton" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.8); color: #ff00ff; border: 2px solid #ff00ff; border-radius: 10px; padding: 20px; font-family: 'Orbitron', sans-serif; cursor: pointer; z-index: 2000; box-shadow: 0 0 20px rgba(255, 0, 255, 0.8); text-align: center;">
+        <i class="fas fa-play" style="font-size: 32px; margin-bottom: 10px;"></i>
+        <div>CLICK TO PLAY MUSIC</div>
+    </div>
+    
     <!-- Debug Elements -->
     <div id="debugControls">
         Press 'D' to teleport to arena edge
@@ -202,18 +208,129 @@
             const audioIcon = audioToggle.querySelector('i');
             let currentAudioPart = 0;
             const totalAudioParts = 19; // We have parts 0-18
+            let audioInitialized = false;
+            
+            // Debug function to show audio status
+            function logAudioStatus(message) {
+                console.log(`Audio Status: ${message} | Current part: ${currentAudioPart} | Paused: ${audioElement.paused} | Muted: ${audioElement.muted} | Error: ${audioElement.error ? 'Yes' : 'No'}`);
+            }
             
             // Function to play the next audio part
             function playNextAudioPart() {
                 currentAudioPart = (currentAudioPart + 1) % totalAudioParts;
-                audioElement.src = `pattern_bar_live_part${currentAudioPart.toString().padStart(2, '0')}.mp3`;
-                audioElement.play().catch(error => {
-                    console.log('Error playing next audio part:', error);
+                const nextFile = `pattern_bar_live_part${currentAudioPart.toString().padStart(2, '0')}.mp3`;
+                logAudioStatus(`Loading next part: ${nextFile}`);
+                
+                audioElement.src = nextFile;
+                audioElement.load();
+                
+                const playPromise = audioElement.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        logAudioStatus('Successfully playing next part');
+                    }).catch(error => {
+                        logAudioStatus(`Error playing next part: ${error.message}`);
+                        // If autoplay is prevented, try again on user interaction
+                        if (!audioInitialized) {
+                            setupAutoplayFallback();
+                        }
+                    });
+                }
+            }
+            
+            // Set up fallback for autoplay restrictions
+            function setupAutoplayFallback() {
+                logAudioStatus('Setting up autoplay fallback');
+                
+                // Show the play music button
+                const playMusicButton = document.getElementById('playMusicButton');
+                if (playMusicButton) {
+                    playMusicButton.style.display = 'block';
+                    
+                    // Add click event to the play button
+                    playMusicButton.addEventListener('click', function() {
+                        logAudioStatus('Play button clicked');
+                        
+                        const playPromise = audioElement.play();
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                logAudioStatus('Successfully played audio after button click');
+                                audioInitialized = true;
+                                playMusicButton.style.display = 'none';
+                            }).catch(error => {
+                                logAudioStatus(`Still cannot play audio after button click: ${error.message}`);
+                                showMessage('Unable to play audio. Please check browser settings.');
+                            });
+                        }
+                    });
+                }
+                
+                // Try to play on any user interaction
+                const userInteractionEvents = ['click', 'touchstart', 'keydown'];
+                
+                function playOnUserInteraction() {
+                    logAudioStatus('User interaction detected, trying to play audio');
+                    
+                    const playPromise = audioElement.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            logAudioStatus('Successfully played audio after user interaction');
+                            audioInitialized = true;
+                            
+                            // Hide the play button
+                            if (playMusicButton) {
+                                playMusicButton.style.display = 'none';
+                            }
+                            
+                            // Remove event listeners once audio starts playing
+                            userInteractionEvents.forEach(event => {
+                                document.removeEventListener(event, playOnUserInteraction);
+                            });
+                        }).catch(error => {
+                            logAudioStatus(`Still cannot play audio after user interaction: ${error.message}`);
+                        });
+                    }
+                }
+                
+                // Add event listeners for user interaction
+                userInteractionEvents.forEach(event => {
+                    document.addEventListener(event, playOnUserInteraction, { once: false });
                 });
             }
             
+            // Show a message to the user
+            function showMessage(message) {
+                const messageDiv = document.createElement('div');
+                messageDiv.style.position = 'fixed';
+                messageDiv.style.top = '20px';
+                messageDiv.style.left = '50%';
+                messageDiv.style.transform = 'translateX(-50%)';
+                messageDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                messageDiv.style.color = '#ff00ff';
+                messageDiv.style.padding = '10px 20px';
+                messageDiv.style.borderRadius = '5px';
+                messageDiv.style.fontFamily = "'Orbitron', sans-serif";
+                messageDiv.style.zIndex = '1000';
+                messageDiv.textContent = message;
+                
+                document.body.appendChild(messageDiv);
+                
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 5000);
+            }
+            
             // When one audio part ends, play the next one
-            audioElement.addEventListener('ended', playNextAudioPart);
+            audioElement.addEventListener('ended', function() {
+                logAudioStatus('Audio ended, playing next part');
+                playNextAudioPart();
+            });
+            
+            // Log when audio starts playing
+            audioElement.addEventListener('playing', function() {
+                logAudioStatus('Audio started playing');
+                audioInitialized = true;
+            });
             
             // Check if audio was previously muted
             const audioMuted = localStorage.getItem('monsterTruckAudioMuted') === 'true';
@@ -233,14 +350,19 @@
             const observer = new MutationObserver(function(mutations) {
                 mutations.forEach(function(mutation) {
                     if (mutation.target.style.display === 'none') {
-                        audioElement.play().catch(error => {
-                            console.log('Audio autoplay prevented:', error);
-                            // Try to play on user interaction instead
-                            document.addEventListener('click', function playOnClick() {
-                                audioElement.play().catch(e => console.log('Still cannot play audio:', e));
-                                document.removeEventListener('click', playOnClick);
-                            }, { once: true });
-                        });
+                        logAudioStatus('Loading screen removed, attempting to play audio');
+                        
+                        const playPromise = audioElement.play();
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                logAudioStatus('Successfully started playing audio');
+                                audioInitialized = true;
+                            }).catch(error => {
+                                logAudioStatus(`Autoplay prevented: ${error.message}`);
+                                setupAutoplayFallback();
+                            });
+                        }
+                        
                         observer.disconnect();
                     }
                 });
@@ -255,22 +377,34 @@
                     audioToggle.classList.remove('muted');
                     audioIcon.className = 'fas fa-volume-up';
                     localStorage.setItem('monsterTruckAudioMuted', 'false');
+                    logAudioStatus('Audio unmuted');
                     
                     // Try to play if it wasn't playing
-                    if (audioElement.paused) {
-                        audioElement.play().catch(e => console.log('Cannot play audio:', e));
+                    if (audioElement.paused && !audioInitialized) {
+                        logAudioStatus('Audio was paused, attempting to play');
+                        const playPromise = audioElement.play();
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                logAudioStatus('Successfully started playing audio after unmute');
+                                audioInitialized = true;
+                            }).catch(error => {
+                                logAudioStatus(`Cannot play audio after unmute: ${error.message}`);
+                            });
+                        }
                     }
                 } else {
                     audioElement.muted = true;
                     audioToggle.classList.add('muted');
                     audioIcon.className = 'fas fa-volume-mute';
                     localStorage.setItem('monsterTruckAudioMuted', 'true');
+                    logAudioStatus('Audio muted');
                 }
             });
             
             // Handle audio errors
             audioElement.addEventListener('error', function(e) {
-                console.error('Audio error:', e);
+                const errorMessage = e.target.error ? `Code: ${e.target.error.code}, Message: ${e.target.error.message}` : 'Unknown error';
+                logAudioStatus(`Audio error: ${errorMessage}`);
                 
                 // Try the next part if this one fails
                 playNextAudioPart();
@@ -281,11 +415,15 @@
                     audioElement.dataset.failedAttempts = (failedAttempts + 1).toString();
                     
                     if (failedAttempts >= totalAudioParts) {
-                        console.error('All audio parts failed to load');
+                        logAudioStatus('All audio parts failed to load, hiding audio toggle');
                         audioToggle.style.display = 'none';
+                        showMessage('Audio playback not supported in your browser');
                     }
                 }
             });
+            
+            // Initial status log
+            logAudioStatus('Audio system initialized');
         });
     </script>
 </body>
