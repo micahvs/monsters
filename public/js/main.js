@@ -2604,6 +2604,27 @@ class Game {
         if (!this.isMultiplayerEnabled) return;
         // ... existing multiplayer event code ...
     }
+
+    showMessage(message) {
+        const messageDiv = document.createElement('div');
+        messageDiv.style.position = 'fixed';
+        messageDiv.style.top = '20px';
+        messageDiv.style.left = '50%';
+        messageDiv.style.transform = 'translateX(-50%)';
+        messageDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        messageDiv.style.color = '#ff00ff';
+        messageDiv.style.padding = '10px 20px';
+        messageDiv.style.borderRadius = '5px';
+        messageDiv.style.fontFamily = "'Orbitron', sans-serif";
+        messageDiv.style.zIndex = '1000';
+        messageDiv.textContent = message;
+        
+        document.body.appendChild(messageDiv);
+        
+        setTimeout(() => {
+            messageDiv.remove();
+        }, 5000);
+    }
 }
 
 // Initialize game when window is fully loaded

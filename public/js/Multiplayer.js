@@ -23,43 +23,35 @@ export class MultiplayerManager {
         this.updatePlayerPositions = this.updatePlayerPositions.bind(this);
         this.sendLocalPlayerUpdate = this.sendLocalPlayerUpdate.bind(this);
         this.disconnect = this.disconnect.bind(this);
+        
+        this.connect();
     }
     
-    async connect() {
+    connect() {
         try {
-            // Dynamically import socket.io-client
-            const io = await import('https://cdn.socket.io/4.7.2/socket.io.esm.min.js');
-            
-            // Connect to Fly.io hosted WebSocket server
-            // In development, you can use localhost
-            const isDev = window.location.hostname === 'localhost';
-            
-            let socketUrl;
-            if (isDev) {
-                socketUrl = 'http://localhost:3000';
-            } else {
-                // Use the deployed Fly.io server URL
-                socketUrl = 'https://monster-truck-game-server.fly.dev';
-            }
-            
-            // Initialize socket connection
-            console.log(`Connecting to socket.io at ${socketUrl}`);
-            this.socket = io.connect(socketUrl, {
+            this.socket = io('https://monster-truck-game-server.fly.dev', {
+                withCredentials: true,
+                transports: ['websocket', 'polling'],
+                timeout: 10000,
                 reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: 5
+                reconnectionAttempts: 5,
+                autoConnect: false // Don't connect automatically
             });
-            
-            // Setup socket event handlers
-            this.setupSocketEvents();
-            
-            // Start position update interval
-            this.startUpdates();
-            
-            return true;
+
+            this.socket.on('connect_error', (error) => {
+                console.log('Connection error:', error);
+                // Gracefully handle connection error
+                if (this.game.isMultiplayerEnabled) {
+                    this.game.showMessage('Multiplayer connection failed - playing in single player mode');
+                }
+            });
+
+            this.socket.connect();
         } catch (error) {
-            console.error('Error connecting to multiplayer server:', error);
-            return false;
+            console.log('Socket initialization error:', error);
+            if (this.game.isMultiplayerEnabled) {
+                this.game.showMessage('Multiplayer initialization failed - playing in single player mode');
+            }
         }
     }
     
