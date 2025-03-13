@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { MonsterTruck } from './MonsterTruck.js';
 
-export class MultiplayerManager {
+export default class Multiplayer {
     constructor(game) {
         this.game = game;
         this.isConnected = false;
         this.socket = null;
-        this.players = {};
+        this.players = new Map();
         this.localPlayerId = null;
         this.updateInterval = null;
         this.lastUpdateTime = 0;
@@ -29,27 +29,45 @@ export class MultiplayerManager {
     
     connect() {
         try {
+            // Initialize socket without Promise
             this.socket = io('https://monster-truck-game-server.fly.dev', {
                 withCredentials: true,
                 transports: ['websocket', 'polling'],
                 timeout: 10000,
                 reconnection: true,
-                reconnectionAttempts: 5,
-                autoConnect: false // Don't connect automatically
+                reconnectionAttempts: 5
+            });
+
+            // Set up event handlers
+            this.socket.on('connect', () => {
+                console.log('Connected to game server');
+                this.isConnected = true;
+                this.localPlayerId = this.socket.id;
+                this.sendPlayerInfo();
             });
 
             this.socket.on('connect_error', (error) => {
                 console.log('Connection error:', error);
-                // Gracefully handle connection error
-                if (this.game.isMultiplayerEnabled) {
+                console.log('Connection error details:', error);
+                if (this.game && this.game.showMessage) {
                     this.game.showMessage('Multiplayer connection failed - playing in single player mode');
                 }
             });
 
-            this.socket.connect();
+            this.socket.on('player_joined', (data) => {
+                this.handlePlayerJoined(data);
+            });
+
+            this.socket.on('player_left', (data) => {
+                this.handlePlayerLeft(data);
+            });
+
+            this.socket.on('player_update', (data) => {
+                this.handlePlayerUpdate(data);
+            });
         } catch (error) {
             console.log('Socket initialization error:', error);
-            if (this.game.isMultiplayerEnabled) {
+            if (this.game && this.game.showMessage) {
                 this.game.showMessage('Multiplayer initialization failed - playing in single player mode');
             }
         }
@@ -119,8 +137,8 @@ export class MultiplayerManager {
         this.socket.on('playerLeft', (playerData) => {
             this.removeRemotePlayer(playerData.id);
             
-            if (this.players[playerData.id]) {
-                this.showNotification(`${this.players[playerData.id].nickname} left the arena`);
+            if (this.players.get(playerData.id)) {
+                this.showNotification(`${this.players.get(playerData.id).nickname} left the arena`);
             }
         });
         
@@ -146,8 +164,8 @@ export class MultiplayerManager {
                 }
             } else {
                 // Show damage effect on remote player
-                if (this.players[damageData.id] && this.players[damageData.id].truckMesh) {
-                    this.showDamageEffect(this.players[damageData.id].truckMesh.position);
+                if (this.players.get(damageData.id) && this.players.get(damageData.id).truckMesh) {
+                    this.showDamageEffect(this.players.get(damageData.id).truckMesh.position);
                 }
             }
         });
@@ -159,20 +177,20 @@ export class MultiplayerManager {
                 this.game.health = 0;
                 this.game.monsterTruck.health = 0;
                 
-                if (this.players[deathData.killedBy]) {
-                    this.showNotification(`You were destroyed by ${this.players[deathData.killedBy].nickname}!`, 'error');
+                if (this.players.get(deathData.killedBy)) {
+                    this.showNotification(`You were destroyed by ${this.players.get(deathData.killedBy).nickname}!`, 'error');
                 }
                 
                 // Wait for respawn from server
-            } else if (this.players[deathData.id]) {
+            } else if (this.players.get(deathData.id)) {
                 // Remote player died
-                this.showExplosion(this.players[deathData.id].truckMesh.position);
+                this.showExplosion(this.players.get(deathData.id).truckMesh.position);
                 
                 if (deathData.killedBy === this.localPlayerId) {
                     this.game.score += 100;
-                    this.showNotification(`You destroyed ${this.players[deathData.id].nickname}!`, 'success');
+                    this.showNotification(`You destroyed ${this.players.get(deathData.id).nickname}!`, 'success');
                 } else {
-                    this.showNotification(`${this.players[deathData.id].nickname} was destroyed!`);
+                    this.showNotification(`${this.players.get(deathData.id).nickname} was destroyed!`);
                 }
             }
         });
@@ -194,9 +212,9 @@ export class MultiplayerManager {
                 }
                 
                 this.showNotification('You have respawned!', 'success');
-            } else if (this.players[respawnData.id]) {
+            } else if (this.players.get(respawnData.id)) {
                 // Remote player respawned - update their position
-                const player = this.players[respawnData.id];
+                const player = this.players.get(respawnData.id);
                 if (player.truckMesh && respawnData.position) {
                     player.truckMesh.position.copy(new THREE.Vector3(
                         respawnData.position.x,
@@ -237,7 +255,7 @@ export class MultiplayerManager {
         });
     }
     
-    sendPlayerJoin() {
+    sendPlayerInfo() {
         if (!this.socket || !this.game.truck) return;
         
         const nickname = localStorage.getItem('monsterTruckNickname') || 'Player';
@@ -348,7 +366,7 @@ export class MultiplayerManager {
         if (!this.game.scene) return;
         
         // Skip if it's the local player or player already exists
-        if (playerData.id === this.localPlayerId || this.players[playerData.id]) {
+        if (playerData.id === this.localPlayerId || this.players.has(playerData.id)) {
             return;
         }
         
@@ -375,7 +393,7 @@ export class MultiplayerManager {
         this.game.scene.add(nickname);
         
         // Store player data
-        this.players[playerData.id] = {
+        this.players.set(playerData.id, {
             id: playerData.id,
             nickname: playerData.nickname,
             truckMesh: remoteTruck.body,
@@ -399,13 +417,13 @@ export class MultiplayerManager {
             targetRotation: new THREE.Euler(0, playerData.rotation?.y || 0, 0),
             lastUpdateTime: Date.now(),
             isRespawning: false
-        };
+        });
     }
     
     updateRemotePlayer(playerData) {
-        if (!this.players[playerData.id]) return;
+        if (!this.players.has(playerData.id)) return;
         
-        const player = this.players[playerData.id];
+        const player = this.players.get(playerData.id);
         
         // Update position and rotation targets for interpolation
         if (playerData.position) {
@@ -438,9 +456,9 @@ export class MultiplayerManager {
     }
     
     removeRemotePlayer(playerId) {
-        if (!this.players[playerId] || !this.game.scene) return;
+        if (!this.players.has(playerId) || !this.game.scene) return;
         
-        const player = this.players[playerId];
+        const player = this.players.get(playerId);
         
         // Remove truck from scene
         if (player.monsterTruck) {
@@ -453,7 +471,7 @@ export class MultiplayerManager {
         }
         
         // Remove from players list
-        delete this.players[playerId];
+        this.players.delete(playerId);
     }
     
     updatePlayerPositions() {
@@ -462,8 +480,8 @@ export class MultiplayerManager {
         const now = Date.now();
         
         // Update each remote player's position with interpolation
-        Object.values(this.players).forEach(player => {
-            if (!player.truckMesh || player.id === this.localPlayerId) return;
+        this.players.forEach((player, playerId) => {
+            if (!player.truckMesh || playerId === this.localPlayerId) return;
             
             // Calculate how far we are between updates (0-1)
             const timeSinceUpdate = now - player.lastUpdateTime;
@@ -522,7 +540,7 @@ export class MultiplayerManager {
             const projectileGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8);
             projectileGeometry.rotateX(Math.PI / 2); // Rotate to point forward
             
-            const playerColor = this.players[projectileData.playerId]?.color || '#ff0000';
+            const playerColor = this.players.get(projectileData.playerId)?.color || '#ff0000';
             const color = new THREE.Color(playerColor);
             
             const projectileMaterial = new THREE.MeshPhongMaterial({
@@ -725,8 +743,8 @@ export class MultiplayerManager {
         let playerColor = '#ffffff';
         if (chatData.playerId === this.localPlayerId) {
             playerColor = '#00ffff'; // Local player messages
-        } else if (this.players[chatData.playerId]) {
-            playerColor = this.players[chatData.playerId].color;
+        } else if (this.players.has(chatData.playerId)) {
+            playerColor = this.players.get(chatData.playerId).color;
         }
         
         // Set message HTML
@@ -1052,7 +1070,7 @@ export class MultiplayerManager {
                 continue;
             }
             
-            const player = this.players[playerId];
+            const player = this.players.get(playerId);
             if (!player.truckMesh) continue;
             
             // Get vehicle dimensions
@@ -1110,7 +1128,7 @@ export class MultiplayerManager {
         }
         
         // Remove remote players
-        Object.keys(this.players).forEach(playerId => {
+        this.players.forEach((player, playerId) => {
             if (playerId !== this.localPlayerId) {
                 this.removeRemotePlayer(playerId);
             }

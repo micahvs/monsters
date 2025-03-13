@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MonsterTruck } from './MonsterTruck.js';
 import { World } from './World.js';
+import Multiplayer from './Multiplayer.js';
 
 const TRUCK_SPECS = {
     'NEON CRUSHER': {
@@ -2530,21 +2531,19 @@ class Game {
     
     // Initialize multiplayer functionality
     initMultiplayer() {
-        // Import and initialize the multiplayer manager
-        import('./Multiplayer.js').then(module => {
-            this.multiplayer = new module.MultiplayerManager(this);
-            
-            // Connect to multiplayer server
-            this.multiplayer.connect().then(success => {
-                if (success) {
-                    console.log("Connected to multiplayer server");
-                } else {
-                    console.warn("Failed to connect to multiplayer server");
-                }
-            });
-        }).catch(error => {
-            console.error("Error loading multiplayer module:", error);
-        });
+        if (!this.isMultiplayerEnabled) {
+            console.log('Multiplayer disabled - running in single player mode');
+            return;
+        }
+
+        try {
+            // Direct initialization
+            this.multiplayer = new Multiplayer(this);
+            console.log('Multiplayer initialized');
+        } catch (error) {
+            console.error('Failed to initialize multiplayer:', error);
+            this.showMessage('Multiplayer initialization failed - playing in single player mode');
+        }
     }
 
     createPowerup() {
