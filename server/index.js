@@ -24,11 +24,10 @@ app.use(cors({
 const io = new Server(httpServer, {
   cors: {
     origin: [
-      "https://monsters-kappa.vercel.app", // Your Vercel app URL
-      "https://monsters-micahvs.vercel.app", // Alternative Vercel URL if any
-      "https://monsters-drab.vercel.app", // Added new Vercel URL
+      "https://monsters-git-main-micahvallardsmith-gmailcoms-projects.vercel.app",
+      "https://monsters-drab.vercel.app",
       "http://localhost:3000",
-      "http://localhost:5000"
+      "http://localhost:8000"
     ],
     methods: ["GET", "POST"],
     credentials: true
