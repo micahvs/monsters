@@ -153,9 +153,8 @@
     <canvas id="game"></canvas>
 
     <!-- Audio Element -->
-    <audio id="backgroundMusic" loop>
-        <source src="https://storage.googleapis.com/ldjam-54-audio/pattern_bar_live.mp3" type="audio/mpeg">
-        <source src="https://cdn.freesound.org/previews/635/635797_14015463-lq.mp3" type="audio/mpeg">
+    <audio id="backgroundMusic">
+        <source src="pattern_bar_live_part00.mp3" type="audio/mpeg">
     </audio>
 
     <!-- HUD Elements -->
@@ -207,7 +206,7 @@
             // Function to play the next audio part
             function playNextAudioPart() {
                 currentAudioPart = (currentAudioPart + 1) % totalAudioParts;
-                audioElement.src = `pattern_bar_live_part${currentAudioPart}.mp3`;
+                audioElement.src = `pattern_bar_live_part${currentAudioPart.toString().padStart(2, '0')}.mp3`;
                 audioElement.play().catch(error => {
                     console.log('Error playing next audio part:', error);
                 });
