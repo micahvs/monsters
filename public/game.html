@@ -94,8 +94,45 @@
             z-index: 1000;
             text-align: center;
         }
+        
+        /* Audio toggle button */
+        #audioToggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #ff00ff;
+            border: 2px solid #ff00ff;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+        
+        #audioToggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.8);
+        }
+        
+        #audioToggle.muted {
+            color: #666;
+            border-color: #666;
+            box-shadow: none;
+        }
+        
+        #audioToggle i {
+            font-size: 24px;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script type="importmap">
     {
@@ -115,6 +152,11 @@
     <!-- Game Canvas -->
     <canvas id="game"></canvas>
 
+    <!-- Audio Element -->
+    <audio id="backgroundMusic" loop>
+        <source src="pattern_bar_live.mp3" type="audio/mpeg">
+    </audio>
+
     <!-- HUD Elements -->
     <div class="hud hud-top-left">
         <div id="playerName">PLAYER</div>
@@ -126,6 +168,11 @@
     </div>
     <div class="hud hud-bottom-left">
         <div id="speed">SPEED: 0 MPH</div>
+    </div>
+    
+    <!-- Audio Toggle Button -->
+    <div id="audioToggle">
+        <i class="fas fa-volume-up"></i>
     </div>
     
     <!-- Debug Elements -->
@@ -147,6 +194,62 @@
                 positionInfo.textContent = `Position: X:${position.x.toFixed(2)} Y:${position.y.toFixed(2)} Z:${position.z.toFixed(2)}`;
             }
         };
+        
+        // Audio controls
+        document.addEventListener('DOMContentLoaded', function() {
+            const audioElement = document.getElementById('backgroundMusic');
+            const audioToggle = document.getElementById('audioToggle');
+            const audioIcon = audioToggle.querySelector('i');
+            
+            // Check if audio was previously muted
+            const audioMuted = localStorage.getItem('monsterTruckAudioMuted') === 'true';
+            
+            // Set initial state
+            audioElement.muted = audioMuted;
+            if (audioMuted) {
+                audioToggle.classList.add('muted');
+                audioIcon.className = 'fas fa-volume-mute';
+            } else {
+                audioToggle.classList.remove('muted');
+                audioIcon.className = 'fas fa-volume-up';
+            }
+            
+            // Play audio when loading screen is removed
+            const loadingScreen = document.getElementById('loadingScreen');
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.target.style.display === 'none') {
+                        audioElement.play().catch(error => {
+                            console.log('Audio autoplay prevented:', error);
+                        });
+                        observer.disconnect();
+                    }
+                });
+            });
+            
+            observer.observe(loadingScreen, { attributes: true, attributeFilter: ['style'] });
+            
+            // Toggle audio on button click
+            audioToggle.addEventListener('click', function() {
+                if (audioElement.muted) {
+                    audioElement.muted = false;
+                    audioToggle.classList.remove('muted');
+                    audioIcon.className = 'fas fa-volume-up';
+                    localStorage.setItem('monsterTruckAudioMuted', 'false');
+                } else {
+                    audioElement.muted = true;
+                    audioToggle.classList.add('muted');
+                    audioIcon.className = 'fas fa-volume-mute';
+                    localStorage.setItem('monsterTruckAudioMuted', 'true');
+                }
+            });
+            
+            // Handle audio errors
+            audioElement.addEventListener('error', function(e) {
+                console.error('Audio error:', e);
+                audioToggle.style.display = 'none';
+            });
+        });
     </script>
 </body>
 </html> 

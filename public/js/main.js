@@ -190,13 +190,19 @@ class Game {
             ArrowRight: false,
             ' ': false,
             'd': false, // Debug key
-            'm': false  // Debug movement
+            'm': false, // Debug movement
+            'M': false  // Audio mute toggle
         };
         
         // Game state
         this.health = 100;
         this.score = 0;
         this.sparks = [];
+        
+        // Audio controls
+        this.backgroundMusic = document.getElementById('backgroundMusic');
+        this.audioToggle = document.getElementById('audioToggle');
+        this.isMuted = localStorage.getItem('monsterTruckAudioMuted') === 'true';
         
         // Shooting mechanics
         this.projectiles = [];
@@ -615,6 +621,11 @@ class Game {
                     if (e.key === 'm' && this.debugMode) {
                         this.debugMovement();
                     }
+                    
+                    // Audio toggle with M key
+                    if (e.key === 'M') {
+                        this.toggleAudio();
+                    }
                 }
             });
             
@@ -763,6 +774,12 @@ class Game {
             this.shootCooldown = 10;
             this.ammo--;
             this.updateAmmoDisplay();
+        }
+        
+        // Audio toggle with 'M' key
+        if (this.keys['M']) {
+            this.keys['M'] = false; // Reset key to prevent multiple toggles
+            this.toggleAudio();
         }
         
         // Decrease cooldown
@@ -2623,6 +2640,31 @@ class Game {
         setTimeout(() => {
             messageDiv.remove();
         }, 5000);
+    }
+
+    // Add this method to toggle audio
+    toggleAudio() {
+        if (!this.backgroundMusic || !this.audioToggle) return;
+        
+        const audioIcon = this.audioToggle.querySelector('i');
+        
+        if (this.backgroundMusic.muted) {
+            // Unmute
+            this.backgroundMusic.muted = false;
+            this.audioToggle.classList.remove('muted');
+            if (audioIcon) audioIcon.className = 'fas fa-volume-up';
+            localStorage.setItem('monsterTruckAudioMuted', 'false');
+            this.isMuted = false;
+            this.showMessage('Audio On');
+        } else {
+            // Mute
+            this.backgroundMusic.muted = true;
+            this.audioToggle.classList.add('muted');
+            if (audioIcon) audioIcon.className = 'fas fa-volume-mute';
+            localStorage.setItem('monsterTruckAudioMuted', 'true');
+            this.isMuted = true;
+            this.showMessage('Audio Off');
+        }
     }
 }
 
