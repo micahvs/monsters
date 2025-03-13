@@ -176,7 +176,7 @@
     </div>
     
     <!-- Play Button -->
-    <button id="playButton" style="position: fixed; bottom: 20px; left: 20px; background: rgba(0, 0, 0, 0.7); color: #ff00ff; border: 2px solid #ff00ff; border-radius: 5px; padding: 10px; font-family: 'Orbitron', sans-serif; cursor: pointer; z-index: 1000; box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);">
+    <button id="playButton" style="position: fixed; bottom: 20px; right: 80px; background: rgba(0, 0, 0, 0.7); color: #ff00ff; border: 2px solid #ff00ff; border-radius: 5px; padding: 10px; font-family: 'Orbitron', sans-serif; cursor: pointer; z-index: 1000; box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);">
         PLAY MUSIC
     </button>
     
@@ -187,6 +187,15 @@
     <div id="debugInfo">
         <div>Debug Information:</div>
         <div id="positionInfo">Position: X:0 Y:0 Z:0</div>
+    </div>
+
+    <!-- Chat Interface -->
+    <div id="chatContainer" style="position: fixed; bottom: 80px; right: 20px; width: 300px; background: rgba(0, 0, 0, 0.7); border: 2px solid #ff00ff; border-radius: 5px; z-index: 1000; display: flex; flex-direction: column; max-height: 200px; overflow: hidden;">
+        <div id="chatMessages" style="overflow-y: auto; max-height: 150px; padding: 10px; color: #fff; font-family: 'Orbitron', sans-serif; font-size: 14px;"></div>
+        <div style="display: flex; padding: 5px; border-top: 1px solid #ff00ff;">
+            <input id="chatInput" type="text" placeholder="Type message..." style="flex: 1; background: rgba(0, 0, 0, 0.5); border: 1px solid #ff00ff; color: #fff; padding: 5px; font-family: 'Orbitron', sans-serif;">
+            <button id="chatSend" style="background: #ff00ff; color: #000; border: none; padding: 5px 10px; margin-left: 5px; cursor: pointer; font-family: 'Orbitron', sans-serif;">Send</button>
+        </div>
     </div>
 
     <!-- Scripts -->
@@ -276,6 +285,60 @@
             });
             
             observer.observe(loadingScreen, { attributes: true, attributeFilter: ['style'] });
+        });
+
+        // Chat functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatInput = document.getElementById('chatInput');
+            const chatSend = document.getElementById('chatSend');
+            const chatMessages = document.getElementById('chatMessages');
+            
+            // Function to add a message to the chat
+            function addChatMessage(sender, message) {
+                const messageElement = document.createElement('div');
+                messageElement.style.marginBottom = '5px';
+                messageElement.innerHTML = `<span style="color: #ff00ff;">${sender}:</span> ${message}`;
+                chatMessages.appendChild(messageElement);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Send message when Send button is clicked
+            chatSend.addEventListener('click', function() {
+                sendChatMessage();
+            });
+            
+            // Send message when Enter key is pressed
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendChatMessage();
+                }
+            });
+            
+            // Function to send chat message
+            function sendChatMessage() {
+                const message = chatInput.value.trim();
+                if (message) {
+                    // Add message to local chat
+                    addChatMessage('You', message);
+                    
+                    // Send message to server if multiplayer is enabled
+                    if (window.gameInstance && window.gameInstance.multiplayer && window.gameInstance.multiplayer.socket) {
+                        window.gameInstance.multiplayer.socket.emit('chat', {
+                            message: message,
+                            sender: window.gameInstance.playerName || 'Player'
+                        });
+                    }
+                    
+                    // Clear input
+                    chatInput.value = '';
+                }
+            }
+            
+            // Add a welcome message
+            addChatMessage('System', 'Welcome to Monster Truck Stadium Chat!');
+            
+            // Expose the addChatMessage function globally so it can be called from the game
+            window.addChatMessage = addChatMessage;
         });
     </script>
 </body>
