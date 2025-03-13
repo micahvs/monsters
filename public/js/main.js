@@ -204,6 +204,12 @@ class Game {
         this.maxAmmo = 30;
         this.reloadTime = 0;
         
+        // Add these properties
+        this.powerups = [];
+        this.activePowerups = new Map();
+        this.lastPowerupSpawn = 0;
+        this.powerupSpawnInterval = 10000; // Spawn every 10 seconds
+        
         // Start initialization
         this.init();
 
@@ -227,6 +233,14 @@ class Game {
             });
         } catch (error) {
             console.log('Socket initialization error:', error);
+        }
+        
+        // Check multiplayer preference
+        this.isMultiplayerEnabled = localStorage.getItem('monsterTruckMultiplayer') === 'true';
+        
+        // Initialize multiplayer only if enabled
+        if (this.isMultiplayerEnabled) {
+            this.initMultiplayer();
         }
     }
     
@@ -654,7 +668,7 @@ class Game {
         }
     }
     
-    update() {
+    update(deltaTime) {
         if (!this.isInitialized || this.isGameOver) return;
         
         try {
@@ -2531,6 +2545,64 @@ class Game {
         }).catch(error => {
             console.error("Error loading multiplayer module:", error);
         });
+    }
+
+    createPowerup() {
+        const types = ['SPEED_BOOST', 'INVINCIBILITY', 'REPAIR'];
+        const randomType = types[Math.floor(Math.random() * types.length)];
+        
+        const geometry = new THREE.BoxGeometry(2, 2, 2);
+        const material = new THREE.MeshPhongMaterial({
+            color: randomType === 'SPEED_BOOST' ? 0x00ff00 : 
+                   randomType === 'INVINCIBILITY' ? 0xffff00 : 0xff0000,
+            emissive: 0x444444,
+            shininess: 100
+        });
+        
+        const powerup = new THREE.Mesh(geometry, material);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * 80;
+        powerup.position.x = Math.cos(angle) * radius;
+        powerup.position.z = Math.sin(angle) * radius;
+        powerup.position.y = 2;
+        
+        powerup.userData.type = randomType;
+        powerup.userData.rotationSpeed = 0.02;
+        
+        this.powerups.push(powerup);
+        this.scene.add(powerup);
+    }
+
+    applyPowerup(type) {
+        switch(type) {
+            case 'SPEED_BOOST':
+                this.truck.maxSpeed *= 2;
+                setTimeout(() => {
+                    this.truck.maxSpeed /= 2;
+                }, 5000);
+                break;
+            case 'INVINCIBILITY':
+                this.truck.isInvincible = true;
+                setTimeout(() => {
+                    this.truck.isInvincible = false;
+                }, 3000);
+                break;
+            case 'REPAIR':
+                this.health = Math.min(100, this.health + 50);
+        }
+    }
+
+    // Update any multiplayer-related methods to check if enabled
+    updateMultiplayer() {
+        if (!this.isMultiplayerEnabled) return;
+        // ... existing multiplayer update code ...
+    }
+
+    // Do the same for other multiplayer methods
+    handleMultiplayerEvents() {
+        if (!this.isMultiplayerEnabled) return;
+        // ... existing multiplayer event code ...
     }
 }
 

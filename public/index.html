@@ -197,6 +197,66 @@
             50% { transform: scale(1.1); opacity: 1; }
             100% { transform: scale(1); opacity: 0.8; }
         }
+        
+        /* Toggle switch styling */
+        .multiplayer-toggle {
+            margin-top: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border: 2px solid #ff00ff;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 2px;
+            bottom: 2px;
+            background-color: #ff00ff;
+            transition: .4s;
+        }
+
+        input:checked + .slider {
+            background-color: #220033;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .slider.round {
+            border-radius: 34px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
     </style>
 </head>
 <body>
@@ -263,6 +323,14 @@
                     <option value="medium">Medium</option>
                     <option value="high">High (Best Quality)</option>
                 </select>
+                
+                <div class="multiplayer-toggle">
+                    <label for="multiplayer">MULTIPLAYER:</label>
+                    <label class="switch">
+                        <input type="checkbox" id="multiplayer" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
             </div>
 
             <div class="selected-options">
@@ -294,6 +362,27 @@
     </div>
 
     <script>
+        const POWERUP_TYPES = {
+            SPEED_BOOST: {
+                duration: 5000,
+                effect: 'Doubles speed',
+                color: 0x00ff00,
+                model: 'lightning'
+            },
+            INVINCIBILITY: {
+                duration: 3000,
+                effect: 'No damage',
+                color: 0xffff00,
+                model: 'star'
+            },
+            REPAIR: {
+                duration: 0,
+                effect: 'Restore 50 health',
+                color: 0xff0000,
+                model: 'heart'
+            }
+        };
+        
         // Create dynamic stars for the background
         document.addEventListener('DOMContentLoaded', function() {
             // Create stars
@@ -436,6 +525,16 @@
                 });
             }
             
+            // Set initial multiplayer toggle state from localStorage
+            const multiplayerToggle = document.getElementById('multiplayer');
+            const savedMultiplayerState = localStorage.getItem('monsterTruckMultiplayer');
+            multiplayerToggle.checked = savedMultiplayerState === null ? true : savedMultiplayerState === 'true';
+            
+            // Update multiplayer state when toggle changes
+            multiplayerToggle.addEventListener('change', function() {
+                localStorage.setItem('monsterTruckMultiplayer', this.checked);
+            });
+            
             // Handle the Enter the Arena button click
             const playButton = document.getElementById('playButton');
             if (playButton) {
@@ -468,6 +567,10 @@
                     // Get and store graphics quality
                     const quality = document.getElementById('quality').value;
                     localStorage.setItem('monsterTruckQuality', quality);
+                    
+                    // Store multiplayer preference
+                    localStorage.setItem('monsterTruckMultiplayer', 
+                        document.getElementById('multiplayer').checked);
                     
                     console.log('Navigating to game.html'); // Debug log
                     
