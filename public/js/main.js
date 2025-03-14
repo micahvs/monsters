@@ -1896,6 +1896,11 @@ class Game {
         
         // Update score display
         this.updateScoreDisplay();
+        
+        // Update debug info if available
+        if (this.truck && window.updateDebugInfo) {
+            window.updateDebugInfo(this.truck.position);
+        }
     }
     
     // Update weapon info display
@@ -4421,53 +4426,42 @@ class Game {
     updatePowerupIndicators() {
         const container = document.getElementById('powerup-indicators');
         if (!container) {
-            // Create container if it doesn't exist
-            const newContainer = document.createElement('div');
-            newContainer.id = 'powerup-indicators';
-            newContainer.className = 'ui-element';
-            newContainer.style.bottom = '10px';
-            newContainer.style.left = '50%';
-            newContainer.style.transform = 'translateX(-50%)';
-            newContainer.style.display = 'flex';
-            newContainer.style.gap = '8px';
-            newContainer.style.justifyContent = 'center';
-            newContainer.style.background = 'none';
-            document.body.appendChild(newContainer);
+            console.warn('Powerup indicators container not found');
+            return;
         }
         
-        const powerupContainer = document.getElementById('powerup-indicators');
-        powerupContainer.innerHTML = ''; // Clear existing indicators
+        // Clear existing indicators
+        container.innerHTML = '';
+        
+        // Track if we have any active powerups
+        let hasActivePowerups = false;
         
         // Add indicators for active powerups
         for (const [type, data] of Object.entries(this.activePowerups)) {
             if (data.timeRemaining > 0) {
+                hasActivePowerups = true;
                 const powerupConfig = this.powerupTypes[type];
                 
                 const indicator = document.createElement('div');
                 indicator.className = 'powerup-indicator';
                 indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.5);
                 indicator.style.color = '#fff';
-                indicator.style.padding = '3px 6px';
-                indicator.style.borderRadius = '3px';
-                indicator.style.display = 'flex';
-                indicator.style.alignItems = 'center';
-                indicator.style.gap = '4px';
                 indicator.style.border = '1px solid ' + this.hexToRgba(powerupConfig.color, 0.8);
                 
                 // Create icon
                 const icon = document.createElement('span');
                 icon.textContent = powerupConfig.icon;
-                icon.style.fontSize = '11px';
+                icon.style.fontSize = '10px';
                 
                 // Create timer
                 const timer = document.createElement('span');
                 timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
-                timer.style.fontSize = '10px';
+                timer.style.fontSize = '9px';
                 
                 indicator.appendChild(icon);
                 indicator.appendChild(timer);
                 
-                powerupContainer.appendChild(indicator);
+                container.appendChild(indicator);
                 
                 // Pulse effect for indicators about to expire
                 if (data.timeRemaining < 180) { // Less than 3 seconds
@@ -4487,11 +4481,10 @@ class Game {
             }
         }
         
-        // Hide container if no active powerups
-        if (powerupContainer.children.length === 0) {
-            powerupContainer.style.display = 'none';
-        } else {
-            powerupContainer.style.display = 'flex';
+        // Show/hide the container based on active powerups
+        const containerParent = document.getElementById('powerup-indicators-container');
+        if (containerParent) {
+            containerParent.style.display = hasActivePowerups ? 'block' : 'none';
         }
     }
     
