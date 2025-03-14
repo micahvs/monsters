@@ -814,6 +814,12 @@ class Game {
                 
                 // Sync health from MonsterTruck to Game
                 this.health = this.monsterTruck.health;
+                
+                // Check for game over condition after health sync
+                if (this.health <= 0 && !this.isGameOver) {
+                    console.log("Game over condition detected in update loop!");
+                    this.gameOver();
+                }
             }
             
             // Check for wall collisions
@@ -840,6 +846,11 @@ class Game {
                         this.checkProjectileHits();
                     }
                 }
+            }
+            
+            // Make sure we update projectiles from the original system too
+            if (typeof this.updateProjectiles === 'function') {
+                this.updateProjectiles();
             }
             
             // Update weapon pickups with safety check
@@ -1416,13 +1427,14 @@ class Game {
         // Minor minimum to ensure feedback but not too harsh
         const minDamage = 5;
         const appliedAmount = Math.max(amount, minDamage);
+        let actualDamage = 0;
         
         // If we have a MonsterTruck instance, use its damage method
         if (this.monsterTruck) {
             // Respect the damage cooldown for more balanced gameplay
             if (this.monsterTruck.damageTimeout <= 0) {
                 // Apply damage through MonsterTruck
-                const actualDamage = this.monsterTruck.takeDamage(appliedAmount);
+                actualDamage = this.monsterTruck.takeDamage(appliedAmount);
                 
                 // Sync health with monster truck
                 this.health = this.monsterTruck.health;
@@ -1436,16 +1448,14 @@ class Game {
                 
                 // Add subtle camera shake based on impact
                 this.shakeCamera(actualDamage / 6);
-                
-                return actualDamage;
             } else {
                 // Still showing hit but not applying damage during cooldown
                 console.log("Hit during damage cooldown - reduced effect");
-                return 0;
             }
         } else {
             // Legacy fallback behavior
             this.health = Math.max(0, this.health - appliedAmount);
+            actualDamage = appliedAmount;
             console.log(`Damage: ${appliedAmount} points. Health: ${this.health}`);
             
             // Add screen effect for significant damage
@@ -1455,8 +1465,6 @@ class Game {
             
             // Add subtle camera shake
             this.shakeCamera(appliedAmount / 6);
-            
-            return appliedAmount;
         }
         
         // Update HUD
@@ -1467,8 +1475,11 @@ class Game {
         
         // Check for game over
         if (this.health <= 0) {
+            console.log("GAME OVER! Health reached zero.");
             this.gameOver();
         }
+        
+        return actualDamage;
     }
     
     // Show shield hit effect
@@ -1685,49 +1696,92 @@ class Game {
 
     // Game over method
     gameOver() {
-        if (this.isGameOver) return;
+        // Prevent multiple game over screens
+        if (this.isGameOver) {
+            console.log("Game already over, not showing another game over screen");
+            return;
+        }
         
         this.isGameOver = true;
-        console.log("Game over!");
+        console.log("GAME OVER! Creating game over screen");
         
-        // Create game over overlay
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            font-family: 'Orbitron', sans-serif;
-            color: #ff00ff;
-        `;
-
-        overlay.innerHTML = `
-            <h1 style="text-shadow: 0 0 10px #ff00ff;">GAME OVER!</h1>
-            <h2 style="text-shadow: 0 0 10px #ff00ff;">SCORE: ${this.score}</h2>
-            <button onclick="window.location.reload()" style="
-                background: linear-gradient(45deg, #ff00ff, #aa00ff);
-                color: white;
-                border: none;
-                padding: 15px 30px;
-                margin-top: 20px;
-                font-size: 18px;
-                border-radius: 5px;
-                cursor: pointer;
+        try {
+            // Make sure we have a score
+            if (this.score === undefined) {
+                this.score = 0;
+            }
+            
+            // Stop all movement and gameplay
+            if (this.truck) {
+                this.truck.velocity = 0;
+                this.truck.acceleration = 0;
+                this.truck.turning = 0;
+            }
+            
+            // Create game over overlay
+            const overlay = document.createElement('div');
+            overlay.id = "game-over-overlay"; // Add ID for easier targeting
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                z-index: 9999;
                 font-family: 'Orbitron', sans-serif;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-                box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
-            ">TRY AGAIN</button>
-        `;
-
-        document.body.appendChild(overlay);
+                color: #ff00ff;
+            `;
+    
+            overlay.innerHTML = `
+                <h1 style="text-shadow: 0 0 10px #ff00ff; font-size: 48px; margin-bottom: 20px;">GAME OVER!</h1>
+                <h2 style="text-shadow: 0 0 10px #ff00ff; font-size: 32px; margin-bottom: 30px;">SCORE: ${this.score}</h2>
+                <button id="try-again-button" style="
+                    background: linear-gradient(45deg, #ff00ff, #aa00ff);
+                    color: white;
+                    border: none;
+                    padding: 15px 30px;
+                    margin-top: 20px;
+                    font-size: 24px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-family: 'Orbitron', sans-serif;
+                    text-transform: uppercase;
+                    letter-spacing: 2px;
+                    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+                ">TRY AGAIN</button>
+            `;
+    
+            document.body.appendChild(overlay);
+            
+            // Add event listener to the try again button
+            const tryAgainButton = document.getElementById("try-again-button");
+            if (tryAgainButton) {
+                tryAgainButton.addEventListener("click", () => {
+                    console.log("Reloading game...");
+                    window.location.reload();
+                });
+            }
+            
+            // Play a game over sound if available
+            try {
+                const gameOverSound = new Audio();
+                gameOverSound.src = 'sounds/gameover.mp3';
+                gameOverSound.volume = 0.5;
+                gameOverSound.play().catch(e => console.log('Could not play game over sound:', e));
+            } catch (error) {
+                console.log("Could not play game over sound:", error);
+            }
+        } catch (error) {
+            console.error("Error showing game over screen:", error);
+            
+            // Fallback game over alert if there's an error
+            alert("GAME OVER! Score: " + this.score);
+        }
     }
 
     // Update HUD method
@@ -1781,61 +1835,78 @@ class Game {
     shoot() {
         if (!this.scene || !this.truck) return;
         
-        console.log("Shooting projectile");
+        console.log("Shooting original projectile");
         
-        // Create projectile
-        const projectileGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8);
-        projectileGeometry.rotateX(Math.PI / 2); // Rotate to point forward
-        
-        const projectileMaterial = new THREE.MeshPhongMaterial({
-            color: 0x00ffff,
-            emissive: 0x00ffff,
-            emissiveIntensity: 1,
-            shininess: 30
-        });
-        
-        const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-        
-        // Calculate direction based on truck's rotation - FIXED: Correct direction calculation
-        const truckDirection = new THREE.Vector3(
-            Math.sin(this.truck.rotation.y), // X component
-            0,                               // Y component (level)
-            Math.cos(this.truck.rotation.y)  // Z component
-        );
-        
-        // Position at front of truck
-        projectile.position.copy(this.truck.position);
-        projectile.position.y += 0.5; // Slightly above truck
-        projectile.position.x += truckDirection.x * 2; // In front of truck
-        projectile.position.z += truckDirection.z * 2;
-        
-        // Set rotation to match truck direction
-        projectile.rotation.y = this.truck.rotation.y;
-        
-        // Add to scene
-        this.scene.add(projectile);
-        
-        // Apply damage multiplier if active
-        const baseDamage = 20;
-        const damage = baseDamage * (this.damageMultiplier || 1);
-        
-        // Store projectile data
-        this.projectiles.push({
-            mesh: projectile,
-            direction: truckDirection,
-            speed: 2.0, // Fast projectile
-            damage: damage,
-            lifetime: 100, // Frames before despawning
-            source: 'player'
-        });
-        
-        // Notify multiplayer system about the projectile
-        if (this.multiplayer && this.multiplayer.isConnected) {
-            this.multiplayer.sendProjectileCreated(this.projectiles[this.projectiles.length - 1]);
+        try {
+            // Create projectile
+            const projectileGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8);
+            projectileGeometry.rotateX(Math.PI / 2); // Rotate to point forward
+            
+            const projectileMaterial = new THREE.MeshPhongMaterial({
+                color: 0x00ffff,
+                emissive: 0x00ffff,
+                emissiveIntensity: 1,
+                shininess: 30
+            });
+            
+            const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+            
+            // Calculate direction based on truck's rotation
+            const truckDirection = new THREE.Vector3(
+                Math.sin(this.truck.rotation.y), // X component
+                0,                               // Y component (level)
+                Math.cos(this.truck.rotation.y)  // Z component
+            );
+            
+            // Position at front of truck
+            projectile.position.set(
+                this.truck.position.x + truckDirection.x * 2,
+                this.truck.position.y + 0.5,
+                this.truck.position.z + truckDirection.z * 2
+            );
+            
+            // Set rotation to match truck direction
+            projectile.rotation.y = this.truck.rotation.y;
+            
+            // Add to scene
+            this.scene.add(projectile);
+            
+            // Add light to projectile for better visibility
+            const projectileLight = new THREE.PointLight(0x00ffff, 0.5, 3);
+            projectile.add(projectileLight);
+            
+            // Apply damage multiplier if active
+            const baseDamage = 20;
+            const damage = baseDamage * (this.damageMultiplier || 1);
+            
+            // Store projectile data - make sure this.projectiles exists
+            if (!this.projectiles) {
+                this.projectiles = [];
+            }
+            
+            this.projectiles.push({
+                mesh: projectile,
+                direction: truckDirection,
+                speed: 2.0, // Fast projectile
+                damage: damage,
+                lifetime: 100, // Frames before despawning
+                source: 'player'
+            });
+            
+            // Notify multiplayer system about the projectile
+            if (this.multiplayer && this.multiplayer.isConnected) {
+                this.multiplayer.sendProjectileCreated(this.projectiles[this.projectiles.length - 1]);
+            }
+            
+            // Create muzzle flash effect
+            this.createMuzzleFlash(projectile.position, truckDirection);
+            
+            console.log("Projectile created successfully, total projectiles:", this.projectiles.length);
+            return true;
+        } catch (error) {
+            console.error("Error shooting projectile:", error);
+            return false;
         }
-        
-        // Create muzzle flash effect
-        this.createMuzzleFlash(projectile.position, truckDirection);
     }
 
     // Create muzzle flash effect
@@ -1877,55 +1948,178 @@ class Game {
 
     // Update projectiles
     updateProjectiles() {
-        if (!this.projectiles || !this.scene) return;
+        if (!this.scene) return;
         
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const projectile = this.projectiles[i];
-            
-            // Update position using all direction components (x, y, z)
-            projectile.mesh.position.x += projectile.direction.x * projectile.speed;
-            projectile.mesh.position.y += projectile.direction.y * projectile.speed; // Apply vertical movement
-            projectile.mesh.position.z += projectile.direction.z * projectile.speed;
-            
-            // Rotate projectile to face direction of movement
-            if (projectile.direction.length() > 0) {
-                // Create a quaternion from the direction vector
-                const quaternion = new THREE.Quaternion();
-                const upVector = new THREE.Vector3(0, 1, 0);
+        // Initialize projectiles array if needed
+        if (!this.projectiles) {
+            this.projectiles = [];
+        }
+        
+        // Debug logging
+        if (this.frameCount % 60 === 0) { // Log once per second
+            console.log(`Updating ${this.projectiles.length} projectiles`);
+        }
+        
+        try {
+            for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                const projectile = this.projectiles[i];
                 
-                // Create a dummy object to calculate quaternion
-                const lookAt = new THREE.Object3D();
-                lookAt.position.copy(projectile.mesh.position);
-                lookAt.lookAt(
-                    projectile.mesh.position.x + projectile.direction.x,
-                    projectile.mesh.position.y + projectile.direction.y,
-                    projectile.mesh.position.z + projectile.direction.z
-                );
+                // Skip invalid projectiles
+                if (!projectile || !projectile.mesh || !projectile.direction) {
+                    console.warn("Invalid projectile found, removing:", projectile);
+                    if (projectile && projectile.mesh) {
+                        this.scene.remove(projectile.mesh);
+                    }
+                    this.projectiles.splice(i, 1);
+                    continue;
+                }
                 
-                // Apply the rotation
-                projectile.mesh.quaternion.copy(lookAt.quaternion);
-            }
-            
-            // Add tracer effect
-            this.createProjectileTrail(projectile);
-            
-            // Decrease lifetime
-            projectile.lifetime--;
-            
-            // Check for collisions
-            const hitResult = this.checkProjectileCollisions(projectile);
-            
-            // Remove if lifetime ended or collision occurred
-            if (projectile.lifetime <= 0 || hitResult) {
-                this.scene.remove(projectile.mesh);
-                this.projectiles.splice(i, 1);
+                // Update position using all direction components (x, y, z)
+                projectile.mesh.position.x += projectile.direction.x * projectile.speed;
+                projectile.mesh.position.y += projectile.direction.y * projectile.speed; // Apply vertical movement
+                projectile.mesh.position.z += projectile.direction.z * projectile.speed;
                 
-                // Create impact effect if collision occurred
-                if (hitResult) {
-                    this.createImpactEffect(projectile.mesh.position, hitResult);
+                // Rotate projectile to face direction of movement
+                if (projectile.direction.length() > 0) {
+                    // Create a quaternion from the direction vector
+                    const quaternion = new THREE.Quaternion();
+                    const upVector = new THREE.Vector3(0, 1, 0);
+                    
+                    // Create a dummy object to calculate quaternion
+                    const lookAt = new THREE.Object3D();
+                    lookAt.position.copy(projectile.mesh.position);
+                    lookAt.lookAt(
+                        projectile.mesh.position.x + projectile.direction.x,
+                        projectile.mesh.position.y + projectile.direction.y,
+                        projectile.mesh.position.z + projectile.direction.z
+                    );
+                    
+                    // Apply the rotation
+                    projectile.mesh.quaternion.copy(lookAt.quaternion);
+                }
+                
+                // Add tracer effect
+                this.createProjectileTrail(projectile);
+                
+                // Decrease lifetime
+                projectile.lifetime--;
+                
+                // Check for collisions with walls
+                const wallHit = this.checkProjectileWallCollisions(projectile);
+                
+                // Check for turret collisions
+                const hitResult = (typeof this.checkProjectileCollisions === 'function') ? 
+                    this.checkProjectileCollisions(projectile) : null;
+                
+                // Remove if lifetime ended or collision occurred
+                if (projectile.lifetime <= 0 || wallHit || hitResult) {
+                    this.scene.remove(projectile.mesh);
+                    this.projectiles.splice(i, 1);
+                    
+                    // Create impact effect if collision occurred
+                    if (hitResult) {
+                        this.createImpactEffect(projectile.mesh.position, hitResult);
+                    } else if (wallHit) {
+                        // Create simple wall impact effect
+                        this.createWallImpactEffect(projectile.mesh.position);
+                    }
                 }
             }
+        } catch (error) {
+            console.error("Error updating projectiles:", error);
         }
+    }
+    
+    // Check if projectile hit a wall
+    checkProjectileWallCollisions(projectile) {
+        if (!projectile || !projectile.mesh) return false;
+        
+        const arenaSize = 1600;
+        const halfSize = arenaSize / 2;
+        const wallThickness = 10;
+        const pos = projectile.mesh.position;
+        
+        // Wall collision - check if projectile is near any wall
+        if (
+            pos.x > halfSize - wallThickness || 
+            pos.x < -halfSize + wallThickness ||
+            pos.z > halfSize - wallThickness || 
+            pos.z < -halfSize + wallThickness
+        ) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // Create a simple wall impact effect
+    createWallImpactEffect(position) {
+        // Create flash
+        const impactLight = new THREE.PointLight(0x00ffff, 1, 5);
+        impactLight.position.copy(position);
+        this.scene.add(impactLight);
+        
+        // Create particles
+        const particleCount = 10;
+        const particles = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 1
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.position.copy(position);
+            
+            // Random velocity
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 0.2 + 0.1;
+            particle.velocity = {
+                x: Math.cos(angle) * speed,
+                y: Math.random() * 0.2,
+                z: Math.sin(angle) * speed
+            };
+            
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Fade out and remove
+        let impactLife = 20;
+        const fadeImpact = () => {
+            impactLife--;
+            
+            if (impactLife > 0) {
+                // Update light
+                impactLight.intensity = impactLife / 20;
+                
+                // Update particles
+                for (const particle of particles) {
+                    particle.position.x += particle.velocity.x;
+                    particle.position.y += particle.velocity.y;
+                    particle.position.z += particle.velocity.z;
+                    
+                    // Apply gravity
+                    particle.velocity.y -= 0.01;
+                    
+                    // Fade out
+                    particle.material.opacity = impactLife / 20;
+                }
+                
+                requestAnimationFrame(fadeImpact);
+            } else {
+                // Remove light and particles
+                this.scene.remove(impactLight);
+                for (const particle of particles) {
+                    this.scene.remove(particle);
+                }
+            }
+        };
+        
+        fadeImpact();
     }
 
     // Create projectile trail effect
