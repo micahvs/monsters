@@ -41,24 +41,31 @@
             text-shadow: 0 0 10px #ff00ff;
         }
 
-        /* UI Elements - Minimalist Design */
+        /* Ultra-Minimal UI Design */
         .ui-element {
-            background: rgba(0, 0, 0, 0.6);
-            border-radius: 4px;
-            padding: 8px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 3px;
+            padding: 5px 8px;
             color: #ff00ff;
-            text-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
-            font-size: 14px;
+            text-shadow: 0 0 4px rgba(255, 0, 255, 0.5);
+            font-size: 12px;
             pointer-events: none;
             position: fixed;
             z-index: 100;
         }
 
-        /* Player Info - Top Left */
-        #player-info {
+        /* Weapon Info - Top Left Corner */
+        #weapon-info {
             top: 10px;
             left: 10px;
-            border-left: 2px solid #ff00ff;
+            border-left: 1px solid #ff00ff;
+        }
+
+        /* Player Info - Top Left, Below Weapon */
+        #player-info {
+            top: 60px;
+            left: 10px;
+            border-left: 1px solid #ff00ff;
         }
 
         /* Game Stats - Top Right */
@@ -66,14 +73,14 @@
             top: 10px;
             right: 10px;
             text-align: right;
-            border-right: 2px solid #ff00ff;
+            border-right: 1px solid #ff00ff;
         }
 
         /* Speed Display - Bottom Left */
         #speed-display {
             bottom: 10px;
             left: 10px;
-            border-left: 2px solid #00ffff;
+            border-left: 1px solid #00ffff;
         }
 
         /* Audio Controls - Bottom Right */
@@ -81,23 +88,25 @@
             bottom: 10px;
             right: 10px;
             display: flex;
-            gap: 10px;
+            gap: 8px;
             pointer-events: auto;
+            background: none;
         }
 
         .audio-button {
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.5);
             color: #ff00ff;
             border: 1px solid #ff00ff;
             border-radius: 50%;
-            width: 36px;
-            height: 36px;
+            width: 30px;
+            height: 30px;
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            box-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+            box-shadow: 0 0 4px rgba(255, 0, 255, 0.4);
             transition: all 0.2s ease;
+            font-size: 12px;
         }
 
         .audio-button:hover {
@@ -116,32 +125,36 @@
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 10px;
+            gap: 8px;
             justify-content: center;
+            background: none;
         }
 
         .powerup-indicator {
-            padding: 5px 8px;
-            border-radius: 4px;
+            padding: 3px 6px;
+            border-radius: 3px;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.5);
+            font-size: 11px;
         }
 
         /* Debug Panel - Hidden by Default */
         #debug-panel {
             top: 10px;
             left: 200px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.5);
             border: 1px solid #00ff00;
             color: #00ff00;
             font-family: monospace;
-            font-size: 12px;
-            max-width: 200px;
-            max-height: 150px;
+            font-size: 10px;
+            max-width: 180px;
+            max-height: 120px;
             overflow: auto;
-            opacity: 0.7;
+            opacity: 0.6;
             display: none; /* Hidden by default */
+            padding: 4px 6px;
         }
 
         /* Show debug panel when debug mode is active */
@@ -151,15 +164,15 @@
 
         /* Chat Container - Bottom Right, Above Audio Controls */
         #chat-container {
-            bottom: 60px;
+            bottom: 50px;
             right: 10px;
-            width: 250px;
-            background: rgba(0, 0, 0, 0.7);
+            width: 200px;
+            background: rgba(0, 0, 0, 0.5);
             border: 1px solid #ff00ff;
-            border-radius: 4px;
+            border-radius: 3px;
             display: flex;
             flex-direction: column;
-            max-height: 150px;
+            max-height: 120px;
             overflow: hidden;
             pointer-events: auto;
             position: fixed;
@@ -168,15 +181,15 @@
 
         #chat-messages {
             overflow-y: auto;
-            max-height: 100px;
-            padding: 8px;
+            max-height: 80px;
+            padding: 6px;
             color: #fff;
-            font-size: 12px;
+            font-size: 10px;
         }
 
         #chat-input-container {
             display: flex;
-            padding: 4px;
+            padding: 3px;
             border-top: 1px solid #ff00ff;
         }
 
@@ -185,8 +198,8 @@
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid #ff00ff;
             color: #fff;
-            padding: 4px;
-            font-size: 12px;
+            padding: 3px;
+            font-size: 10px;
             font-family: 'Orbitron', sans-serif;
         }
 
@@ -194,10 +207,10 @@
             background: #ff00ff;
             color: #000;
             border: none;
-            padding: 4px 8px;
-            margin-left: 4px;
+            padding: 3px 6px;
+            margin-left: 3px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 10px;
             font-family: 'Orbitron', sans-serif;
         }
 
@@ -205,16 +218,40 @@
         #debug-toggle {
             position: fixed;
             top: 10px;
-            left: 170px;
-            background: rgba(0, 0, 0, 0.7);
+            left: 150px;
+            background: rgba(0, 0, 0, 0.5);
             color: #00ff00;
             border: 1px solid #00ff00;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 12px;
+            border-radius: 3px;
+            padding: 2px 5px;
+            font-size: 10px;
             cursor: pointer;
             z-index: 101;
             pointer-events: auto;
+        }
+        
+        /* Health and ammo bars */
+        .stat-bar {
+            height: 4px;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            margin-top: 3px;
+            position: relative;
+        }
+        
+        .stat-bar-fill {
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        
+        .health-bar-fill {
+            background: linear-gradient(to right, #ff0000, #ffff00, #00ff00);
+        }
+        
+        .ammo-bar-fill {
+            background: linear-gradient(to right, #0066ff, #00ffff);
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -238,7 +275,13 @@
     <!-- Game Canvas -->
     <canvas id="game"></canvas>
 
-    <!-- Minimalist UI Elements -->
+    <!-- Ultra-Minimal UI Elements -->
+    <!-- Weapon Info -->
+    <div id="weapon-info" class="ui-element">
+        <div id="currentWeapon">MACHINE GUN</div>
+        <div id="weaponStats">DMG: 20 | FIRE RATE: 0.1s</div>
+    </div>
+    
     <!-- Player Info -->
     <div id="player-info" class="ui-element">
         <div id="playerName">PLAYER</div>
@@ -248,7 +291,13 @@
     <!-- Game Stats -->
     <div id="game-stats" class="ui-element">
         <div id="health">HEALTH: 100%</div>
+        <div class="stat-bar">
+            <div class="stat-bar-fill health-bar-fill" style="width: 100%"></div>
+        </div>
         <div id="ammo">AMMO: 30/30</div>
+        <div class="stat-bar">
+            <div class="stat-bar-fill ammo-bar-fill" style="width: 100%"></div>
+        </div>
     </div>
     
     <!-- Speed Display -->
@@ -262,13 +311,13 @@
     <!-- Debug Panel (Hidden by Default) -->
     <div id="debug-panel" class="ui-element">
         <div>Debug Controls:</div>
-        <div>D: Teleport to arena edge</div>
+        <div>D: Teleport to edge</div>
         <div>Space: Fire weapon</div>
         <div>1-4: Switch weapons</div>
-        <div>Q/E: Previous/Next weapon</div>
+        <div>Q/E: Prev/Next weapon</div>
         <div>&nbsp;</div>
-        <div>Debug Information:</div>
-        <div id="positionInfo">Position: X:0 Y:0 Z:0</div>
+        <div>Debug Info:</div>
+        <div id="positionInfo">Pos: X:0 Y:0 Z:0</div>
     </div>
     
     <!-- Powerup Indicators -->
@@ -308,7 +357,7 @@
         window.updateDebugInfo = function(position) {
             const positionInfo = document.getElementById('positionInfo');
             if (positionInfo && position) {
-                positionInfo.textContent = `Position: X:${position.x.toFixed(2)} Y:${position.y.toFixed(2)} Z:${position.z.toFixed(2)}`;
+                positionInfo.textContent = `Pos: X:${position.x.toFixed(1)} Y:${position.y.toFixed(1)} Z:${position.z.toFixed(1)}`;
             }
         };
         
@@ -426,7 +475,7 @@
             // Function to add a message to the chat
             function addChatMessage(sender, message) {
                 const messageElement = document.createElement('div');
-                messageElement.style.marginBottom = '5px';
+                messageElement.style.marginBottom = '3px';
                 messageElement.innerHTML = `<span style="color: #ff00ff;">${sender}:</span> ${message}`;
                 chatMessages.appendChild(messageElement);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -470,6 +519,21 @@
             // Expose the addChatMessage function globally so it can be called from the game
             window.addChatMessage = addChatMessage;
         });
+        
+        // Update health and ammo bars
+        window.updateStatBars = function(health, ammo, maxAmmo) {
+            const healthBarFill = document.querySelector('.health-bar-fill');
+            const ammoBarFill = document.querySelector('.ammo-bar-fill');
+            
+            if (healthBarFill && health !== undefined) {
+                healthBarFill.style.width = `${health}%`;
+            }
+            
+            if (ammoBarFill && ammo !== undefined && maxAmmo !== undefined) {
+                const ammoPercent = (ammo / maxAmmo) * 100;
+                ammoBarFill.style.width = `${ammoPercent}%`;
+            }
+        };
     </script>
 </body>
 </html> 

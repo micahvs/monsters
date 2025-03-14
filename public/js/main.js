@@ -1860,7 +1860,7 @@ class Game {
 
     // Update HUD method
     updateHUD() {
-        // Update health display with color coding
+        // Update health display with color coding and bar
         const healthElement = document.getElementById('health');
         if (healthElement) {
             const healthPercent = this.health;
@@ -1873,7 +1873,15 @@ class Game {
             }
             
             healthElement.innerHTML = `HEALTH: <span style="color: ${healthColor};">${Math.floor(healthPercent)}%</span>`;
+            
+            // Update health bar
+            if (window.updateStatBars) {
+                window.updateStatBars(healthPercent);
+            }
         }
+        
+        // Update weapon info
+        this.updateWeaponInfo();
         
         // Update speed display
         this.updateSpeedDisplay();
@@ -1888,10 +1896,25 @@ class Game {
         
         // Update score display
         this.updateScoreDisplay();
+    }
+    
+    // Update weapon info display
+    updateWeaponInfo() {
+        const weaponNameElement = document.getElementById('currentWeapon');
+        const weaponStatsElement = document.getElementById('weaponStats');
         
-        // Update weapon display
-        if (typeof this.updateWeaponDisplay === 'function') {
-            this.updateWeaponDisplay();
+        if (weaponNameElement && weaponStatsElement && this.weapons && this.currentWeaponIndex !== undefined) {
+            const currentWeapon = this.weapons[this.currentWeaponIndex];
+            if (currentWeapon) {
+                // Update weapon name
+                weaponNameElement.innerHTML = `<span style="color: #00ffff;">${currentWeapon.name || 'UNKNOWN WEAPON'}</span>`;
+                
+                // Update weapon stats
+                let damageText = currentWeapon.damage || 20;
+                let fireRateText = currentWeapon.fireRate ? (currentWeapon.fireRate + 's') : '0.1s';
+                
+                weaponStatsElement.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
+            }
         }
     }
     
@@ -1923,6 +1946,8 @@ class Game {
             // Get current weapon if available
             let ammoText = 'AMMO: ∞';
             let ammoColor = '#ffffff';
+            let ammoValue = 0;
+            let maxAmmoValue = 1;
             
             if (this.weapons && this.currentWeaponIndex !== undefined) {
                 const weapon = this.weapons[this.currentWeaponIndex];
@@ -1930,6 +1955,8 @@ class Game {
                     if (weapon.ammo !== undefined && weapon.maxAmmo !== undefined) {
                         // Color coding based on ammo percentage
                         const ammoPercent = (weapon.ammo / weapon.maxAmmo) * 100;
+                        ammoValue = weapon.ammo;
+                        maxAmmoValue = weapon.maxAmmo;
                         
                         if (ammoPercent <= 25) {
                             ammoColor = '#ff0000'; // Red for low ammo
@@ -1942,11 +1969,18 @@ class Game {
                         ammoText = `AMMO: <span style="color: ${ammoColor};">${weapon.ammo}/${weapon.maxAmmo}</span>`;
                     } else {
                         ammoText = `AMMO: <span style="color: #00ffff;">∞</span>`;
+                        ammoValue = 100;
+                        maxAmmoValue = 100;
                     }
                 }
             }
             
             ammoElement.innerHTML = ammoText;
+            
+            // Update ammo bar
+            if (window.updateStatBars) {
+                window.updateStatBars(this.health, ammoValue, maxAmmoValue);
+            }
         }
     }
     
@@ -4395,8 +4429,9 @@ class Game {
             newContainer.style.left = '50%';
             newContainer.style.transform = 'translateX(-50%)';
             newContainer.style.display = 'flex';
-            newContainer.style.gap = '10px';
+            newContainer.style.gap = '8px';
             newContainer.style.justifyContent = 'center';
+            newContainer.style.background = 'none';
             document.body.appendChild(newContainer);
         }
         
@@ -4410,23 +4445,24 @@ class Game {
                 
                 const indicator = document.createElement('div');
                 indicator.className = 'powerup-indicator';
-                indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.7);
+                indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.5);
                 indicator.style.color = '#fff';
-                indicator.style.padding = '5px 8px';
-                indicator.style.borderRadius = '4px';
+                indicator.style.padding = '3px 6px';
+                indicator.style.borderRadius = '3px';
                 indicator.style.display = 'flex';
                 indicator.style.alignItems = 'center';
-                indicator.style.gap = '5px';
-                indicator.style.border = '1px solid ' + this.hexToRgba(powerupConfig.color, 1.0);
+                indicator.style.gap = '4px';
+                indicator.style.border = '1px solid ' + this.hexToRgba(powerupConfig.color, 0.8);
                 
                 // Create icon
                 const icon = document.createElement('span');
                 icon.textContent = powerupConfig.icon;
-                icon.style.fontSize = '16px';
+                icon.style.fontSize = '11px';
                 
                 // Create timer
                 const timer = document.createElement('span');
                 timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
+                timer.style.fontSize = '10px';
                 
                 indicator.appendChild(icon);
                 indicator.appendChild(timer);
