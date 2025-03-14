@@ -1894,6 +1894,69 @@ class Game {
             this.updateWeaponDisplay();
         }
     }
+    
+    // Update speed display
+    updateSpeedDisplay() {
+        const speedElement = document.getElementById('speed');
+        if (speedElement && this.truck) {
+            // Calculate speed in MPH (arbitrary conversion for game feel)
+            const speed = Math.round(this.truckSpeed * 10);
+            
+            // Color coding based on speed
+            let speedColor = '#ffffff';
+            if (speed > 80) {
+                speedColor = '#ff0000'; // Red for high speed
+            } else if (speed > 50) {
+                speedColor = '#ffff00'; // Yellow for medium speed
+            } else if (speed > 20) {
+                speedColor = '#00ffff'; // Cyan for normal speed
+            }
+            
+            speedElement.innerHTML = `SPEED: <span style="color: ${speedColor};">${speed} MPH</span>`;
+        }
+    }
+    
+    // Update ammo display
+    updateAmmoDisplay() {
+        const ammoElement = document.getElementById('ammo');
+        if (ammoElement) {
+            // Get current weapon if available
+            let ammoText = 'AMMO: ∞';
+            let ammoColor = '#ffffff';
+            
+            if (this.weapons && this.currentWeaponIndex !== undefined) {
+                const weapon = this.weapons[this.currentWeaponIndex];
+                if (weapon) {
+                    if (weapon.ammo !== undefined && weapon.maxAmmo !== undefined) {
+                        // Color coding based on ammo percentage
+                        const ammoPercent = (weapon.ammo / weapon.maxAmmo) * 100;
+                        
+                        if (ammoPercent <= 25) {
+                            ammoColor = '#ff0000'; // Red for low ammo
+                        } else if (ammoPercent <= 50) {
+                            ammoColor = '#ffff00'; // Yellow for medium ammo
+                        } else {
+                            ammoColor = '#00ffff'; // Cyan for good ammo
+                        }
+                        
+                        ammoText = `AMMO: <span style="color: ${ammoColor};">${weapon.ammo}/${weapon.maxAmmo}</span>`;
+                    } else {
+                        ammoText = `AMMO: <span style="color: #00ffff;">∞</span>`;
+                    }
+                }
+            }
+            
+            ammoElement.innerHTML = ammoText;
+        }
+    }
+    
+    // Update score display
+    updateScoreDisplay() {
+        const scoreElement = document.getElementById('score');
+        if (scoreElement && this.score !== undefined) {
+            scoreElement.innerHTML = `SCORE: <span style="color: #00ffff;">${this.score}</span>`;
+        }
+    }
 
     // Add shooting mechanics to the Game class
 
@@ -2761,30 +2824,6 @@ class Game {
         };
         
         animateVehicleImpact();
-    }
-
-    // Update ammo display
-    updateAmmoDisplay() {
-        const ammoDisplay = document.getElementById('ammo');
-        if (ammoDisplay) {
-            ammoDisplay.textContent = `AMMO: ${this.ammo}/${this.maxAmmo}`;
-        }
-    }
-
-    // Show reloading message
-    showReloadingMessage() {
-        const ammoDisplay = document.getElementById('ammo');
-        if (ammoDisplay) {
-            ammoDisplay.innerHTML = `<span style="color: #ff0000;">RELOADING...</span>`;
-        }
-    }
-
-    // Hide reloading message
-    hideReloadingMessage() {
-        const ammoDisplay = document.getElementById('ammo');
-        if (ammoDisplay) {
-            ammoDisplay.textContent = `AMMO: ${this.ammo}/${this.maxAmmo}`;
-        }
     }
 
     // Add turret-related methods to the Game class
@@ -4351,14 +4390,18 @@ class Game {
             // Create container if it doesn't exist
             const newContainer = document.createElement('div');
             newContainer.id = 'powerup-indicators';
-            newContainer.style.position = 'absolute';
-            newContainer.style.bottom = '80px'; // Position above audio controls
-            newContainer.style.right = '10px';
             newContainer.style.display = 'flex';
             newContainer.style.flexDirection = 'column';
             newContainer.style.alignItems = 'flex-end';
-            newContainer.style.zIndex = '100';
-            document.body.appendChild(newContainer);
+            newContainer.style.marginBottom = '15px';
+            
+            // Find the mid-right-zone to append to
+            const midRightZone = document.getElementById('mid-right-zone');
+            if (midRightZone) {
+                midRightZone.insertBefore(newContainer, midRightZone.firstChild);
+            } else {
+                document.body.appendChild(newContainer);
+            }
         }
         
         const powerupContainer = document.getElementById('powerup-indicators');
@@ -4381,6 +4424,8 @@ class Game {
                 indicator.style.alignItems = 'center';
                 indicator.style.justifyContent = 'space-between';
                 indicator.style.width = '150px';
+                indicator.style.border = '1px solid ' + this.hexToRgba(powerupConfig.color, 1.0);
+                indicator.style.boxShadow = '0 0 10px ' + this.hexToRgba(powerupConfig.color, 0.5);
                 
                 // Create icon
                 const icon = document.createElement('span');
