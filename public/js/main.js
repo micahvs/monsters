@@ -1029,55 +1029,64 @@ class Game {
         }
         
         // Shooting
-        if (this.keys[' '] && this.weapons && this.weapons.length > 0) {
-            const currentWeapon = this.getCurrentWeapon();
+        if (this.keys[' ']) {
+            // Use old shooting system as fallback
+            if (typeof this.shoot === 'function') {
+                console.log("Using original shoot method");
+                this.shoot();
+            }
             
-            if (currentWeapon) {
-                try {
-                    console.log("Attempting to shoot with weapon:", currentWeapon.type.name);
-                    
-                    // Calculate shooting position and direction
-                    const shootPos = new THREE.Vector3(
-                        this.truck.position.x,
-                        this.truck.position.y + 0.5,
-                        this.truck.position.z
-                    );
-                    
-                    // Calculate forward direction from truck rotation
-                    const direction = new THREE.Vector3(
-                        Math.sin(this.truck.rotation.y),
-                        0,
-                        Math.cos(this.truck.rotation.y)
-                    );
-                    
-                    // Handle mines differently - they're dropped behind the truck
-                    if (currentWeapon.type.name === "Mines") {
-                        // Drop behind the truck
-                        const shootPosBehind = new THREE.Vector3(
-                            this.truck.position.x - direction.x * 2,
-                            this.truck.position.y,
-                            this.truck.position.z - direction.z * 2
+            // Also try new weapon system if available
+            if (this.weapons && this.weapons.length > 0) {
+                const currentWeapon = this.getCurrentWeapon();
+                
+                if (currentWeapon) {
+                    try {
+                        console.log("Attempting to shoot with weapon:", currentWeapon.type.name);
+                        
+                        // Calculate shooting position and direction
+                        const shootPos = new THREE.Vector3(
+                            this.truck.position.x,
+                            this.truck.position.y + 0.5,
+                            this.truck.position.z
                         );
                         
-                        // Direction is down
-                        const downDirection = new THREE.Vector3(0, -1, 0);
+                        // Calculate forward direction from truck rotation
+                        const direction = new THREE.Vector3(
+                            Math.sin(this.truck.rotation.y),
+                            0,
+                            Math.cos(this.truck.rotation.y)
+                        );
                         
-                        // Shoot the mine
-                        const result = currentWeapon.shoot(shootPosBehind, downDirection);
-                        console.log("Mine shot result:", result);
-                    } else {
-                        // Shoot regular weapon
-                        const result = currentWeapon.shoot(shootPos, direction);
-                        console.log("Weapon shot result:", result);
+                        // Handle mines differently - they're dropped behind the truck
+                        if (currentWeapon.type.name === "Mines") {
+                            // Drop behind the truck
+                            const shootPosBehind = new THREE.Vector3(
+                                this.truck.position.x - direction.x * 2,
+                                this.truck.position.y,
+                                this.truck.position.z - direction.z * 2
+                            );
+                            
+                            // Direction is down
+                            const downDirection = new THREE.Vector3(0, -1, 0);
+                            
+                            // Shoot the mine
+                            const result = currentWeapon.shoot(shootPosBehind, downDirection);
+                            console.log("Mine shot result:", result);
+                        } else {
+                            // Shoot regular weapon
+                            const result = currentWeapon.shoot(shootPos, direction);
+                            console.log("Weapon shot result:", result);
+                        }
+                        
+                        // Update weapon display
+                        this.updateWeaponDisplay();
+                    } catch (error) {
+                        console.error("Error while shooting:", error);
                     }
-                    
-                    // Update weapon display
-                    this.updateWeaponDisplay();
-                } catch (error) {
-                    console.error("Error while shooting:", error);
+                } else {
+                    console.warn("No current weapon available");
                 }
-            } else {
-                console.warn("No current weapon available");
             }
         }
         
@@ -3318,42 +3327,39 @@ class Game {
             // Create container for the powerup
             const container = new THREE.Object3D();
             
-            // Create base geometry based on powerup type
-            let geometry;
+            // Use standard cube geometry for all powerups with different colors
             let material;
             
             // Make powerups larger and more visible
             const sizeMultiplier = 2.0; // Double size for better visibility
             
+            // Create a standard cube for all powerup types
+            const geometry = new THREE.BoxGeometry(1.5 * sizeMultiplier, 1.5 * sizeMultiplier, 1.5 * sizeMultiplier);
+            
+            // Add text or icon to each face of the cube to identify the powerup type
+            let iconText;
+            
             switch(powerupConfig.model) {
                 case 'lightning':
-                    // Create a lightning bolt shape
-                    geometry = new THREE.ConeGeometry(0.7 * sizeMultiplier, 2 * sizeMultiplier, 4);
-                    geometry.rotateX(Math.PI / 2);
+                    iconText = "⚡"; // Lightning bolt for speed
                     break;
                 case 'star':
-                    // Create a star shape (using octahedron as approximation)
-                    geometry = new THREE.OctahedronGeometry(1 * sizeMultiplier, 0);
+                    iconText = "★"; // Star for invincibility
                     break;
                 case 'heart':
-                    // Create a heart-like shape (using sphere as base)
-                    geometry = new THREE.SphereGeometry(1 * sizeMultiplier, 8, 8);
+                    iconText = "❤"; // Heart for health
                     break;
                 case 'ammo':
-                    // Create an ammo box shape
-                    geometry = new THREE.BoxGeometry(1 * sizeMultiplier, 0.8 * sizeMultiplier, 1.5 * sizeMultiplier);
+                    iconText = "🔫"; // Gun for ammo
                     break;
                 case 'shield':
-                    // Create a shield shape
-                    geometry = new THREE.SphereGeometry(1 * sizeMultiplier, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-                    geometry.scale(1.2, 1.2, 0.8);
+                    iconText = "🛡️"; // Shield for shield
                     break;
                 default:
-                    // Default cube
-                    geometry = new THREE.BoxGeometry(1.5 * sizeMultiplier, 1.5 * sizeMultiplier, 1.5 * sizeMultiplier);
+                    iconText = "?"; // Question mark for unknown
             }
             
-            // Create material with stronger glow effect
+            // Create material with stronger glow effect - use PhongMaterial which supports emissive
             material = new THREE.MeshPhongMaterial({
                 color: powerupConfig.color,
                 emissive: powerupConfig.emissive,
@@ -3616,9 +3622,11 @@ class Game {
                     }
                 }
                 
-                // Check for collision with truck
+                // Check for collision with truck - use a larger collision radius for better gameplay
                 const distance = powerup.position.distanceTo(this.truck.position);
-                if (distance < 6) { // Increased collision radius for better gameplay
+                const collisionRadius = 8; // Larger collision radius for easier pickup
+                
+                if (distance < collisionRadius) {
                     console.log(`Powerup collected! Type: ${powerup.userData.type}, distance: ${distance.toFixed(2)}`);
                     
                     // Apply powerup effect
