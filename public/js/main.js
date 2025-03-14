@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MonsterTruck } from './MonsterTruck.js';
 import { World } from './World.js';
 import Multiplayer from './Multiplayer.js';
+import { Weapon, WeaponTypes, WeaponPickup } from './Weapons.js';
 
 const TRUCK_SPECS = {
     'NEON CRUSHER': {
@@ -204,14 +205,18 @@ class Game {
         this.audioToggle = document.getElementById('audioToggle');
         this.isMuted = localStorage.getItem('monsterTruckAudioMuted') === 'true';
         
-        // Shooting mechanics
+        // Weapon and shooting mechanics
         this.projectiles = [];
-        this.shootCooldown = 0;
-        this.ammo = 30; // Limited ammo
-        this.maxAmmo = 30;
-        this.reloadTime = 0;
+        this.weapons = [];
+        this.currentWeaponIndex = 0;
+        this.weaponPickups = [];
+        this.lastWeaponPickupSpawn = 0;
+        this.weaponPickupSpawnInterval = 15000; // Spawn weapon pickup every 15 seconds
         
-        // Add these properties
+        // Initialize weapons
+        this.initializeWeapons();
+        
+        // Add powerup properties
         this.powerups = [];
         this.activePowerups = new Map();
         this.lastPowerupSpawn = 0;
@@ -815,9 +820,23 @@ class Game {
                 this.checkWallCollisions();
             }
             
-            // Update projectiles
-            if (typeof this.updateProjectiles === 'function') {
-                this.updateProjectiles();
+            // Update weapons and their projectiles
+            if (this.weapons) {
+                // Update all weapons
+                this.weapons.forEach(weapon => {
+                    weapon.update();
+                });
+                
+                // Update weapon display (will update cooldown indicator)
+                this.updateWeaponDisplay();
+                
+                // Check for projectile hits on enemies
+                this.checkProjectileHits();
+            }
+            
+            // Update weapon pickups
+            if (typeof this.updateWeaponPickups === 'function') {
+                this.updateWeaponPickups();
             }
             
             // Update powerups
@@ -833,6 +852,11 @@ class Game {
             // Update visual effects
             if (typeof this.updateSparks === 'function' && this.sparks && this.sparks.length > 0) {
                 this.updateSparks();
+            }
+            
+            // Update special effects if any
+            if (this.specialEffects && this.specialEffects.length > 0) {
+                this.updateSpecialEffects();
             }
             
             // Update stadium spectators
@@ -857,6 +881,100 @@ class Game {
             }
         } catch (error) {
             console.error("Error in game update loop:", error);
+        }
+    }
+    
+    // Check for projectile hits
+    checkProjectileHits() {
+        if (!this.weapons || !this.turrets) return;
+        
+        // Loop through all weapons
+        this.weapons.forEach(weapon => {
+            // Loop through all turrets
+            this.turrets.forEach(turret => {
+                // Skip destroyed turrets
+                if (turret.destroyed) return;
+                
+                // Create a vector for turret position
+                const turretPos = new THREE.Vector3(
+                    turret.mesh.position.x,
+                    turret.mesh.position.y + 1.5, // Target center of turret
+                    turret.mesh.position.z
+                );
+                
+                // Check for collision
+                const hit = weapon.checkCollision(turretPos, 2);
+                
+                if (hit) {
+                    // Apply damage
+                    this.damageTurret(turret, hit.damage);
+                    
+                    // If hit was explosive, create bigger effect
+                    if (hit.explosive) {
+                        // Apply area damage to nearby turrets
+                        this.applyAreaDamage(turretPos, 10, hit.damage / 2);
+                    }
+                    
+                    // Add score based on damage
+                    this.score += Math.floor(hit.damage);
+                    
+                    // Update score display
+                    this.updateScoreDisplay();
+                }
+            });
+        });
+    }
+    
+    // Apply area damage to all turrets in radius
+    applyAreaDamage(position, radius, damage) {
+        if (!this.turrets) return;
+        
+        this.turrets.forEach(turret => {
+            // Skip destroyed turrets
+            if (turret.destroyed) return;
+            
+            // Calculate distance to turret
+            const distance = position.distanceTo(turret.mesh.position);
+            
+            // Apply damage if within radius
+            if (distance < radius) {
+                // Damage falls off with distance
+                const falloff = 1 - (distance / radius);
+                const actualDamage = damage * falloff;
+                
+                // Apply damage
+                this.damageTurret(turret, actualDamage);
+            }
+        });
+    }
+    
+    // Update the score display
+    updateScoreDisplay() {
+        const scoreDisplay = document.getElementById('score');
+        if (scoreDisplay) {
+            scoreDisplay.textContent = `SCORE: ${this.score}`;
+        }
+    }
+    
+    // Add method to update special effects
+    updateSpecialEffects() {
+        if (!this.specialEffects) return;
+        
+        for (let i = this.specialEffects.length - 1; i >= 0; i--) {
+            const effect = this.specialEffects[i];
+            
+            // Check if effect has an update method
+            if (effect.update && typeof effect.update === 'function') {
+                // Call update method, which returns true if the effect should be removed
+                const shouldRemove = effect.update();
+                
+                if (shouldRemove) {
+                    this.specialEffects.splice(i, 1);
+                }
+            } else if (effect.mesh && !effect.mesh.parent) {
+                // If the mesh has been removed from the scene, remove the effect
+                this.specialEffects.splice(i, 1);
+            }
         }
     }
     
@@ -886,38 +1004,51 @@ class Game {
         }
         
         // Shooting
-        if (this.keys[' '] && this.shootCooldown <= 0 && this.ammo > 0 && this.reloadTime <= 0) {
-            this.shoot();
-            this.shootCooldown = 10;
-            this.ammo--;
-            this.updateAmmoDisplay();
+        if (this.keys[' '] && this.weapons && this.weapons.length > 0) {
+            const currentWeapon = this.getCurrentWeapon();
+            
+            if (currentWeapon) {
+                // Calculate shooting position and direction
+                const shootPos = new THREE.Vector3();
+                this.truck.getWorldPosition(shootPos);
+                shootPos.y += 0.5; // Raise slightly
+                
+                // Calculate forward direction from truck rotation
+                const direction = new THREE.Vector3(
+                    Math.sin(this.truck.rotation.y),
+                    0,
+                    Math.cos(this.truck.rotation.y)
+                );
+                
+                // Handle mines differently - they're dropped behind the truck
+                if (currentWeapon.type === WeaponTypes.MINES) {
+                    // Drop behind the truck
+                    const shootPosBehind = new THREE.Vector3();
+                    this.truck.getWorldPosition(shootPosBehind);
+                    
+                    // Move position behind truck
+                    shootPosBehind.x -= direction.x * 2;
+                    shootPosBehind.z -= direction.z * 2;
+                    
+                    // Direction is down
+                    const downDirection = new THREE.Vector3(0, -1, 0);
+                    
+                    // Shoot the mine
+                    currentWeapon.shoot(shootPosBehind, downDirection);
+                } else {
+                    // Shoot regular weapon
+                    currentWeapon.shoot(shootPos, direction);
+                }
+                
+                // Update weapon display
+                this.updateWeaponDisplay();
+            }
         }
         
         // Audio toggle with 'M' key
         if (this.keys['M']) {
             this.keys['M'] = false; // Reset key to prevent multiple toggles
             this.toggleAudio();
-        }
-        
-        // Decrease cooldown
-        if (this.shootCooldown > 0) {
-            this.shootCooldown--;
-        }
-        
-        // Auto-reload when empty
-        if (this.ammo <= 0 && this.reloadTime <= 0) {
-            this.reloadTime = 120;
-            this.showReloadingMessage();
-        }
-        
-        // Handle reload timer
-        if (this.reloadTime > 0) {
-            this.reloadTime--;
-            if (this.reloadTime === 0) {
-                this.ammo = this.maxAmmo;
-                this.updateAmmoDisplay();
-                this.hideReloadingMessage();
-            }
         }
     }
     
@@ -1559,11 +1690,14 @@ class Game {
         // Update speed display
         this.updateSpeedDisplay();
         
-        // Update ammo display
-        this.updateAmmoDisplay();
+        // Update weapon and ammo display
+        this.updateWeaponDisplay();
         
         // Update powerup indicators
         this.updatePowerupIndicators();
+        
+        // Update score display
+        this.updateScoreDisplay();
     }
 
     // Add shooting mechanics to the Game class
@@ -2563,17 +2697,82 @@ class Game {
         animateExplosion();
     }
 
-    // Initialize with ammo display
+    // Initialize with weapon and ammo display
     initHUD() {
         const playerName = document.getElementById('playerName');
         const health = document.getElementById('health');
         const score = document.getElementById('score');
         const ammo = document.getElementById('ammo');
         
+        // Create weapon display if it doesn't exist
+        let weaponDisplay = document.getElementById('weapon');
+        if (!weaponDisplay) {
+            weaponDisplay = document.createElement('div');
+            weaponDisplay.id = 'weapon';
+            weaponDisplay.style.position = 'absolute';
+            weaponDisplay.style.top = '10px';
+            weaponDisplay.style.left = '10px';
+            weaponDisplay.style.color = '#ffffff';
+            weaponDisplay.style.fontFamily = '"Orbitron", sans-serif';
+            weaponDisplay.style.fontSize = '18px';
+            weaponDisplay.style.fontWeight = 'bold';
+            weaponDisplay.style.textShadow = '2px 2px 4px rgba(0, 0, 0, 0.5)';
+            document.body.appendChild(weaponDisplay);
+        }
+        
+        // Set initial values
         if (playerName) playerName.textContent = localStorage.getItem('monsterTruckNickname') || 'PLAYER';
         if (health) health.innerHTML = `HEALTH: <span style="color:#00ff00">${this.health}%</span>`;
         if (score) score.textContent = `SCORE: ${this.score}`;
-        if (ammo) ammo.textContent = `AMMO: ${this.ammo}/${this.maxAmmo}`;
+        
+        // Set weapon and ammo display if weapons are initialized
+        if (this.weapons && this.weapons.length > 0) {
+            const currentWeapon = this.getCurrentWeapon();
+            
+            if (weaponDisplay) {
+                weaponDisplay.textContent = `${currentWeapon.type.icon} ${currentWeapon.type.name}`;
+            }
+            
+            if (ammo) {
+                ammo.textContent = `AMMO: ${currentWeapon.ammo}/${currentWeapon.maxAmmo}`;
+            }
+            
+            // Initialize cooldown indicator
+            this.updateCooldownIndicator();
+        }
+        
+        // Create weapon key bindings legend
+        this.createWeaponLegend();
+    }
+    
+    // Create weapon key bindings legend
+    createWeaponLegend() {
+        let legend = document.getElementById('weapon-legend');
+        if (!legend) {
+            legend = document.createElement('div');
+            legend.id = 'weapon-legend';
+            legend.style.position = 'absolute';
+            legend.style.top = '40px';
+            legend.style.left = '10px';
+            legend.style.color = '#ffffff';
+            legend.style.fontFamily = '"Orbitron", sans-serif';
+            legend.style.fontSize = '12px';
+            legend.style.fontWeight = 'bold';
+            legend.style.textShadow = '1px 1px 2px rgba(0, 0, 0, 0.5)';
+            legend.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            legend.style.padding = '5px';
+            legend.style.borderRadius = '5px';
+            legend.style.maxWidth = '200px';
+            
+            legend.innerHTML = `
+                <div>1-4: Switch Weapons</div>
+                <div>Q/E: Prev/Next Weapon</div>
+                <div>R: Reload</div>
+                <div>SPACE: Fire</div>
+            `;
+            
+            document.body.appendChild(legend);
+        }
     }
 
     // Debug method to help diagnose movement issues
@@ -2896,46 +3095,66 @@ class Game {
         
         const powerupConfig = this.powerupTypes[type];
         
+        // Determine which sound to play
+        let soundType = type.toLowerCase();
+        // Map powerup types to sound types
+        if (type === 'SPEED_BOOST') soundType = 'speed';
+        else if (type === 'INVINCIBILITY' || type === 'SHIELD') soundType = 'shield';
+        else if (type === 'DAMAGE_BOOST') soundType = 'damage';
+        else if (type === 'REPAIR') soundType = 'health';
+        else if (type === 'AMMO_REFILL') soundType = 'ammo';
+        
         // Play sound effect
-        if (this.powerupSounds[type]) {
+        if (this.powerupSounds[soundType]) {
             // Clone the audio to allow overlapping sounds
-            const sound = this.powerupSounds[type].cloneNode();
+            const sound = this.powerupSounds[soundType].cloneNode();
             sound.volume = 0.4;
             sound.play().catch(e => console.log('Error playing powerup sound:', e));
+        } else {
+            console.log(`No sound found for powerup type: ${soundType}`);
         }
         
         // Create visual effect
         this.createPowerupEffect(type);
         
-        // Apply powerup effect
-        switch (type) {
-            case 'speed':
-                this.activePowerups.speed = {
-                    timeRemaining: powerupConfig.duration,
-                    multiplier: powerupConfig.multiplier
-                };
-                break;
-            case 'shield':
-                this.activePowerups.shield = {
-                    timeRemaining: powerupConfig.duration,
-                    strength: powerupConfig.strength
-                };
-                break;
-            case 'damage':
-                this.activePowerups.damage = {
-                    timeRemaining: powerupConfig.duration,
-                    multiplier: powerupConfig.multiplier
-                };
-                break;
-            case 'health':
-                // Instant effect - restore health
-                this.health = Math.min(100, this.health + powerupConfig.amount);
-                break;
-            case 'ammo':
-                // Instant effect - add ammo
-                this.ammo = Math.min(this.maxAmmo, this.ammo + powerupConfig.amount);
-                break;
+        // Apply powerup effect based on the powerup's duration
+        if (powerupConfig.duration > 0) {
+            // Calculate expiration time
+            const expirationTime = Date.now() + powerupConfig.duration;
+            
+            // Set up timeout to remove the powerup effect when it expires
+            const timeoutId = setTimeout(() => {
+                // Call the remove function to revert the powerup effect
+                powerupConfig.remove();
+                // Remove from active powerups
+                this.activePowerups.delete(type);
+                // Update the indicators
+                this.updatePowerupIndicators();
+                // Create fade-out effect
+                this.createPowerupFadeEffect(type);
+            }, powerupConfig.duration);
+            
+            // Add to active powerups (replace existing if any)
+            if (this.activePowerups.has(type)) {
+                // Clear existing timeout to prevent multiple removals
+                clearTimeout(this.activePowerups.get(type).timeoutId);
+            }
+            
+            // Store in map with timeout ID and expiration time
+            this.activePowerups.set(type, {
+                timeoutId: timeoutId,
+                expirationTime: expirationTime
+            });
+            
+            // Apply the effect immediately
+            powerupConfig.apply();
+        } else {
+            // For instant powerups, just apply the effect without adding to active powerups
+            powerupConfig.apply();
         }
+        
+        // Update powerup indicators display
+        this.updatePowerupIndicators();
         
         console.log(`Powerup applied: ${powerupConfig.name}`);
     }
@@ -3045,8 +3264,49 @@ class Game {
         }
         
         // Update shield effect if active
-        if (this.hasShield && this.shieldMesh) {
+        if (this.hasShield && this.truck) {
             this.updateShieldEffect();
+        }
+    }
+    
+    // Add this method for updating the shield effect
+    updateShieldEffect() {
+        if (!this.truck) return;
+        
+        // Create shield mesh if it doesn't exist
+        if (!this.shieldMesh) {
+            const shieldGeometry = new THREE.SphereGeometry(4, 16, 12);
+            const shieldMaterial = new THREE.MeshPhongMaterial({
+                color: 0x00ffff,
+                emissive: 0x00ffff,
+                emissiveIntensity: 0.3,
+                transparent: true,
+                opacity: 0.4,
+                side: THREE.DoubleSide
+            });
+            
+            this.shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
+            this.scene.add(this.shieldMesh);
+            
+            // Add subtle pulsing animation
+            this.shieldPulseTime = 0;
+        }
+        
+        // Update shield position to match truck
+        this.shieldMesh.position.copy(this.truck.position);
+        this.shieldMesh.position.y += 1.5; // Adjust height to center on truck
+        
+        // Animate shield with subtle pulse effect
+        this.shieldPulseTime += 0.05;
+        const pulseScale = 1 + Math.sin(this.shieldPulseTime) * 0.05;
+        this.shieldMesh.scale.set(pulseScale, pulseScale, pulseScale);
+    }
+    
+    // Add this method for removing the shield effect
+    removeShieldEffect() {
+        if (this.shieldMesh && this.scene) {
+            this.scene.remove(this.shieldMesh);
+            this.shieldMesh = null;
         }
     }
     
@@ -3099,9 +3359,13 @@ class Game {
 
     // Create visual effect for powerup collection
     createPowerupEffect(type) {
-        if (!this.truck) return;
+        if (!this.truck || !this.scene) return;
         
         const powerupConfig = this.powerupTypes[type];
+        if (!powerupConfig) {
+            console.log(`No config found for powerup type: ${type}`);
+            return;
+        }
         
         // Create particles around the truck
         const particleCount = 20;
@@ -3166,15 +3430,195 @@ class Game {
         };
         
         fadeLight();
+        
+        // Create custom effect based on powerup type
+        switch(type) {
+            case 'SHIELD':
+                // Shield effect is handled in updateShieldEffect method
+                this.hasShield = true;
+                break;
+            case 'SPEED_BOOST':
+                // Add speed trail effect
+                this.createSpeedBoostEffect();
+                break;
+            case 'DAMAGE_BOOST':
+                // Add damage boost effect
+                this.createDamageBoostEffect();
+                break;
+        }
+    }
+    
+    // Add speed boost visual effect
+    createSpeedBoostEffect() {
+        if (!this.truck) return;
+        
+        // Create speed lines behind truck
+        const count = 10;
+        
+        for (let i = 0; i < count; i++) {
+            const lineGeometry = new THREE.BoxGeometry(0.1, 0.1, 1 + Math.random() * 2);
+            const lineMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            const line = new THREE.Mesh(lineGeometry, lineMaterial);
+            
+            // Position behind truck
+            const angle = Math.random() * Math.PI;
+            const radius = 1.5 + Math.random() * 1.5;
+            const truckDirection = new THREE.Vector3(
+                -Math.sin(this.truck.rotation.y), 
+                0, 
+                -Math.cos(this.truck.rotation.y)
+            );
+            
+            line.position.set(
+                this.truck.position.x + truckDirection.x * (3 + Math.random() * 2) + Math.cos(angle) * radius,
+                this.truck.position.y + Math.random() * 2,
+                this.truck.position.z + truckDirection.z * (3 + Math.random() * 2) + Math.sin(angle) * radius
+            );
+            
+            line.lookAt(this.truck.position);
+            
+            // Set velocity - away from truck
+            const velocity = {
+                x: truckDirection.x * (0.2 + Math.random() * 0.1),
+                y: 0,
+                z: truckDirection.z * (0.2 + Math.random() * 0.1)
+            };
+            
+            // Add to scene
+            this.scene.add(line);
+            
+            // Add to sparks for animation
+            this.sparks.push({
+                mesh: line,
+                velocity: velocity,
+                life: 1.0
+            });
+        }
+    }
+    
+    // Add damage boost visual effect
+    createDamageBoostEffect() {
+        if (!this.truck) return;
+        
+        // Create energy particles around the truck
+        const count = 15;
+        
+        for (let i = 0; i < count; i++) {
+            const particleGeometry = new THREE.SphereGeometry(0.15, 6, 6);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: 0xff00ff,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // Position around truck
+            const angle = Math.random() * Math.PI * 2;
+            const height = Math.random() * 2;
+            const radius = 2;
+            
+            particle.position.set(
+                this.truck.position.x + Math.cos(angle) * radius,
+                this.truck.position.y + height,
+                this.truck.position.z + Math.sin(angle) * radius
+            );
+            
+            // Set orbital motion
+            particle.userData = {
+                centerX: this.truck.position.x,
+                centerZ: this.truck.position.z,
+                radius: radius,
+                speed: 0.05 + Math.random() * 0.05,
+                angle: angle,
+                verticalSpeed: 0.02 * (Math.random() > 0.5 ? 1 : -1),
+                life: 1.0
+            };
+            
+            // Add to scene and array with special handling for orbital particles
+            this.scene.add(particle);
+            
+            // Add a special effect with custom update logic
+            const specialEffect = {
+                mesh: particle,
+                update: () => {
+                    // Update angle
+                    particle.userData.angle += particle.userData.speed;
+                    
+                    // Update position based on truck position
+                    particle.position.x = this.truck.position.x + Math.cos(particle.userData.angle) * particle.userData.radius;
+                    particle.position.z = this.truck.position.z + Math.sin(particle.userData.angle) * particle.userData.radius;
+                    
+                    // Update height with vertical oscillation
+                    particle.position.y += particle.userData.verticalSpeed;
+                    if (particle.position.y > this.truck.position.y + 3 || particle.position.y < this.truck.position.y) {
+                        particle.userData.verticalSpeed *= -1;
+                    }
+                    
+                    // Decrease life gradually
+                    particle.userData.life -= 0.005;
+                    particle.material.opacity = particle.userData.life;
+                    
+                    // Remove if life is depleted
+                    if (particle.userData.life <= 0) {
+                        this.scene.remove(particle);
+                        return true; // Signal removal
+                    }
+                    return false; // Keep updating
+                }
+            };
+            
+            // Create array for special effects if it doesn't exist
+            if (!this.specialEffects) {
+                this.specialEffects = [];
+            }
+            
+            this.specialEffects.push(specialEffect);
+        }
     }
 
     // Create fade effect for expiring powerups
     createPowerupFadeEffect(type) {
-        if (!this.truck) return;
+        if (!this.truck || !this.scene) return;
         
-        const powerupConfig = this.powerupTypes[type];
+        // Handle either powerup object or type string
+        let powerupConfig;
         
-        // Create particles around the truck
+        if (typeof type === 'string') {
+            // Type is a string - get config from powerupTypes
+            powerupConfig = this.powerupTypes[type];
+            if (!powerupConfig) {
+                console.log(`No config found for powerup type: ${type}`);
+                return;
+            }
+        } else if (type && type.userData && type.userData.type) {
+            // Type is a powerup object - get config from its userData
+            powerupConfig = this.powerupTypes[type.userData.type];
+            if (!powerupConfig) {
+                console.log(`No config found for powerup object type: ${type.userData.type}`);
+                return;
+            }
+        } else {
+            console.log('Invalid argument passed to createPowerupFadeEffect');
+            return;
+        }
+        
+        // Determine position based on parameter type
+        let position;
+        if (typeof type === 'string') {
+            // If type is a string, use truck position
+            position = this.truck.position.clone();
+        } else {
+            // If type is a powerup object, use its position
+            position = type.position.clone();
+        }
+        
+        // Create particles
         const particleCount = 10;
         
         for (let i = 0; i < particleCount; i++) {
@@ -3190,13 +3634,13 @@ class Game {
             
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
             
-            // Position around truck
+            // Position at the appropriate location
             const angle = Math.random() * Math.PI * 2;
             const radius = 2;
             particle.position.set(
-                this.truck.position.x + Math.cos(angle) * radius,
-                this.truck.position.y + Math.random() * 2,
-                this.truck.position.z + Math.sin(angle) * radius
+                position.x + Math.cos(angle) * radius,
+                position.y + Math.random() * 2,
+                position.z + Math.sin(angle) * radius
             );
             
             // Set velocity - downward and outward
@@ -3239,58 +3683,273 @@ class Game {
         powerupContainer.innerHTML = ''; // Clear existing indicators
         
         // Add indicators for active powerups
-        for (const [type, data] of Object.entries(this.activePowerups)) {
-            if (data.timeRemaining > 0) {
-                const powerupConfig = this.powerupTypes[type];
-                
-                const indicator = document.createElement('div');
-                indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.7);
-                indicator.style.color = '#fff';
-                indicator.style.padding = '5px 10px';
-                indicator.style.margin = '5px';
-                indicator.style.borderRadius = '5px';
-                indicator.style.fontWeight = 'bold';
-                indicator.style.textShadow = '1px 1px 2px rgba(0,0,0,0.7)';
-                indicator.style.display = 'flex';
-                indicator.style.alignItems = 'center';
-                indicator.style.justifyContent = 'space-between';
-                indicator.style.width = '150px';
-                
-                // Create icon
-                const icon = document.createElement('span');
-                icon.textContent = powerupConfig.icon;
-                icon.style.marginRight = '10px';
-                icon.style.fontSize = '20px';
-                
-                // Create label
-                const label = document.createElement('span');
-                label.textContent = powerupConfig.name;
-                
-                // Create timer
-                const timer = document.createElement('span');
-                timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
-                timer.style.marginLeft = '10px';
-                
-                indicator.appendChild(icon);
-                indicator.appendChild(label);
-                indicator.appendChild(timer);
-                
-                powerupContainer.appendChild(indicator);
-                
-                // Pulse effect for indicators about to expire
-                if (data.timeRemaining < 180) { // Less than 3 seconds
-                    indicator.style.animation = 'pulse 0.5s infinite alternate';
-                    if (!document.getElementById('powerup-pulse-style')) {
-                        const style = document.createElement('style');
-                        style.id = 'powerup-pulse-style';
-                        style.textContent = `
-                            @keyframes pulse {
-                                from { opacity: 1; }
-                                to { opacity: 0.6; }
-                            }
-                        `;
-                        document.head.appendChild(style);
+        for (const [type, data] of this.activePowerups.entries()) {
+            const powerupConfig = this.powerupTypes[type];
+            if (!powerupConfig) continue; // Skip if config not found
+            
+            const indicator = document.createElement('div');
+            indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.7);
+            indicator.style.color = '#fff';
+            indicator.style.padding = '5px 10px';
+            indicator.style.margin = '5px';
+            indicator.style.borderRadius = '5px';
+            indicator.style.fontWeight = 'bold';
+            indicator.style.textShadow = '1px 1px 2px rgba(0,0,0,0.7)';
+            indicator.style.display = 'flex';
+            indicator.style.alignItems = 'center';
+            indicator.style.justifyContent = 'space-between';
+            indicator.style.width = '150px';
+            
+            // Create label
+            const label = document.createElement('span');
+            label.textContent = powerupConfig.name;
+            
+            // Create timer
+            const timer = document.createElement('span');
+            const timeRemaining = Math.ceil((data.expirationTime - Date.now()) / 1000); // Convert ms to seconds
+            timer.textContent = timeRemaining + 's';
+            timer.style.marginLeft = '10px';
+            
+            indicator.appendChild(label);
+            indicator.appendChild(timer);
+            
+            powerupContainer.appendChild(indicator);
+            
+            // Pulse effect for indicators about to expire
+            if (timeRemaining < 3) { // Less than 3 seconds
+                indicator.style.animation = 'pulse 0.5s infinite alternate';
+                if (!document.getElementById('powerup-pulse-style')) {
+                    const style = document.createElement('style');
+                    style.id = 'powerup-pulse-style';
+                    style.textContent = `
+                        @keyframes pulse {
+                            from { opacity: 1; }
+                            to { opacity: 0.6; }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+            }
+        }
+    }
+    
+    // Initialize weapons for the player
+    initializeWeapons() {
+        if (!this.scene) return;
+        
+        // Create all weapon types
+        this.weapons = [
+            new Weapon(this.scene, WeaponTypes.MACHINE_GUN),
+            new Weapon(this.scene, WeaponTypes.ROCKETS),
+            new Weapon(this.scene, WeaponTypes.SHOTGUN),
+            new Weapon(this.scene, WeaponTypes.MINES)
+        ];
+        
+        // Start with machine gun
+        this.currentWeaponIndex = 0;
+        
+        // Set keyboard bindings for weapon switching
+        window.addEventListener('keydown', (e) => {
+            // Number keys 1-4 for weapon selection
+            if (e.key >= '1' && e.key <= '4') {
+                const index = parseInt(e.key) - 1;
+                if (index >= 0 && index < this.weapons.length) {
+                    this.switchWeapon(index);
+                }
+            }
+            
+            // Q key for previous weapon
+            if (e.key === 'q' || e.key === 'Q') {
+                this.prevWeapon();
+            }
+            
+            // E key for next weapon
+            if (e.key === 'e' || e.key === 'E') {
+                this.nextWeapon();
+            }
+            
+            // R key for manual reload
+            if (e.key === 'r' || e.key === 'R') {
+                this.getCurrentWeapon().startReload();
+            }
+        });
+    }
+    
+    // Get current weapon
+    getCurrentWeapon() {
+        return this.weapons[this.currentWeaponIndex];
+    }
+    
+    // Switch to a specific weapon
+    switchWeapon(index) {
+        if (index >= 0 && index < this.weapons.length) {
+            this.currentWeaponIndex = index;
+            
+            // Update weapon display
+            this.updateWeaponDisplay();
+            
+            console.log(`Switched to ${this.getCurrentWeapon().type.name}`);
+        }
+    }
+    
+    // Switch to next weapon
+    nextWeapon() {
+        this.currentWeaponIndex = (this.currentWeaponIndex + 1) % this.weapons.length;
+        this.updateWeaponDisplay();
+    }
+    
+    // Switch to previous weapon
+    prevWeapon() {
+        this.currentWeaponIndex = (this.currentWeaponIndex - 1 + this.weapons.length) % this.weapons.length;
+        this.updateWeaponDisplay();
+    }
+    
+    // Update weapon HUD display
+    updateWeaponDisplay() {
+        const weaponDisplay = document.getElementById('weapon');
+        const ammoDisplay = document.getElementById('ammo');
+        
+        if (weaponDisplay) {
+            const currentWeapon = this.getCurrentWeapon();
+            weaponDisplay.textContent = `${currentWeapon.type.icon} ${currentWeapon.type.name}`;
+        }
+        
+        if (ammoDisplay) {
+            const currentWeapon = this.getCurrentWeapon();
+            ammoDisplay.textContent = `AMMO: ${currentWeapon.ammo}/${currentWeapon.maxAmmo}`;
+            
+            // Add reload indicator if reloading
+            if (currentWeapon.isReloading) {
+                ammoDisplay.innerHTML = `<span style="color: #ff0000;">RELOADING...</span>`;
+            }
+        }
+        
+        // Update cooldown indicator
+        this.updateCooldownIndicator();
+    }
+    
+    // Update weapon cooldown indicator
+    updateCooldownIndicator() {
+        // Get or create cooldown bar
+        let cooldownBar = document.getElementById('cooldown-bar');
+        if (!cooldownBar) {
+            // Create cooldown indicator container
+            const container = document.createElement('div');
+            container.id = 'cooldown-container';
+            container.style.position = 'absolute';
+            container.style.bottom = '70px';
+            container.style.left = '10px';
+            container.style.width = '200px';
+            container.style.height = '10px';
+            container.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+            container.style.borderRadius = '5px';
+            container.style.overflow = 'hidden';
+            
+            // Create cooldown bar
+            cooldownBar = document.createElement('div');
+            cooldownBar.id = 'cooldown-bar';
+            cooldownBar.style.height = '100%';
+            cooldownBar.style.width = '100%';
+            cooldownBar.style.backgroundColor = '#00ffff';
+            cooldownBar.style.transition = 'width 0.1s linear';
+            
+            container.appendChild(cooldownBar);
+            document.body.appendChild(container);
+        }
+        
+        // Update cooldown progress
+        const currentWeapon = this.getCurrentWeapon();
+        const progress = currentWeapon.update().cooldownProgress;
+        cooldownBar.style.width = `${progress * 100}%`;
+        
+        // Update cooldown bar color based on weapon type
+        cooldownBar.style.backgroundColor = '#' + currentWeapon.type.color.toString(16).padStart(6, '0');
+    }
+    
+    // Create weapon pickup
+    createWeaponPickup() {
+        if (!this.scene) return;
+        
+        // Choose a random weapon type (excluding the machine gun which is the default)
+        const availableTypes = [
+            WeaponTypes.ROCKETS,
+            WeaponTypes.SHOTGUN,
+            WeaponTypes.MINES
+        ];
+        
+        const randomType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        
+        // Choose a random position in the arena
+        const angle = Math.random() * Math.PI * 2;
+        const radius = Math.random() * 100 + 50; // Between 50 and 150 units from center
+        const position = new THREE.Vector3(
+            Math.cos(angle) * radius,
+            0,
+            Math.sin(angle) * radius
+        );
+        
+        // Create pickup
+        const pickup = new WeaponPickup(this.scene, position, randomType);
+        this.weaponPickups.push(pickup);
+        
+        console.log(`Created weapon pickup: ${randomType.name} at position (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
+    }
+    
+    // Update weapon pickups
+    updateWeaponPickups() {
+        if (!this.weaponPickups || !this.truck) return;
+        
+        const now = Date.now();
+        
+        // Check if we should spawn a new weapon pickup
+        if (now - this.lastWeaponPickupSpawn > this.weaponPickupSpawnInterval) {
+            this.createWeaponPickup();
+            this.lastWeaponPickupSpawn = now;
+        }
+        
+        // Update existing pickups
+        for (let i = this.weaponPickups.length - 1; i >= 0; i--) {
+            const pickup = this.weaponPickups[i];
+            
+            // Update pickup animation
+            const shouldRemove = pickup.update();
+            
+            // Remove if lifetime ended
+            if (shouldRemove) {
+                pickup.remove();
+                this.weaponPickups.splice(i, 1);
+                continue;
+            }
+            
+            // Check for collision with truck
+            if (pickup.mesh) {
+                const distance = pickup.mesh.position.distanceTo(this.truck.position);
+                if (distance < 4) { // Collision radius
+                    // Find the weapon of this type
+                    const weaponIndex = this.weapons.findIndex(
+                        weapon => weapon.type === pickup.weaponType
+                    );
+                    
+                    if (weaponIndex !== -1) {
+                        // Switch to this weapon
+                        this.switchWeapon(weaponIndex);
+                        
+                        // Refill ammo
+                        this.weapons[weaponIndex].ammo = this.weapons[weaponIndex].maxAmmo;
+                        
+                        // Create pickup effect
+                        pickup.createPickupEffect();
+                        
+                        // Update HUD
+                        this.updateWeaponDisplay();
+                        
+                        // Show message
+                        this.showMessage(`Picked up ${pickup.weaponType.name}`);
                     }
+                    
+                    // Remove pickup
+                    pickup.remove();
+                    this.weaponPickups.splice(i, 1);
                 }
             }
         }
