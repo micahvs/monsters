@@ -3912,27 +3912,49 @@ class Game {
         }
     }
     
+    // Create the shield effect
+    createShieldEffect() {
+        if (!this.truck || !this.scene) return;
+        
+        // Clean up any existing shield mesh
+        if (this.shieldMesh) {
+            this.scene.remove(this.shieldMesh);
+            this.shieldMesh = null;
+        }
+        
+        // Create new shield mesh
+        const shieldGeometry = new THREE.SphereGeometry(4, 16, 12);
+        const shieldMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ffff,
+            emissive: 0x00ffff,
+            emissiveIntensity: 0.3,
+            transparent: true,
+            opacity: 0.4,
+            side: THREE.DoubleSide
+        });
+        
+        this.shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
+        this.scene.add(this.shieldMesh);
+        
+        // Add subtle pulsing animation
+        this.shieldPulseTime = 0;
+        
+        // Position at truck
+        if (this.truck) {
+            this.shieldMesh.position.copy(this.truck.position);
+            this.shieldMesh.position.y += 1.5; // Raise slightly to center on truck
+        }
+        
+        console.log("Shield effect created");
+    }
+    
     // Add this method for updating the shield effect
     updateShieldEffect() {
         if (!this.truck) return;
         
         // Create shield mesh if it doesn't exist
         if (!this.shieldMesh) {
-            const shieldGeometry = new THREE.SphereGeometry(4, 16, 12);
-            const shieldMaterial = new THREE.MeshPhongMaterial({
-                color: 0x00ffff,
-                emissive: 0x00ffff,
-                emissiveIntensity: 0.3,
-                transparent: true,
-                opacity: 0.4,
-                side: THREE.DoubleSide
-            });
-            
-            this.shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
-            this.scene.add(this.shieldMesh);
-            
-            // Add subtle pulsing animation
-            this.shieldPulseTime = 0;
+            this.createShieldEffect();
         }
         
         // Update shield position to match truck
