@@ -41,94 +41,102 @@
             text-shadow: 0 0 10px #ff00ff;
         }
 
-        /* Professional HUD Design */
+        /* Base HUD Element */
         .hud-element {
             background: rgba(0, 0, 0, 0.3);
             border-radius: 4px;
             color: #fff;
-            font-size: 11px;
+            font-size: 10px;
             position: fixed;
             z-index: 100;
             pointer-events: none;
             box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(2px);
             border: 1px solid rgba(255, 0, 255, 0.2);
+            padding: 5px 8px;
         }
 
-        /* Top HUD Bar */
-        #top-hud {
+        /* Player Info - Top Left */
+        #player-info {
             top: 10px;
             left: 10px;
-            right: 10px;
-            height: 40px;
-            display: flex;
-            justify-content: space-between;
-            padding: 0;
-            background: none;
-            border: none;
-            box-shadow: none;
-        }
-
-        /* Left Section - Weapon & Player */
-        #left-hud {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            width: 200px;
-        }
-
-        #weapon-info {
-            padding: 5px 8px;
-            border-left: 2px solid #00ffff;
-        }
-
-        #player-info {
-            padding: 5px 8px;
+            width: 150px;
             border-left: 2px solid #ff00ff;
         }
 
-        /* Right Section - Health & Ammo */
-        #right-hud {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            width: 200px;
-            text-align: right;
-        }
-
+        /* Game Stats - Top Right */
         #game-stats {
-            padding: 5px 8px;
+            top: 10px;
+            right: 10px;
+            width: 150px;
+            text-align: right;
             border-right: 2px solid #ff00ff;
         }
 
-        /* Bottom HUD Bar */
-        #bottom-hud {
-            bottom: 10px;
+        /* Weapon Info - Left Side, Below Player Info */
+        #weapon-info {
+            top: 60px;
             left: 10px;
-            right: 10px;
-            height: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            padding: 0;
-            background: none;
-            border: none;
-            box-shadow: none;
-        }
-
-        /* Speed Display */
-        #speed-display {
-            padding: 5px 8px;
+            width: 150px;
             border-left: 2px solid #00ffff;
         }
 
-        /* Audio Controls */
+        /* Weapon Legend - Left Side, Below Weapon Info */
+        #weapon-legend {
+            top: 110px;
+            left: 10px;
+            width: 150px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 10px;
+            line-height: 1.5;
+            border-left: 2px solid #00ffff;
+        }
+        
+        #weapon-legend div {
+            margin-bottom: 2px;
+        }
+
+        /* Speed Display - Bottom Left */
+        #speed-display {
+            bottom: 10px;
+            left: 10px;
+            width: 150px;
+            border-left: 2px solid #00ffff;
+        }
+
+        /* Cooldown Container - Bottom Left, Above Speed Display */
+        #cooldown-container {
+            bottom: 50px;
+            left: 10px;
+            width: 150px;
+            height: 4px;
+            padding: 0;
+            border-left: 2px solid #00ffff;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 0;
+            overflow: hidden;
+            transition: opacity 0.3s ease;
+        }
+        
+        #cooldown-bar {
+            height: 100%;
+            width: 100%;
+            background: #00ffff;
+            transition: width 0.1s linear;
+        }
+
+        /* Audio Controls - Bottom Right */
         #audio-controls {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
             display: flex;
             gap: 8px;
-            pointer-events: auto;
+            z-index: 100;
             background: none;
             border: none;
+            box-shadow: none;
         }
 
         .audio-button {
@@ -158,14 +166,14 @@
             box-shadow: none;
         }
 
-        /* Powerup Indicators */
+        /* Powerup Indicators - Bottom Center */
         #powerup-indicators-container {
             position: fixed;
             bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
             width: auto;
-            max-width: 80%;
+            max-width: 60%;
             z-index: 100;
             background: none;
             border: none;
@@ -191,17 +199,17 @@
             border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
-        /* Debug Panel */
+        /* Debug Panel - Left Side, Below Weapon Legend */
         #debug-panel {
             position: fixed;
-            top: 60px;
+            top: 220px;
             left: 10px;
+            width: 150px;
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid #00ff00;
             color: #00ff00;
             font-family: monospace;
-            font-size: 10px;
-            max-width: 180px;
+            font-size: 9px;
             max-height: 120px;
             overflow: auto;
             opacity: 0.6;
@@ -214,28 +222,28 @@
             display: block;
         }
 
-        /* Debug Toggle Button */
+        /* Debug Toggle Button - Top Left, Next to Player Info */
         #debug-toggle {
             position: fixed;
             top: 10px;
-            left: 220px;
+            left: 170px;
             background: rgba(0, 0, 0, 0.5);
             color: #00ff00;
             border: 1px solid #00ff00;
             border-radius: 3px;
             padding: 2px 5px;
-            font-size: 10px;
+            font-size: 9px;
             cursor: pointer;
             z-index: 101;
             pointer-events: auto;
         }
 
-        /* Chat Container */
+        /* Chat Container - Bottom Right, Above Audio Controls */
         #chat-container {
             position: fixed;
             bottom: 50px;
             right: 10px;
-            width: 200px;
+            width: 180px;
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid #ff00ff;
             border-radius: 3px;
@@ -252,7 +260,7 @@
             max-height: 80px;
             padding: 6px;
             color: #fff;
-            font-size: 10px;
+            font-size: 9px;
         }
 
         #chat-input-container {
@@ -267,7 +275,7 @@
             border: 1px solid #ff00ff;
             color: #fff;
             padding: 3px;
-            font-size: 10px;
+            font-size: 9px;
             font-family: 'Orbitron', sans-serif;
         }
 
@@ -278,7 +286,7 @@
             padding: 3px 6px;
             margin-left: 3px;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 9px;
             font-family: 'Orbitron', sans-serif;
         }
         
@@ -309,23 +317,23 @@
             background: linear-gradient(to right, #0066ff, #00ffff);
         }
         
-        /* Weapon Legend */
-        #weapon-legend {
-            background: rgba(0, 0, 0, 0.5);
+        /* Damage Boost Notification - Top Right, Below Game Stats */
+        #damage-boost {
+            position: fixed;
+            top: 80px;
+            right: 10px;
+            width: 150px;
+            text-align: right;
+            border-right: 2px solid #ff00ff;
+            background: rgba(0, 0, 0, 0.3);
             color: #fff;
-            font-size: 11px;
-            line-height: 1.5;
-            padding: 8px 10px;
-            border-left: 2px solid #00ffff;
-            max-width: 180px;
-        }
-        
-        #weapon-legend div {
-            margin-bottom: 2px;
-        }
-        
-        #cooldown-container {
-            transition: opacity 0.3s ease;
+            font-size: 10px;
+            padding: 5px 8px;
+            z-index: 100;
+            pointer-events: none;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255, 0, 255, 0.2);
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -349,67 +357,44 @@
     <!-- Game Canvas -->
     <canvas id="game"></canvas>
 
-    <!-- Professional HUD Layout -->
-    <!-- Top HUD Bar -->
-    <div id="top-hud" class="hud-element">
-        <!-- Left Section -->
-        <div id="left-hud">
-            <div id="weapon-info" class="hud-element">
-                <div id="currentWeapon">MACHINE GUN</div>
-                <div id="weaponStats">DMG: 20 | FIRE RATE: 0.1s</div>
-            </div>
-            
-            <div id="player-info" class="hud-element">
-                <div id="playerName">PLAYER</div>
-                <div id="score">SCORE: 0</div>
-            </div>
+    <!-- Player Info - Top Left -->
+    <div id="player-info" class="hud-element">
+        <div id="playerName">PLAYER</div>
+        <div id="score">SCORE: 0</div>
+    </div>
+    
+    <!-- Game Stats - Top Right -->
+    <div id="game-stats" class="hud-element">
+        <div id="health">HEALTH: 100%</div>
+        <div class="stat-bar">
+            <div class="stat-bar-fill health-bar-fill" style="width: 100%"></div>
         </div>
-        
-        <!-- Right Section -->
-        <div id="right-hud">
-            <div id="game-stats" class="hud-element">
-                <div id="health">HEALTH: 100%</div>
-                <div class="stat-bar">
-                    <div class="stat-bar-fill health-bar-fill" style="width: 100%"></div>
-                </div>
-                <div id="ammo">AMMO: 30/30</div>
-                <div class="stat-bar">
-                    <div class="stat-bar-fill ammo-bar-fill" style="width: 100%"></div>
-                </div>
-            </div>
+        <div id="ammo">AMMO: 30/30</div>
+        <div class="stat-bar">
+            <div class="stat-bar-fill ammo-bar-fill" style="width: 100%"></div>
         </div>
     </div>
     
-    <!-- Bottom HUD Bar -->
-    <div id="bottom-hud" class="hud-element">
-        <!-- Speed Display -->
-        <div id="speed-display" class="hud-element">
-            <div id="speed">SPEED: 0 MPH</div>
-        </div>
-        
-        <!-- Audio Controls -->
-        <div id="audio-controls">
-            <!-- Play/Pause Button -->
-            <button id="playPauseButton" class="audio-button">
-                <i class="fas fa-play"></i>
-            </button>
-            
-            <!-- Audio Toggle Button -->
-            <div id="audioToggle" class="audio-button">
-                <i class="fas fa-volume-up"></i>
-            </div>
-        </div>
+    <!-- Weapon Info - Left Side, Below Player Info -->
+    <div id="weapon-info" class="hud-element">
+        <div id="currentWeapon">MACHINE GUN</div>
+        <div id="weaponStats">DMG: 20 | FIRE RATE: 0.1s</div>
     </div>
     
-    <!-- Powerup Indicators Container -->
+    <!-- Speed Display - Bottom Left -->
+    <div id="speed-display" class="hud-element">
+        <div id="speed">SPEED: 0 MPH</div>
+    </div>
+    
+    <!-- Powerup Indicators Container - Bottom Center -->
     <div id="powerup-indicators-container">
         <div id="powerup-indicators"></div>
     </div>
     
-    <!-- Debug Toggle Button -->
+    <!-- Debug Toggle Button - Top Left, Next to Player Info -->
     <button id="debug-toggle">DEBUG</button>
     
-    <!-- Debug Panel (Hidden by Default) -->
+    <!-- Debug Panel - Left Side, Below Weapon Legend -->
     <div id="debug-panel">
         <div>Debug Controls:</div>
         <div>D: Teleport to edge</div>
@@ -421,12 +406,25 @@
         <div id="positionInfo">Pos: X:0 Y:0 Z:0</div>
     </div>
     
-    <!-- Chat Container -->
+    <!-- Chat Container - Bottom Right, Above Audio Controls -->
     <div id="chat-container">
         <div id="chat-messages"></div>
         <div id="chat-input-container">
             <input id="chatInput" type="text" placeholder="Type message...">
             <button id="chatSend">Send</button>
+        </div>
+    </div>
+    
+    <!-- Audio Controls - Bottom Right -->
+    <div id="audio-controls">
+        <!-- Play/Pause Button -->
+        <button id="playPauseButton" class="audio-button">
+            <i class="fas fa-play"></i>
+        </button>
+        
+        <!-- Audio Toggle Button -->
+        <div id="audioToggle" class="audio-button">
+            <i class="fas fa-volume-up"></i>
         </div>
     </div>
 

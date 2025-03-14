@@ -3365,14 +3365,10 @@ class Game {
         legend = document.createElement('div');
         legend.id = 'weapon-legend';
         legend.className = 'hud-element';
-        legend.style.position = 'fixed';
-        legend.style.top = '120px';
-        legend.style.left = '10px';
+        
+        // No need to set most styles as they're defined in CSS
+        // Just ensure it doesn't have default hud-element padding
         legend.style.padding = '8px 10px';
-        legend.style.borderLeft = '2px solid #00ffff';
-        legend.style.zIndex = '100';
-        legend.style.fontSize = '11px';
-        legend.style.lineHeight = '1.5';
         
         legend.innerHTML = `
             <div style="color: #00ffff; margin-bottom: 5px;">⇒ ${this.getCurrentWeapon()?.type?.name || 'Machine Gun'}</div>
@@ -4647,24 +4643,12 @@ class Game {
             container = document.createElement('div');
             container.id = 'cooldown-container';
             container.className = 'hud-element';
-            container.style.position = 'fixed';
-            container.style.bottom = '50px';
-            container.style.left = '10px';
-            container.style.width = '150px';
-            container.style.height = '4px';
-            container.style.padding = '0';
-            container.style.borderLeft = '2px solid #00ffff';
-            container.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
-            container.style.borderRadius = '0';
-            container.style.overflow = 'hidden';
+            
+            // No need to set most styles as they're defined in CSS
             
             // Create cooldown bar
             cooldownBar = document.createElement('div');
             cooldownBar.id = 'cooldown-bar';
-            cooldownBar.style.height = '100%';
-            cooldownBar.style.width = '100%';
-            cooldownBar.style.backgroundColor = '#00ffff';
-            cooldownBar.style.transition = 'width 0.1s linear';
             
             container.appendChild(cooldownBar);
             document.body.appendChild(container);
