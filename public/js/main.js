@@ -193,7 +193,8 @@ class Game {
             ' ': false,
             'd': false, // Debug key
             'm': false, // Debug movement
-            'M': false  // Audio mute toggle
+            'M': false, // Audio mute toggle
+            'p': false  // Debug powerup spawn key
         };
         
         // Game state
@@ -212,7 +213,7 @@ class Game {
         this.currentWeaponIndex = 0;
         this.weaponPickups = [];
         this.lastWeaponPickupSpawn = 0;
-        this.weaponPickupSpawnInterval = 15000; // Spawn weapon pickup every 15 seconds
+        this.weaponPickupSpawnInterval = 8000; // Spawn weapon pickup more frequently (8 seconds)
         
         // Initialize weapons
         this.initializeWeapons();
@@ -221,7 +222,7 @@ class Game {
         this.powerups = [];
         this.activePowerups = new Map();
         this.lastPowerupSpawn = 0;
-        this.powerupSpawnInterval = 10000; // Spawn every 10 seconds
+        this.powerupSpawnInterval = 5000; // Spawn more frequently (5 seconds)
         
         // Powerup definitions
         this.powerupTypes = {
@@ -1085,6 +1086,16 @@ class Game {
             this.keys['M'] = false; // Reset key to prevent multiple toggles
             this.toggleAudio();
         }
+        
+        // Debug key to spawn powerups with 'P' key
+        if (this.keys['p']) {
+            this.keys['p'] = false; // Reset key to prevent multiple spawns
+            if (this.debugMode) {
+                console.log("Debug: Forcing powerup spawn");
+                this.createPowerup();
+                this.showMessage("Debug: Powerup spawned");
+            }
+        }
     }
     
     updateTruck() {
@@ -1191,6 +1202,19 @@ class Game {
         try {
             // Increment frame counter
             this.frameCount++;
+            
+            // Force first powerup spawns when game starts
+            if (this.frameCount === 60) { // After 1 second
+                // Create initial powerups to ensure they appear
+                this.createPowerup();
+                this.createPowerup();
+                this.createPowerup();
+                
+                // Create initial weapon pickups
+                this.createWeaponPickup();
+                
+                console.log("Initial powerups and weapon pickups spawned");
+            }
             
             // Update game state
             this.update();
@@ -3298,39 +3322,42 @@ class Game {
             let geometry;
             let material;
             
+            // Make powerups larger and more visible
+            const sizeMultiplier = 2.0; // Double size for better visibility
+            
             switch(powerupConfig.model) {
                 case 'lightning':
                     // Create a lightning bolt shape
-                    geometry = new THREE.ConeGeometry(0.7, 2, 4);
+                    geometry = new THREE.ConeGeometry(0.7 * sizeMultiplier, 2 * sizeMultiplier, 4);
                     geometry.rotateX(Math.PI / 2);
                     break;
                 case 'star':
                     // Create a star shape (using octahedron as approximation)
-                    geometry = new THREE.OctahedronGeometry(1, 0);
+                    geometry = new THREE.OctahedronGeometry(1 * sizeMultiplier, 0);
                     break;
                 case 'heart':
                     // Create a heart-like shape (using sphere as base)
-                    geometry = new THREE.SphereGeometry(1, 8, 8);
+                    geometry = new THREE.SphereGeometry(1 * sizeMultiplier, 8, 8);
                     break;
                 case 'ammo':
                     // Create an ammo box shape
-                    geometry = new THREE.BoxGeometry(1, 0.8, 1.5);
+                    geometry = new THREE.BoxGeometry(1 * sizeMultiplier, 0.8 * sizeMultiplier, 1.5 * sizeMultiplier);
                     break;
                 case 'shield':
                     // Create a shield shape
-                    geometry = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+                    geometry = new THREE.SphereGeometry(1 * sizeMultiplier, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
                     geometry.scale(1.2, 1.2, 0.8);
                     break;
                 default:
                     // Default cube
-                    geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+                    geometry = new THREE.BoxGeometry(1.5 * sizeMultiplier, 1.5 * sizeMultiplier, 1.5 * sizeMultiplier);
             }
             
-            // Create material with glow effect
+            // Create material with stronger glow effect
             material = new THREE.MeshPhongMaterial({
                 color: powerupConfig.color,
                 emissive: powerupConfig.emissive,
-                emissiveIntensity: 0.5,
+                emissiveIntensity: 1.0, // Stronger glow
                 shininess: 100,
                 transparent: true,
                 opacity: 0.9
@@ -3339,24 +3366,38 @@ class Game {
             const powerupMesh = new THREE.Mesh(geometry, material);
             container.add(powerupMesh);
             
-            // Add a point light to make it glow
-            const light = new THREE.PointLight(powerupConfig.color, 1, 5);
+            // Add a stronger point light to make it more visible
+            const light = new THREE.PointLight(powerupConfig.color, 2, 20); // Brighter, wider light
             light.position.set(0, 0, 0);
             container.add(light);
             
-            // Position the powerup in the arena - make them more visible near the player's starting area
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * 50 + 20; // Between 20 and 70 units from center (closer to player)
-            container.position.x = Math.cos(angle) * radius;
-            container.position.z = Math.sin(angle) * radius;
-            container.position.y = 2; // Slightly above ground
+            // Position the powerup close to the player or truck if available
+            let spawnX, spawnZ;
+            
+            if (this.truck) {
+                // Position relative to the truck for better visibility
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 30 + Math.random() * 20; // Between 30-50 units from truck
+                spawnX = this.truck.position.x + Math.cos(angle) * radius;
+                spawnZ = this.truck.position.z + Math.sin(angle) * radius;
+            } else {
+                // Fall back to arena-based positioning if no truck
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * 50 + 20; // Between 20 and 70 units from center
+                spawnX = Math.cos(angle) * radius;
+                spawnZ = Math.sin(angle) * radius;
+            }
+            
+            container.position.x = spawnX;
+            container.position.z = spawnZ;
+            container.position.y = 3; // Higher above ground for better visibility
             
             // Store powerup type and other data
             container.userData = {
                 type: randomType,
-                rotationSpeed: 0.02,
-                floatSpeed: 0.01,
-                floatHeight: 0.5,
+                rotationSpeed: 0.05, // Faster rotation to be more noticeable
+                floatSpeed: 0.02,
+                floatHeight: 1.0, // Larger float height
                 floatOffset: Math.random() * Math.PI * 2, // Random starting phase
                 creationTime: Date.now()
             };
@@ -3377,11 +3418,8 @@ class Game {
                 this.lastPowerupSpawn = Date.now();
             }
             
-            // Force immediate powerup spawning for testing
-            // Spawn 3 initial powerups to make sure they appear
-            if (this.powerups.length < 3) {
-                setTimeout(() => this.createPowerup(), 500);
-            }
+            // Show message to indicate a powerup has spawned
+            this.showMessage(`${powerupConfig.name} powerup spawned!`);
             
             return container;
         } catch (error) {
