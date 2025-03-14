@@ -1860,46 +1860,38 @@ class Game {
 
     // Update HUD method
     updateHUD() {
-        try {
-            // Update health display
-            const healthDisplay = document.getElementById('health');
-            if (healthDisplay && this.health !== undefined) {
-                // Color coding based on health percentage
-                const healthPercent = Math.floor((this.health / 100) * 100);
-                let healthColor = '#00ff00'; // Green
-                
-                if (healthPercent < 30) {
-                    healthColor = '#ff0000'; // Red
-                } else if (healthPercent < 70) {
-                    healthColor = '#ffff00'; // Yellow
-                }
-                
-                healthDisplay.innerHTML = `HEALTH: <span style="color:${healthColor}">${healthPercent}%</span>`;
+        // Update health display with color coding
+        const healthElement = document.getElementById('health');
+        if (healthElement) {
+            const healthPercent = this.health;
+            let healthColor = '#00ff00'; // Green for good health
+            
+            if (healthPercent < 30) {
+                healthColor = '#ff0000'; // Red for low health
+            } else if (healthPercent < 70) {
+                healthColor = '#ffff00'; // Yellow for medium health
             }
             
-            // Update speed display
-            if (typeof this.updateSpeedDisplay === 'function') {
-                this.updateSpeedDisplay();
-            }
-            
-            // Update weapon and ammo display only if weapons are initialized
-            if (this.weapons && Array.isArray(this.weapons) && this.weapons.length > 0 && this.getCurrentWeapon()) {
-                if (typeof this.updateWeaponDisplay === 'function') {
-                    this.updateWeaponDisplay();
-                }
-            }
-            
-            // Update powerup indicators
-            if (typeof this.updatePowerupIndicators === 'function') {
-                this.updatePowerupIndicators();
-            }
-            
-            // Update score display
-            if (typeof this.updateScoreDisplay === 'function') {
-                this.updateScoreDisplay();
-            }
-        } catch (error) {
-            console.error("Error in updateHUD:", error);
+            healthElement.innerHTML = `HEALTH: <span style="color: ${healthColor};">${Math.floor(healthPercent)}%</span>`;
+        }
+        
+        // Update speed display
+        this.updateSpeedDisplay();
+        
+        // Update ammo display
+        this.updateAmmoDisplay();
+        
+        // Update powerup indicators
+        if (typeof this.updatePowerupIndicators === 'function') {
+            this.updatePowerupIndicators();
+        }
+        
+        // Update score display
+        this.updateScoreDisplay();
+        
+        // Update weapon display
+        if (typeof this.updateWeaponDisplay === 'function') {
+            this.updateWeaponDisplay();
         }
     }
 
@@ -4360,12 +4352,12 @@ class Game {
             const newContainer = document.createElement('div');
             newContainer.id = 'powerup-indicators';
             newContainer.style.position = 'absolute';
-            newContainer.style.bottom = '80px'; // Moved higher to avoid overlap
+            newContainer.style.bottom = '80px'; // Position above audio controls
             newContainer.style.right = '10px';
             newContainer.style.display = 'flex';
             newContainer.style.flexDirection = 'column';
             newContainer.style.alignItems = 'flex-end';
-            newContainer.style.zIndex = '1002'; // Ensure it's above other elements
+            newContainer.style.zIndex = '100';
             document.body.appendChild(newContainer);
         }
         
@@ -4373,73 +4365,58 @@ class Game {
         powerupContainer.innerHTML = ''; // Clear existing indicators
         
         // Add indicators for active powerups
-        for (const [type, data] of this.activePowerups.entries()) {
-            const powerupConfig = this.powerupTypes[type];
-            if (!powerupConfig) continue; // Skip if config not found
-            
-            const indicator = document.createElement('div');
-            indicator.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'; // Dark background for better readability
-            indicator.style.color = '#fff';
-            indicator.style.padding = '5px 10px';
-            indicator.style.margin = '5px';
-            indicator.style.borderRadius = '5px';
-            indicator.style.fontWeight = 'bold';
-            indicator.style.textShadow = '1px 1px 2px rgba(0,0,0,0.7)';
-            indicator.style.display = 'flex';
-            indicator.style.alignItems = 'center';
-            indicator.style.justifyContent = 'space-between';
-            indicator.style.width = '180px'; // Slightly wider
-            indicator.style.border = `2px solid ${this.hexToRgba(powerupConfig.color, 1.0)}`; // Colored border
-            indicator.style.boxShadow = `0 0 10px ${this.hexToRgba(powerupConfig.color, 0.7)}`; // Glow effect
-            
-            // Create label
-            const label = document.createElement('span');
-            label.textContent = powerupConfig.name;
-            // Set label color to match powerup
-            label.style.color = this.hexToRgba(powerupConfig.color, 1.0);
-            label.style.textShadow = `0 0 5px ${this.hexToRgba(powerupConfig.color, 0.7)}`;
-            
-            // Create timer
-            const timer = document.createElement('span');
-            const timeRemaining = Math.ceil((data.expirationTime - Date.now()) / 1000); // Convert ms to seconds
-            timer.textContent = timeRemaining + 's';
-            timer.style.marginLeft = '10px';
-            timer.style.color = '#ffffff'; // Keep timer white for readability
-            
-            indicator.appendChild(label);
-            indicator.appendChild(timer);
-            
-            powerupContainer.appendChild(indicator);
-            
-            // Enhanced pulse effect for indicators about to expire
-            if (timeRemaining < 3) { // Less than 3 seconds
-                indicator.style.animation = 'pulse-urgent 0.5s infinite alternate';
+        for (const [type, data] of Object.entries(this.activePowerups)) {
+            if (data.timeRemaining > 0) {
+                const powerupConfig = this.powerupTypes[type];
                 
-                // Make timer flash red for urgency
-                timer.style.color = '#ff0000';
-                timer.style.fontWeight = 'bold';
+                const indicator = document.createElement('div');
+                indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.7);
+                indicator.style.color = '#fff';
+                indicator.style.padding = '5px 10px';
+                indicator.style.margin = '5px';
+                indicator.style.borderRadius = '5px';
+                indicator.style.fontWeight = 'bold';
+                indicator.style.textShadow = '1px 1px 2px rgba(0,0,0,0.7)';
+                indicator.style.display = 'flex';
+                indicator.style.alignItems = 'center';
+                indicator.style.justifyContent = 'space-between';
+                indicator.style.width = '150px';
                 
-                if (!document.getElementById('powerup-pulse-style')) {
-                    const style = document.createElement('style');
-                    style.id = 'powerup-pulse-style';
-                    style.textContent = `
-                        @keyframes pulse {
-                            from { opacity: 1; }
-                            to { opacity: 0.6; }
-                        }
-                        
-                        @keyframes pulse-urgent {
-                            from { 
-                                transform: scale(1);
-                                box-shadow: 0 0 10px ${this.hexToRgba(powerupConfig.color, 0.7)};
+                // Create icon
+                const icon = document.createElement('span');
+                icon.textContent = powerupConfig.icon;
+                icon.style.marginRight = '10px';
+                icon.style.fontSize = '20px';
+                
+                // Create label
+                const label = document.createElement('span');
+                label.textContent = powerupConfig.name;
+                
+                // Create timer
+                const timer = document.createElement('span');
+                timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
+                timer.style.marginLeft = '10px';
+                
+                indicator.appendChild(icon);
+                indicator.appendChild(label);
+                indicator.appendChild(timer);
+                
+                powerupContainer.appendChild(indicator);
+                
+                // Pulse effect for indicators about to expire
+                if (data.timeRemaining < 180) { // Less than 3 seconds
+                    indicator.style.animation = 'pulse 0.5s infinite alternate';
+                    if (!document.getElementById('powerup-pulse-style')) {
+                        const style = document.createElement('style');
+                        style.id = 'powerup-pulse-style';
+                        style.textContent = `
+                            @keyframes pulse {
+                                from { opacity: 1; }
+                                to { opacity: 0.6; }
                             }
-                            to { 
-                                transform: scale(1.05);
-                                box-shadow: 0 0 15px ${this.hexToRgba(powerupConfig.color, 1.0)};
-                            }
-                        }
-                    `;
-                    document.head.appendChild(style);
+                        `;
+                        document.head.appendChild(style);
+                    }
                 }
             }
         }
