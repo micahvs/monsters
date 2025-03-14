@@ -4390,18 +4390,14 @@ class Game {
             // Create container if it doesn't exist
             const newContainer = document.createElement('div');
             newContainer.id = 'powerup-indicators';
+            newContainer.className = 'ui-element';
+            newContainer.style.bottom = '10px';
+            newContainer.style.left = '50%';
+            newContainer.style.transform = 'translateX(-50%)';
             newContainer.style.display = 'flex';
-            newContainer.style.flexDirection = 'column';
-            newContainer.style.alignItems = 'flex-end';
-            newContainer.style.marginBottom = '15px';
-            
-            // Find the mid-right-zone to append to
-            const midRightZone = document.getElementById('mid-right-zone');
-            if (midRightZone) {
-                midRightZone.insertBefore(newContainer, midRightZone.firstChild);
-            } else {
-                document.body.appendChild(newContainer);
-            }
+            newContainer.style.gap = '10px';
+            newContainer.style.justifyContent = 'center';
+            document.body.appendChild(newContainer);
         }
         
         const powerupContainer = document.getElementById('powerup-indicators');
@@ -4413,37 +4409,26 @@ class Game {
                 const powerupConfig = this.powerupTypes[type];
                 
                 const indicator = document.createElement('div');
+                indicator.className = 'powerup-indicator';
                 indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.7);
                 indicator.style.color = '#fff';
-                indicator.style.padding = '5px 10px';
-                indicator.style.margin = '5px';
-                indicator.style.borderRadius = '5px';
-                indicator.style.fontWeight = 'bold';
-                indicator.style.textShadow = '1px 1px 2px rgba(0,0,0,0.7)';
+                indicator.style.padding = '5px 8px';
+                indicator.style.borderRadius = '4px';
                 indicator.style.display = 'flex';
                 indicator.style.alignItems = 'center';
-                indicator.style.justifyContent = 'space-between';
-                indicator.style.width = '150px';
+                indicator.style.gap = '5px';
                 indicator.style.border = '1px solid ' + this.hexToRgba(powerupConfig.color, 1.0);
-                indicator.style.boxShadow = '0 0 10px ' + this.hexToRgba(powerupConfig.color, 0.5);
                 
                 // Create icon
                 const icon = document.createElement('span');
                 icon.textContent = powerupConfig.icon;
-                icon.style.marginRight = '10px';
-                icon.style.fontSize = '20px';
-                
-                // Create label
-                const label = document.createElement('span');
-                label.textContent = powerupConfig.name;
+                icon.style.fontSize = '16px';
                 
                 // Create timer
                 const timer = document.createElement('span');
                 timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
-                timer.style.marginLeft = '10px';
                 
                 indicator.appendChild(icon);
-                indicator.appendChild(label);
                 indicator.appendChild(timer);
                 
                 powerupContainer.appendChild(indicator);
@@ -4464,6 +4449,13 @@ class Game {
                     }
                 }
             }
+        }
+        
+        // Hide container if no active powerups
+        if (powerupContainer.children.length === 0) {
+            powerupContainer.style.display = 'none';
+        } else {
+            powerupContainer.style.display = 'flex';
         }
     }
     

@@ -41,129 +41,67 @@
             text-shadow: 0 0 10px #ff00ff;
         }
 
-        /* Main UI Container - holds all UI elements in a grid layout */
-        #ui-container {
+        /* UI Elements - Minimalist Design */
+        .ui-element {
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 4px;
+            padding: 8px;
+            color: #ff00ff;
+            text-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+            font-size: 14px;
+            pointer-events: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; /* Allow clicks to pass through to game */
-            display: grid;
-            grid-template-columns: 300px 1fr 300px;
-            grid-template-rows: auto 1fr auto;
-            grid-template-areas: 
-                "top-left top-center top-right"
-                "mid-left mid-center mid-right"
-                "bottom-left bottom-center bottom-right";
             z-index: 100;
         }
 
-        /* UI Zones */
-        .ui-zone {
-            padding: 15px;
-            color: #ff00ff;
-            text-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
-        }
-
-        #top-left-zone {
-            grid-area: top-left;
-        }
-
-        #top-right-zone {
-            grid-area: top-right;
-            text-align: right;
-        }
-
-        #bottom-left-zone {
-            grid-area: bottom-left;
-            align-self: end;
-        }
-
-        #bottom-right-zone {
-            grid-area: bottom-right;
-            align-self: end;
-            justify-self: end;
-        }
-
-        #mid-right-zone {
-            grid-area: mid-right;
-            align-self: start;
-            justify-self: end;
-            margin-top: 20px;
-        }
-
-        /* Player Info */
+        /* Player Info - Top Left */
         #player-info {
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ff00ff;
-            box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+            top: 10px;
+            left: 10px;
+            border-left: 2px solid #ff00ff;
         }
 
-        /* Game Stats */
+        /* Game Stats - Top Right */
         #game-stats {
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 5px;
-            padding: 10px;
-            border: 1px solid #ff00ff;
-            box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
+            top: 10px;
+            right: 10px;
+            text-align: right;
+            border-right: 2px solid #ff00ff;
         }
 
-        /* Debug Panel */
-        #debug-panel {
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #00ff00;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-            color: #00ff00;
-            font-family: monospace;
-            max-width: 250px;
-            max-height: 200px;
-            overflow: auto;
-        }
-
-        /* Speed Display */
+        /* Speed Display - Bottom Left */
         #speed-display {
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 5px;
-            padding: 10px;
-            border: 1px solid #00ffff;
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-            display: inline-block;
+            bottom: 10px;
+            left: 10px;
+            border-left: 2px solid #00ffff;
         }
 
-        /* Audio Controls */
-        #audio-controls-container {
+        /* Audio Controls - Bottom Right */
+        #audio-controls {
+            bottom: 10px;
+            right: 10px;
             display: flex;
-            gap: 15px;
-            justify-content: flex-end;
-            margin-top: 15px;
-            pointer-events: auto; /* Make buttons clickable */
+            gap: 10px;
+            pointer-events: auto;
         }
 
         .audio-button {
             background: rgba(0, 0, 0, 0.7);
             color: #ff00ff;
-            border: 2px solid #ff00ff;
+            border: 1px solid #ff00ff;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 36px;
+            height: 36px;
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
-            transition: all 0.3s ease;
+            box-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+            transition: all 0.2s ease;
         }
 
         .audio-button:hover {
             transform: scale(1.1);
-            box-shadow: 0 0 15px rgba(255, 0, 255, 0.8);
         }
 
         .audio-button.muted {
@@ -172,63 +110,111 @@
             box-shadow: none;
         }
 
-        .audio-button i {
-            font-size: 24px;
+        /* Powerup Indicators - Bottom Center */
+        #powerup-indicators {
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            justify-content: center;
         }
 
-        /* Chat Container */
-        #chat-container {
+        .powerup-indicator {
+            padding: 5px 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* Debug Panel - Hidden by Default */
+        #debug-panel {
+            top: 10px;
+            left: 200px;
             background: rgba(0, 0, 0, 0.7);
-            border: 2px solid #ff00ff;
-            border-radius: 5px;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 12px;
+            max-width: 200px;
+            max-height: 150px;
+            overflow: auto;
+            opacity: 0.7;
+            display: none; /* Hidden by default */
+        }
+
+        /* Show debug panel when debug mode is active */
+        body.debug-mode #debug-panel {
+            display: block;
+        }
+
+        /* Chat Container - Bottom Right, Above Audio Controls */
+        #chat-container {
+            bottom: 60px;
+            right: 10px;
+            width: 250px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #ff00ff;
+            border-radius: 4px;
             display: flex;
             flex-direction: column;
-            max-height: 200px;
-            width: 280px;
+            max-height: 150px;
             overflow: hidden;
-            pointer-events: auto; /* Make chat interactive */
-            margin-bottom: 15px;
+            pointer-events: auto;
+            position: fixed;
+            z-index: 100;
         }
 
         #chat-messages {
             overflow-y: auto;
-            max-height: 150px;
-            padding: 10px;
+            max-height: 100px;
+            padding: 8px;
             color: #fff;
-            font-size: 14px;
+            font-size: 12px;
         }
 
         #chat-input-container {
             display: flex;
-            padding: 5px;
+            padding: 4px;
             border-top: 1px solid #ff00ff;
         }
 
-        #chat-input {
+        #chatInput {
             flex: 1;
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid #ff00ff;
             color: #fff;
-            padding: 5px;
+            padding: 4px;
+            font-size: 12px;
             font-family: 'Orbitron', sans-serif;
         }
 
-        #chat-send {
+        #chatSend {
             background: #ff00ff;
             color: #000;
             border: none;
-            padding: 5px 10px;
-            margin-left: 5px;
+            padding: 4px 8px;
+            margin-left: 4px;
             cursor: pointer;
+            font-size: 12px;
             font-family: 'Orbitron', sans-serif;
         }
 
-        /* Powerup Indicators */
-        #powerup-indicators {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            margin-bottom: 15px;
+        /* Toggle button for debug panel */
+        #debug-toggle {
+            position: fixed;
+            top: 10px;
+            left: 170px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            z-index: 101;
+            pointer-events: auto;
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -252,70 +238,61 @@
     <!-- Game Canvas -->
     <canvas id="game"></canvas>
 
-    <!-- Main UI Container with Grid Layout -->
-    <div id="ui-container">
-        <!-- Top Left Zone: Player Info -->
-        <div id="top-left-zone" class="ui-zone">
-            <div id="player-info">
-                <div id="playerName">PLAYER</div>
-                <div id="score">SCORE: 0</div>
-            </div>
-            
-            <div id="debug-panel">
-                <div>Debug Controls:</div>
-                <div>D: Teleport to arena edge</div>
-                <div>Space: Fire weapon</div>
-                <div>1-4: Switch weapons</div>
-                <div>Q/E: Previous/Next weapon</div>
-                <div>&nbsp;</div>
-                <div>Debug Information:</div>
-                <div id="positionInfo">Position: X:0 Y:0 Z:0</div>
-            </div>
+    <!-- Minimalist UI Elements -->
+    <!-- Player Info -->
+    <div id="player-info" class="ui-element">
+        <div id="playerName">PLAYER</div>
+        <div id="score">SCORE: 0</div>
+    </div>
+    
+    <!-- Game Stats -->
+    <div id="game-stats" class="ui-element">
+        <div id="health">HEALTH: 100%</div>
+        <div id="ammo">AMMO: 30/30</div>
+    </div>
+    
+    <!-- Speed Display -->
+    <div id="speed-display" class="ui-element">
+        <div id="speed">SPEED: 0 MPH</div>
+    </div>
+    
+    <!-- Debug Toggle Button -->
+    <button id="debug-toggle">DEBUG</button>
+    
+    <!-- Debug Panel (Hidden by Default) -->
+    <div id="debug-panel" class="ui-element">
+        <div>Debug Controls:</div>
+        <div>D: Teleport to arena edge</div>
+        <div>Space: Fire weapon</div>
+        <div>1-4: Switch weapons</div>
+        <div>Q/E: Previous/Next weapon</div>
+        <div>&nbsp;</div>
+        <div>Debug Information:</div>
+        <div id="positionInfo">Position: X:0 Y:0 Z:0</div>
+    </div>
+    
+    <!-- Powerup Indicators -->
+    <div id="powerup-indicators" class="ui-element"></div>
+    
+    <!-- Chat Container -->
+    <div id="chat-container">
+        <div id="chat-messages"></div>
+        <div id="chat-input-container">
+            <input id="chatInput" type="text" placeholder="Type message...">
+            <button id="chatSend">Send</button>
         </div>
+    </div>
+    
+    <!-- Audio Controls -->
+    <div id="audio-controls" class="ui-element">
+        <!-- Play/Pause Button -->
+        <button id="playPauseButton" class="audio-button">
+            <i class="fas fa-play"></i>
+        </button>
         
-        <!-- Top Right Zone: Game Stats -->
-        <div id="top-right-zone" class="ui-zone">
-            <div id="game-stats">
-                <div id="health">HEALTH: 100%</div>
-                <div id="ammo">AMMO: 30/30</div>
-            </div>
-        </div>
-        
-        <!-- Middle Right Zone: Powerups and Chat -->
-        <div id="mid-right-zone" class="ui-zone">
-            <!-- Powerup Indicators Container -->
-            <div id="powerup-indicators"></div>
-            
-            <!-- Chat Interface -->
-            <div id="chat-container">
-                <div id="chat-messages"></div>
-                <div id="chat-input-container">
-                    <input id="chatInput" type="text" placeholder="Type message...">
-                    <button id="chatSend">Send</button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Bottom Left Zone: Speed Display -->
-        <div id="bottom-left-zone" class="ui-zone">
-            <div id="speed-display">
-                <div id="speed">SPEED: 0 MPH</div>
-            </div>
-        </div>
-        
-        <!-- Bottom Right Zone: Audio Controls -->
-        <div id="bottom-right-zone" class="ui-zone">
-            <div id="audio-controls-container">
-                <!-- Play/Pause Button -->
-                <button id="playPauseButton" class="audio-button">
-                    <i class="fas fa-play"></i>
-                </button>
-                
-                <!-- Audio Toggle Button -->
-                <div id="audioToggle" class="audio-button">
-                    <i class="fas fa-volume-up"></i>
-                </div>
-            </div>
+        <!-- Audio Toggle Button -->
+        <div id="audioToggle" class="audio-button">
+            <i class="fas fa-volume-up"></i>
         </div>
     </div>
 
@@ -334,6 +311,14 @@
                 positionInfo.textContent = `Position: X:${position.x.toFixed(2)} Y:${position.y.toFixed(2)} Z:${position.z.toFixed(2)}`;
             }
         };
+        
+        // Debug toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const debugToggle = document.getElementById('debug-toggle');
+            debugToggle.addEventListener('click', function() {
+                document.body.classList.toggle('debug-mode');
+            });
+        });
         
         // Audio controls - improved version
         document.addEventListener('DOMContentLoaded', function() {
