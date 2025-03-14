@@ -799,19 +799,22 @@ class Game {
         }
     }
     
-    update(deltaTime) {
+    update(deltaTime = 1) {
         if (!this.isInitialized || this.isGameOver) return;
         
         try {
-            // Handle controls
+            // Limit the number of heavy updates per frame
+            const thisFrame = this.frameCount;
+            
+            // Handle controls - always needed for responsiveness
             this.handleControls();
             
-            // Update truck position
-            this.updateTruck();
+            // Update truck position with delta time
+            this.updateTruck(deltaTime);
             
-            // Update monster truck (handles damage visual effects, etc.)
+            // Update monster truck - essential for gameplay
             if (this.monsterTruck) {
-                this.monsterTruck.update();
+                this.monsterTruck.update(deltaTime);
                 
                 // Sync health from MonsterTruck to Game
                 this.health = this.monsterTruck.health;
@@ -823,17 +826,19 @@ class Game {
                 }
             }
             
-            // Check for wall collisions
+            // Check for wall collisions - essential for gameplay
             if (typeof this.checkWallCollisions === 'function') {
                 this.checkWallCollisions();
             }
             
-            // Update weapons and their projectiles - with safety checks
+            // PERFORMANCE OPTIMIZATION: Stagger heavy updates across frames
+            
+            // Update weapons every frame (essential for shooting)
             if (this.weapons && Array.isArray(this.weapons) && this.weapons.length > 0) {
                 // Update all weapons
                 this.weapons.forEach(weapon => {
                     if (weapon && typeof weapon.update === 'function') {
-                        weapon.update();
+                        weapon.update(deltaTime);
                     }
                 });
                 
@@ -849,59 +854,74 @@ class Game {
                 }
             }
             
-            // Make sure we update projectiles from the original system too
+            // Update projectiles every frame (essential for gameplay)
             if (typeof this.updateProjectiles === 'function') {
-                this.updateProjectiles();
+                this.updateProjectiles(deltaTime);
             }
             
-            // Update weapon pickups with safety check
-            if (typeof this.updateWeaponPickups === 'function' && Array.isArray(this.weaponPickups)) {
-                this.updateWeaponPickups();
+            // Distribute heavy updates across frames to prevent spikes
+            const updateGroup = thisFrame % 3; // 0, 1, or 2
+            
+            if (updateGroup === 0) {
+                // Group 1: Update powerups and weapon pickups
+                if (typeof this.updatePowerups === 'function') {
+                    this.updatePowerups(deltaTime);
+                }
+                
+                if (typeof this.updateWeaponPickups === 'function' && Array.isArray(this.weaponPickups)) {
+                    this.updateWeaponPickups(deltaTime);
+                }
+                
+                // Update particle effects - critical for performance
+                if (typeof this.updateTrails === 'function') {
+                    this.updateTrails();
+                }
+                
+                if (typeof this.updateImpacts === 'function') {
+                    this.updateImpacts();
+                }
+            } 
+            else if (updateGroup === 1) {
+                // Group 2: Update turrets and visual effects
+                if (typeof this.updateTurrets === 'function') {
+                    this.updateTurrets(deltaTime);
+                }
+                
+                if (typeof this.updateSparks === 'function' && this.sparks && this.sparks.length > 0) {
+                    this.updateSparks(deltaTime);
+                }
+                
+                if (this.specialEffects && this.specialEffects.length > 0) {
+                    this.updateSpecialEffects(deltaTime);
+                }
+            }
+            else if (updateGroup === 2) {
+                // Group 3: Update cosmetic elements
+                if (typeof this.updateSpectators === 'function' && this.spectators) {
+                    this.updateSpectators(deltaTime);
+                }
+                
+                // Update multiplayer (less critical)
+                if (this.multiplayer) {
+                    this.multiplayer.update();
+                }
+                
+                // Debug info - update position display (not critical)
+                if (this.truck && window.updateDebugInfo) {
+                    window.updateDebugInfo(this.truck.position);
+                }
             }
             
-            // Update powerups
-            if (typeof this.updatePowerups === 'function') {
-                this.updatePowerups();
-            }
-            
-            // Update turrets
-            if (typeof this.updateTurrets === 'function') {
-                this.updateTurrets();
-            }
-            
-            // Update visual effects
-            if (typeof this.updateSparks === 'function' && this.sparks && this.sparks.length > 0) {
-                this.updateSparks();
-            }
-            
-            // Update special effects if any
-            if (this.specialEffects && this.specialEffects.length > 0) {
-                this.updateSpecialEffects();
-            }
-            
-            // Update stadium spectators
-            if (typeof this.updateSpectators === 'function' && this.spectators) {
-                this.updateSpectators();
-            }
-            
-            // Update camera to follow truck
+            // Always update camera and HUD for smooth gameplay
             if (typeof this.updateCamera === 'function' && this.camera && this.truck) {
-                this.updateCamera();
+                this.updateCamera(deltaTime);
             }
             
-            // Update HUD - with safety check
             if (typeof this.updateHUD === 'function') {
-                this.updateHUD();
-            }
-            
-            // Update multiplayer
-            if (this.multiplayer) {
-                this.multiplayer.update();
-            }
-            
-            // Debug info - update position display
-            if (this.truck && window.updateDebugInfo) {
-                window.updateDebugInfo(this.truck.position);
+                // HUD updates only every other frame to reduce DOM operations
+                if (thisFrame % 2 === 0) {
+                    this.updateHUD();
+                }
             }
         } catch (error) {
             console.error("Error in game update loop:", error);
@@ -1107,21 +1127,36 @@ class Game {
         }
     }
     
-    updateTruck() {
+    updateTruck(deltaTime = 1) {
         if (!this.truck) return;
         
-        // Update velocity based on acceleration
-        this.truck.velocity += this.truck.acceleration;
+        // Base values - these are the "60fps standard" values
+        const baseAcceleration = 0.02;
+        const baseMaxSpeed = 1.0;
+        const baseFriction = 0.02;
+        const baseTurning = 0.02;
+        
+        // Scale by deltaTime for frame rate independence
+        const scaledAcceleration = this.truck.acceleration * deltaTime;
+        const scaledFriction = baseFriction * deltaTime;
+        const scaledTurning = this.truck.turning * deltaTime;
+        
+        // Update velocity based on acceleration with delta time scaling
+        this.truck.velocity += scaledAcceleration;
+        
+        // Get max speed based on active powerups
+        let maxSpeed = baseMaxSpeed;
+        if (this.activePowerups && this.activePowerups.has('SPEED_BOOST')) {
+            maxSpeed = baseMaxSpeed * 2; // Double speed with powerup
+        }
         
         // Apply speed limits
-        const maxSpeed = 1.0;
         if (Math.abs(this.truck.velocity) > maxSpeed) {
             this.truck.velocity = Math.sign(this.truck.velocity) * maxSpeed;
         }
         
-        // Apply friction/drag to gradually slow down
-        const friction = 0.02;
-        this.truck.velocity *= (1 - friction);
+        // Apply friction/drag with delta time scaling
+        this.truck.velocity *= (1 - scaledFriction);
         
         // Stop completely if very slow
         if (Math.abs(this.truck.velocity) < 0.001) {
@@ -1131,20 +1166,21 @@ class Game {
         // Only update position if moving
         if (Math.abs(this.truck.velocity) > 0) {
             // Calculate movement direction based on truck's rotation
-            // FIXED: Ensure correct direction calculation
             const moveX = Math.sin(this.truck.rotation.y) * this.truck.velocity;
             const moveZ = Math.cos(this.truck.rotation.y) * this.truck.velocity;
             
-            // Apply movement
-            this.truck.position.x += moveX;
-            this.truck.position.z += moveZ;
+            // Apply movement with delta time scaling
+            this.truck.position.x += moveX * deltaTime;
+            this.truck.position.z += moveZ * deltaTime;
         }
         
-        // Apply turning (always update rotation)
-        this.truck.rotation.y += this.truck.turning;
+        // Apply turning with delta time scaling
+        this.truck.rotation.y += scaledTurning;
         
-        // Update speed display
-        this.updateSpeedDisplay();
+        // Update speed display - less frequently to reduce DOM updates
+        if (this.frameCount % 5 === 0) {
+            this.updateSpeedDisplay();
+        }
     }
     
     updateCamera() {
@@ -1206,31 +1242,43 @@ class Game {
     animate() {
         if (!this.isInitialized) return;
         
+        // Calculate delta time for frame-rate independent movement
+        const now = performance.now();
+        if (!this.lastFrameTime) this.lastFrameTime = now;
+        const deltaTime = Math.min((now - this.lastFrameTime) / 16.67, 2.0); // Cap at 2x normal delta to prevent large jumps
+        this.lastFrameTime = now;
+        
         requestAnimationFrame(() => this.animate());
         
         try {
             // Increment frame counter
             this.frameCount++;
             
-            // Force first powerup spawns when game starts
+            // Force first powerup spawns when game starts, but stagger them
             if (this.frameCount === 60) { // After 1 second
-                // Create initial powerups to ensure they appear
-                this.createPowerup();
-                this.createPowerup();
+                // Create initial powerup to ensure they appear
                 this.createPowerup();
                 
-                // Create initial weapon pickups
-                this.createWeaponPickup();
+                // Stagger powerup and weapon pickup creation
+                setTimeout(() => this.createPowerup(), 500);
+                setTimeout(() => this.createWeaponPickup(), 1000);
+                setTimeout(() => this.createPowerup(), 1500);
                 
-                console.log("Initial powerups and weapon pickups spawned");
+                console.log("Initial powerups and weapon pickup spawning staggered");
             }
             
-            // Update game state
-            this.update();
+            // Update game state with delta time
+            this.update(deltaTime);
             
-            // Render scene
+            // Render scene - only render at 30fps on slower devices
             if (this.renderer && this.scene && this.camera) {
-                this.renderer.render(this.scene, this.camera);
+                // Check if we should throttle rendering
+                const shouldRender = !this.lastRenderTime || now - this.lastRenderTime >= 33.33; // ~30fps
+                
+                if (shouldRender) {
+                    this.renderer.render(this.scene, this.camera);
+                    this.lastRenderTime = now;
+                }
             }
         } catch (error) {
             console.error("Error in animate:", error);
@@ -1980,7 +2028,77 @@ class Game {
     }
 
     // Update projectiles
-    updateProjectiles() {
+    // Pool of particles for reuse
+    initializeParticlePool() {
+        if (!this.particlePool) {
+            this.particlePool = [];
+            this.particlePoolSize = 100; // Create a fixed pool
+            
+            // Create particle objects once
+            for (let i = 0; i < this.particlePoolSize; i++) {
+                const particleGeometry = new THREE.SphereGeometry(0.1, 4, 4); // Simplified geometry
+                const particleMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.visible = false; // Hide initially
+                particle.inUse = false;
+                
+                // Add to scene but hidden
+                this.scene.add(particle);
+                this.particlePool.push(particle);
+            }
+            
+            console.log(`Created particle pool with ${this.particlePoolSize} particles`);
+        }
+    }
+    
+    // Get a particle from the pool
+    getParticle(color = 0xffffff) {
+        if (!this.particlePool) {
+            this.initializeParticlePool();
+        }
+        
+        // Find an available particle
+        for (let i = 0; i < this.particlePool.length; i++) {
+            const particle = this.particlePool[i];
+            if (!particle.inUse) {
+                particle.material.color.set(color);
+                particle.material.opacity = 0.7;
+                particle.visible = true;
+                particle.inUse = true;
+                particle.scale.set(1, 1, 1);
+                return particle;
+            }
+        }
+        
+        // If all particles are in use, reuse the oldest one
+        // This is more performant than creating new ones
+        const particle = this.particlePool[this.nextParticleIndex || 0];
+        this.nextParticleIndex = (this.nextParticleIndex + 1) % this.particlePoolSize;
+        
+        particle.material.color.set(color);
+        particle.material.opacity = 0.7;
+        particle.visible = true;
+        particle.inUse = true;
+        particle.scale.set(1, 1, 1);
+        
+        return particle;
+    }
+    
+    // Release a particle back to the pool
+    releaseParticle(particle) {
+        if (particle) {
+            particle.visible = false;
+            particle.inUse = false;
+        }
+    }
+    
+    // Optimized projectile update
+    updateProjectiles(deltaTime = 1) {
         if (!this.scene) return;
         
         // Initialize projectiles array if needed
@@ -1988,10 +2106,20 @@ class Game {
             this.projectiles = [];
         }
         
-        // Debug logging
-        if (this.frameCount % 60 === 0) { // Log once per second
+        // Initialize particle pool if needed
+        if (!this.particlePool) {
+            this.initializeParticlePool();
+        }
+        
+        // Reduce debug logging frequency
+        if (this.frameCount % 300 === 0) { // Log once every 5 seconds
             console.log(`Updating ${this.projectiles.length} projectiles`);
         }
+        
+        // Calculate maximum number of trail particles to create
+        // Limit based on projectile count to prevent overload
+        const maxTrailsPerFrame = Math.min(5, Math.ceil(10 / Math.max(1, this.projectiles.length)));
+        let trailsCreatedThisFrame = 0;
         
         try {
             for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -1999,7 +2127,6 @@ class Game {
                 
                 // Skip invalid projectiles
                 if (!projectile || !projectile.mesh || !projectile.direction) {
-                    console.warn("Invalid projectile found, removing:", projectile);
                     if (projectile && projectile.mesh) {
                         this.scene.remove(projectile.mesh);
                     }
@@ -2007,59 +2134,112 @@ class Game {
                     continue;
                 }
                 
-                // Update position using all direction components (x, y, z)
-                projectile.mesh.position.x += projectile.direction.x * projectile.speed;
-                projectile.mesh.position.y += projectile.direction.y * projectile.speed; // Apply vertical movement
-                projectile.mesh.position.z += projectile.direction.z * projectile.speed;
+                // Update position using all direction components with delta time scaling
+                const moveFactor = projectile.speed * deltaTime;
+                projectile.mesh.position.x += projectile.direction.x * moveFactor;
+                projectile.mesh.position.y += projectile.direction.y * moveFactor;
+                projectile.mesh.position.z += projectile.direction.z * moveFactor;
                 
                 // Rotate projectile to face direction of movement
-                if (projectile.direction.length() > 0) {
-                    // Create a quaternion from the direction vector
-                    const quaternion = new THREE.Quaternion();
-                    const upVector = new THREE.Vector3(0, 1, 0);
-                    
-                    // Create a dummy object to calculate quaternion
-                    const lookAt = new THREE.Object3D();
-                    lookAt.position.copy(projectile.mesh.position);
-                    lookAt.lookAt(
+                // But do this less frequently to save performance
+                if (i % 3 === 0 && projectile.direction.length() > 0) {
+                    projectile.mesh.lookAt(
                         projectile.mesh.position.x + projectile.direction.x,
                         projectile.mesh.position.y + projectile.direction.y,
                         projectile.mesh.position.z + projectile.direction.z
                     );
-                    
-                    // Apply the rotation
-                    projectile.mesh.quaternion.copy(lookAt.quaternion);
                 }
                 
-                // Add tracer effect
-                this.createProjectileTrail(projectile);
+                // Add tracer effect - limit number of trails created per frame
+                if (trailsCreatedThisFrame < maxTrailsPerFrame && i % 2 === 0) {
+                    this.createOptimizedProjectileTrail(projectile);
+                    trailsCreatedThisFrame++;
+                }
                 
-                // Decrease lifetime
-                projectile.lifetime--;
+                // Decrease lifetime with delta time scaling
+                projectile.lifetime -= deltaTime;
                 
-                // Check for collisions with walls
-                const wallHit = this.checkProjectileWallCollisions(projectile);
+                // Only check collisions every other frame for distant projectiles
+                const shouldCheckCollisions = 
+                    (projectile.lifetime < 30) || // Always check when close to despawning
+                    (this.truck && projectile.mesh.position.distanceTo(this.truck.position) < 20) || // Always check when close to player
+                    (i % 2 === 0); // Otherwise check every other projectile
                 
-                // Check for turret collisions
-                const hitResult = (typeof this.checkProjectileCollisions === 'function') ? 
-                    this.checkProjectileCollisions(projectile) : null;
-                
-                // Remove if lifetime ended or collision occurred
-                if (projectile.lifetime <= 0 || wallHit || hitResult) {
+                if (shouldCheckCollisions) {
+                    // Check for collisions with walls
+                    const wallHit = this.checkProjectileWallCollisions(projectile);
+                    
+                    // Check for turret collisions
+                    const hitResult = (typeof this.checkProjectileCollisions === 'function') ? 
+                        this.checkProjectileCollisions(projectile) : null;
+                    
+                    // Remove if lifetime ended or collision occurred
+                    if (projectile.lifetime <= 0 || wallHit || hitResult) {
+                        this.scene.remove(projectile.mesh);
+                        this.projectiles.splice(i, 1);
+                        
+                        // Create impact effect if collision occurred
+                        if (hitResult) {
+                            this.createOptimizedImpactEffect(projectile.mesh.position, hitResult);
+                        } else if (wallHit) {
+                            // Create simple wall impact effect
+                            this.createOptimizedWallImpactEffect(projectile.mesh.position);
+                        }
+                    }
+                }
+                else if (projectile.lifetime <= 0) {
+                    // Just remove if expired
                     this.scene.remove(projectile.mesh);
                     this.projectiles.splice(i, 1);
-                    
-                    // Create impact effect if collision occurred
-                    if (hitResult) {
-                        this.createImpactEffect(projectile.mesh.position, hitResult);
-                    } else if (wallHit) {
-                        // Create simple wall impact effect
-                        this.createWallImpactEffect(projectile.mesh.position);
-                    }
                 }
             }
         } catch (error) {
             console.error("Error updating projectiles:", error);
+        }
+    }
+    
+    // Optimized trail effect using particle pool
+    createOptimizedProjectileTrail(projectile) {
+        if (!projectile || !projectile.mesh) return;
+        
+        // Get a particle from the pool
+        const trailColor = projectile.source === 'player' ? 0xff00ff : 0xff0000;
+        const trail = this.getParticle(trailColor);
+        
+        // Set trail properties
+        trail.position.copy(projectile.mesh.position);
+        trail.userData.lifetime = 10; // Shorter lifetime
+        trail.userData.fadeRate = 0.07; // Faster fade
+        trail.userData.shrinkRate = 0.03; // Gradually shrink
+        
+        // Add to active trails for updating
+        if (!this.activeTrails) {
+            this.activeTrails = [];
+        }
+        this.activeTrails.push(trail);
+    }
+    
+    // Update all active trails in one pass
+    updateTrails() {
+        if (!this.activeTrails || this.activeTrails.length === 0) return;
+        
+        for (let i = this.activeTrails.length - 1; i >= 0; i--) {
+            const trail = this.activeTrails[i];
+            
+            // Reduce lifetime
+            trail.userData.lifetime--;
+            
+            // Fade and shrink
+            if (trail.material) {
+                trail.material.opacity -= trail.userData.fadeRate;
+                trail.scale.multiplyScalar(1 - trail.userData.shrinkRate);
+            }
+            
+            // Remove if faded out
+            if (trail.userData.lifetime <= 0 || trail.material.opacity <= 0) {
+                this.releaseParticle(trail);
+                this.activeTrails.splice(i, 1);
+            }
         }
     }
     
@@ -2085,74 +2265,137 @@ class Game {
         return false;
     }
     
-    // Create a simple wall impact effect
-    createWallImpactEffect(position) {
-        // Create flash
-        const impactLight = new THREE.PointLight(0x00ffff, 1, 5);
-        impactLight.position.copy(position);
-        this.scene.add(impactLight);
+    // Create an optimized wall impact effect using particle pool
+    createOptimizedWallImpactEffect(position) {
+        if (!position) return;
         
-        // Create particles
-        const particleCount = 10;
-        const particles = [];
+        // Use a shared light for multiple impacts to reduce overhead
+        if (!this.impactLightPool) {
+            this.impactLightPool = [];
+            // Create a small pool of reusable lights
+            for (let i = 0; i < 3; i++) {
+                const light = new THREE.PointLight(0x00ffff, 1, 5);
+                light.visible = false;
+                this.scene.add(light);
+                this.impactLightPool.push({
+                    light: light,
+                    inUse: false
+                });
+            }
+        }
+        
+        // Get a light from the pool
+        let impactLight = null;
+        for (let i = 0; i < this.impactLightPool.length; i++) {
+            if (!this.impactLightPool[i].inUse) {
+                impactLight = this.impactLightPool[i].light;
+                this.impactLightPool[i].inUse = true;
+                this.impactLightPool[i].timeLeft = 20; // Frames until release
+                break;
+            }
+        }
+        
+        // If we got a light, use it
+        if (impactLight) {
+            impactLight.position.copy(position);
+            impactLight.visible = true;
+            impactLight.intensity = 1;
+        }
+        
+        // Create fewer particles
+        const particleCount = 5; // Reduced from 10
         
         for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00ffff,
-                transparent: true,
-                opacity: 1
-            });
+            // Get a particle from the pool
+            const particle = this.getParticle(0x00ffff);
             
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            // Position
             particle.position.copy(position);
             
-            // Random velocity
+            // Random velocity - lower speeds for better performance
             const angle = Math.random() * Math.PI * 2;
-            const speed = Math.random() * 0.2 + 0.1;
-            particle.velocity = {
+            const speed = Math.random() * 0.15 + 0.05;
+            
+            // Store velocity in userData to avoid creating new objects
+            particle.userData.velocity = {
                 x: Math.cos(angle) * speed,
-                y: Math.random() * 0.2,
+                y: Math.random() * 0.15,
                 z: Math.sin(angle) * speed
             };
             
-            this.scene.add(particle);
-            particles.push(particle);
-        }
-        
-        // Fade out and remove
-        let impactLife = 20;
-        const fadeImpact = () => {
-            impactLife--;
+            // Store impact effect data
+            particle.userData.impactEffect = true;
+            particle.userData.gravity = 0.01;
+            particle.userData.lifetime = 20;
+            particle.userData.fadeRate = 0.05;
             
-            if (impactLife > 0) {
-                // Update light
-                impactLight.intensity = impactLife / 20;
-                
-                // Update particles
-                for (const particle of particles) {
-                    particle.position.x += particle.velocity.x;
-                    particle.position.y += particle.velocity.y;
-                    particle.position.z += particle.velocity.z;
+            // Add to active impacts
+            if (!this.activeImpacts) {
+                this.activeImpacts = [];
+            }
+            this.activeImpacts.push(particle);
+        }
+    }
+    
+    // Update all active impact effects
+    updateImpacts() {
+        // Update lights
+        if (this.impactLightPool) {
+            for (const lightData of this.impactLightPool) {
+                if (lightData.inUse) {
+                    lightData.timeLeft--;
+                    lightData.light.intensity = lightData.timeLeft / 20;
                     
-                    // Apply gravity
-                    particle.velocity.y -= 0.01;
-                    
-                    // Fade out
-                    particle.material.opacity = impactLife / 20;
-                }
-                
-                requestAnimationFrame(fadeImpact);
-            } else {
-                // Remove light and particles
-                this.scene.remove(impactLight);
-                for (const particle of particles) {
-                    this.scene.remove(particle);
+                    if (lightData.timeLeft <= 0) {
+                        lightData.inUse = false;
+                        lightData.light.visible = false;
+                    }
                 }
             }
-        };
+        }
         
-        fadeImpact();
+        // Update particles
+        if (!this.activeImpacts || this.activeImpacts.length === 0) return;
+        
+        for (let i = this.activeImpacts.length - 1; i >= 0; i--) {
+            const particle = this.activeImpacts[i];
+            
+            // Skip invalid particles
+            if (!particle || !particle.userData) {
+                this.activeImpacts.splice(i, 1);
+                continue;
+            }
+            
+            // Update position
+            if (particle.userData.velocity) {
+                particle.position.x += particle.userData.velocity.x;
+                particle.position.y += particle.userData.velocity.y;
+                particle.position.z += particle.userData.velocity.z;
+                
+                // Apply gravity
+                particle.userData.velocity.y -= particle.userData.gravity;
+            }
+            
+            // Decrease lifetime
+            particle.userData.lifetime--;
+            
+            // Update opacity
+            if (particle.material) {
+                particle.material.opacity = particle.userData.lifetime / 20;
+            }
+            
+            // Remove if faded out
+            if (particle.userData.lifetime <= 0) {
+                this.releaseParticle(particle);
+                this.activeImpacts.splice(i, 1);
+            }
+        }
+    }
+    
+    // Create an optimized impact effect for projectile hits
+    createOptimizedImpactEffect(position, hitType) {
+        const color = hitType === 'wall' ? 0x00ffff : 0xff0000;
+        this.createOptimizedWallImpactEffect(position);
     }
 
     // Create projectile trail effect
