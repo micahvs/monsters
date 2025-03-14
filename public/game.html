@@ -41,80 +41,183 @@
             text-shadow: 0 0 10px #ff00ff;
         }
 
-        /* Base HUD Element */
-        .hud-element {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 4px;
+        /* Cyberpunk UI Theme */
+        .ui-panel {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 0;
             color: #fff;
-            font-size: 10px;
+            font-size: 14px;
             position: fixed;
             z-index: 100;
             pointer-events: none;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(2px);
-            border: 1px solid rgba(255, 0, 255, 0.2);
-            padding: 5px 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            padding: 12px;
+            letter-spacing: 0.5px;
+            border: none;
+            overflow: hidden;
         }
-
+        
+        .ui-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255, 0, 255, 0.1) 0%, rgba(0, 255, 255, 0.1) 100%);
+            pointer-events: none;
+        }
+        
         /* Player Info - Top Left */
         #player-info {
-            top: 10px;
-            left: 10px;
-            width: 150px;
-            border-left: 2px solid #ff00ff;
+            top: 20px;
+            left: 20px;
+            width: 220px;
+            border-left: 3px solid #ff00ff;
+        }
+        
+        #player-info::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to right, #ff00ff, transparent);
+        }
+        
+        #playerName {
+            color: #ff00ff;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            text-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+        
+        #score {
+            color: #00ffff;
+            font-size: 16px;
         }
 
         /* Game Stats - Top Right */
         #game-stats {
-            top: 10px;
-            right: 10px;
-            width: 150px;
+            top: 20px;
+            right: 20px;
+            width: 220px;
             text-align: right;
-            border-right: 2px solid #ff00ff;
+            border-right: 3px solid #ff00ff;
+        }
+        
+        #game-stats::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to left, #ff00ff, transparent);
+        }
+        
+        #health, #ammo {
+            font-size: 16px;
+            margin-bottom: 4px;
         }
 
-        /* Weapon Info - Left Side, Below Player Info */
+        /* Weapon Info - Left Side */
         #weapon-info {
-            top: 60px;
-            left: 10px;
-            width: 150px;
-            border-left: 2px solid #00ffff;
+            top: 110px;
+            left: 20px;
+            width: 220px;
+            border-left: 3px solid #00ffff;
+        }
+        
+        #weapon-info::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to right, #00ffff, transparent);
+        }
+        
+        #currentWeapon {
+            color: #00ffff;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        
+        #weaponStats {
+            font-size: 16px;
         }
 
-        /* Weapon Legend - Left Side, Below Weapon Info */
+        /* Weapon Legend - Left Side */
         #weapon-legend {
-            top: 110px;
-            left: 10px;
-            width: 150px;
-            background: rgba(0, 0, 0, 0.3);
-            color: #fff;
-            font-size: 10px;
-            line-height: 1.5;
-            border-left: 2px solid #00ffff;
+            top: 200px;
+            left: 20px;
+            width: 220px;
+            border-left: 3px solid #00ffff;
+        }
+        
+        #weapon-legend::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to right, #00ffff, transparent);
         }
         
         #weapon-legend div {
-            margin-bottom: 2px;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        #weapon-legend div:first-child {
+            color: #00ffff;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
         }
 
         /* Speed Display - Bottom Left */
         #speed-display {
-            bottom: 10px;
-            left: 10px;
-            width: 150px;
-            border-left: 2px solid #00ffff;
+            bottom: 20px;
+            left: 20px;
+            width: 220px;
+            border-left: 3px solid #00ffff;
+        }
+        
+        #speed-display::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to right, #00ffff, transparent);
+        }
+        
+        #speed {
+            font-size: 16px;
+            color: #00ffff;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
         }
 
-        /* Cooldown Container - Bottom Left, Above Speed Display */
+        /* Cooldown Bar - Bottom Left, Above Speed Display */
         #cooldown-container {
-            bottom: 50px;
-            left: 10px;
-            width: 150px;
-            height: 4px;
+            bottom: 80px;
+            left: 20px;
+            width: 220px;
+            height: 6px;
             padding: 0;
-            border-left: 2px solid #00ffff;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 0;
+            border-left: 3px solid #00ffff;
+            background: rgba(0, 0, 0, 0.7);
             overflow: hidden;
             transition: opacity 0.3s ease;
         }
@@ -124,40 +227,41 @@
             width: 100%;
             background: #00ffff;
             transition: width 0.1s linear;
+            box-shadow: 0 0 10px #00ffff;
         }
 
         /* Audio Controls - Bottom Right */
         #audio-controls {
             position: fixed;
-            bottom: 10px;
-            right: 10px;
+            bottom: 20px;
+            right: 20px;
             display: flex;
-            gap: 8px;
+            gap: 15px;
             z-index: 100;
             background: none;
             border: none;
-            box-shadow: none;
         }
 
         .audio-button {
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.7);
             color: #ff00ff;
-            border: 1px solid #ff00ff;
+            border: 2px solid #ff00ff;
             border-radius: 50%;
-            width: 26px;
-            height: 26px;
+            width: 40px;
+            height: 40px;
             display: flex;
             justify-content: center;
             align-items: center;
             cursor: pointer;
-            box-shadow: 0 0 4px rgba(255, 0, 255, 0.4);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
             transition: all 0.2s ease;
-            font-size: 11px;
+            font-size: 16px;
             pointer-events: auto;
         }
 
         .audio-button:hover {
             transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.6);
         }
 
         .audio-button.muted {
@@ -169,7 +273,7 @@
         /* Powerup Indicators - Bottom Center */
         #powerup-indicators-container {
             position: fixed;
-            bottom: 10px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             width: auto;
@@ -177,96 +281,125 @@
             z-index: 100;
             background: none;
             border: none;
-            box-shadow: none;
             pointer-events: none;
         }
 
         #powerup-indicators {
             display: flex;
-            gap: 8px;
+            gap: 15px;
             justify-content: center;
             background: none;
         }
 
         .powerup-indicator {
-            padding: 3px 6px;
-            border-radius: 3px;
+            padding: 8px 12px;
             display: flex;
             align-items: center;
-            gap: 4px;
-            background: rgba(0, 0, 0, 0.5);
-            font-size: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            font-size: 14px;
+            border-bottom: 2px solid;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
         }
 
-        /* Debug Panel - Left Side, Below Weapon Legend */
+        /* Debug Panel - Left Side */
         #debug-panel {
             position: fixed;
-            top: 220px;
-            left: 10px;
-            width: 150px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #00ff00;
+            top: 350px;
+            left: 20px;
+            width: 220px;
+            background: rgba(0, 0, 0, 0.7);
+            border-left: 3px solid #00ff00;
             color: #00ff00;
-            font-family: monospace;
-            font-size: 9px;
-            max-height: 120px;
+            font-family: 'Orbitron', monospace;
+            font-size: 14px;
+            max-height: 200px;
             overflow: auto;
-            opacity: 0.6;
+            opacity: 0.8;
             display: none;
-            padding: 4px 6px;
+            padding: 12px;
             z-index: 100;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+        }
+        
+        #debug-panel::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to right, #00ff00, transparent);
         }
 
         body.debug-mode #debug-panel {
             display: block;
         }
 
-        /* Debug Toggle Button - Top Left, Next to Player Info */
+        /* Debug Toggle Button */
         #debug-toggle {
             position: fixed;
-            top: 10px;
-            left: 170px;
-            background: rgba(0, 0, 0, 0.5);
+            top: 20px;
+            left: 250px;
+            background: rgba(0, 0, 0, 0.7);
             color: #00ff00;
-            border: 1px solid #00ff00;
-            border-radius: 3px;
-            padding: 2px 5px;
-            font-size: 9px;
+            border: 2px solid #00ff00;
+            padding: 6px 12px;
+            font-size: 14px;
             cursor: pointer;
             z-index: 101;
             pointer-events: auto;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+        
+        #debug-toggle:hover {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
         }
 
-        /* Chat Container - Bottom Right, Above Audio Controls */
+        /* Chat Container - Bottom Right */
         #chat-container {
             position: fixed;
-            bottom: 50px;
-            right: 10px;
-            width: 180px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #ff00ff;
-            border-radius: 3px;
+            bottom: 80px;
+            right: 20px;
+            width: 280px;
+            background: rgba(0, 0, 0, 0.7);
+            border-right: 3px solid #ff00ff;
             display: flex;
             flex-direction: column;
-            max-height: 120px;
+            max-height: 200px;
             overflow: hidden;
             pointer-events: auto;
             z-index: 100;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+        }
+        
+        #chat-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to left, #ff00ff, transparent);
         }
 
         #chat-messages {
             overflow-y: auto;
-            max-height: 80px;
-            padding: 6px;
+            max-height: 150px;
+            padding: 12px;
             color: #fff;
-            font-size: 9px;
+            font-size: 14px;
         }
 
         #chat-input-container {
             display: flex;
-            padding: 3px;
+            padding: 8px;
             border-top: 1px solid #ff00ff;
+            background: rgba(0, 0, 0, 0.5);
         }
 
         #chatInput {
@@ -274,8 +407,8 @@
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid #ff00ff;
             color: #fff;
-            padding: 3px;
-            font-size: 9px;
+            padding: 8px;
+            font-size: 14px;
             font-family: 'Orbitron', sans-serif;
         }
 
@@ -283,22 +416,30 @@
             background: #ff00ff;
             color: #000;
             border: none;
-            padding: 3px 6px;
-            margin-left: 3px;
+            padding: 8px 12px;
+            margin-left: 8px;
             cursor: pointer;
-            font-size: 9px;
+            font-size: 14px;
             font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        
+        #chatSend:hover {
+            background: #ff66ff;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
         }
         
         /* Health and ammo bars */
         .stat-bar {
-            height: 4px;
+            height: 8px;
             width: 100%;
             background: rgba(0, 0, 0, 0.5);
-            margin-top: 3px;
+            margin-top: 6px;
+            margin-bottom: 12px;
             position: relative;
-            border-radius: 2px;
             overflow: hidden;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.7);
         }
         
         .stat-bar-fill {
@@ -307,6 +448,7 @@
             left: 0;
             top: 0;
             transition: width 0.3s ease;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
         
         .health-bar-fill {
@@ -317,23 +459,37 @@
             background: linear-gradient(to right, #0066ff, #00ffff);
         }
         
-        /* Damage Boost Notification - Top Right, Below Game Stats */
+        /* Damage Boost Notification */
         #damage-boost {
             position: fixed;
-            top: 80px;
-            right: 10px;
-            width: 150px;
+            top: 150px;
+            right: 20px;
+            width: 220px;
             text-align: right;
-            border-right: 2px solid #ff00ff;
-            background: rgba(0, 0, 0, 0.3);
+            border-right: 3px solid #ff00ff;
+            background: rgba(0, 0, 0, 0.7);
             color: #fff;
-            font-size: 10px;
-            padding: 5px 8px;
+            font-size: 16px;
+            padding: 12px;
             z-index: 100;
             pointer-events: none;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(2px);
-            border: 1px solid rgba(255, 0, 255, 0.2);
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
+            animation: pulse 2s infinite alternate;
+        }
+        
+        #damage-boost::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to left, #ff00ff, transparent);
+        }
+        
+        @keyframes pulse {
+            from { box-shadow: 0 0 15px rgba(255, 0, 255, 0.3); }
+            to { box-shadow: 0 0 25px rgba(255, 0, 255, 0.7); }
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -358,13 +514,13 @@
     <canvas id="game"></canvas>
 
     <!-- Player Info - Top Left -->
-    <div id="player-info" class="hud-element">
+    <div id="player-info" class="ui-panel">
         <div id="playerName">PLAYER</div>
         <div id="score">SCORE: 0</div>
     </div>
     
     <!-- Game Stats - Top Right -->
-    <div id="game-stats" class="hud-element">
+    <div id="game-stats" class="ui-panel">
         <div id="health">HEALTH: 100%</div>
         <div class="stat-bar">
             <div class="stat-bar-fill health-bar-fill" style="width: 100%"></div>
@@ -375,26 +531,38 @@
         </div>
     </div>
     
-    <!-- Weapon Info - Left Side, Below Player Info -->
-    <div id="weapon-info" class="hud-element">
+    <!-- Weapon Info - Left Side -->
+    <div id="weapon-info" class="ui-panel">
         <div id="currentWeapon">MACHINE GUN</div>
         <div id="weaponStats">DMG: 20 | FIRE RATE: 0.1s</div>
     </div>
     
+    <!-- Weapon Legend - Left Side -->
+    <div id="weapon-legend" class="ui-panel">
+        <div>⇒ MACHINE GUN</div>
+        <div>1-4: Switch Weapons</div>
+        <div>Q/E: Prev/Next Weapon</div>
+        <div>R: Reload</div>
+        <div>SPACE: Fire</div>
+    </div>
+    
     <!-- Speed Display - Bottom Left -->
-    <div id="speed-display" class="hud-element">
+    <div id="speed-display" class="ui-panel">
         <div id="speed">SPEED: 0 MPH</div>
     </div>
     
-    <!-- Powerup Indicators Container - Bottom Center -->
+    <!-- Cooldown Bar - Bottom Left -->
+    <div id="cooldown-container" class="ui-panel"></div>
+    
+    <!-- Powerup Indicators - Bottom Center -->
     <div id="powerup-indicators-container">
         <div id="powerup-indicators"></div>
     </div>
     
-    <!-- Debug Toggle Button - Top Left, Next to Player Info -->
+    <!-- Debug Toggle Button -->
     <button id="debug-toggle">DEBUG</button>
     
-    <!-- Debug Panel - Left Side, Below Weapon Legend -->
+    <!-- Debug Panel - Left Side -->
     <div id="debug-panel">
         <div>Debug Controls:</div>
         <div>D: Teleport to edge</div>
@@ -406,8 +574,8 @@
         <div id="positionInfo">Pos: X:0 Y:0 Z:0</div>
     </div>
     
-    <!-- Chat Container - Bottom Right, Above Audio Controls -->
-    <div id="chat-container">
+    <!-- Chat Container - Bottom Right -->
+    <div id="chat-container" class="ui-panel">
         <div id="chat-messages"></div>
         <div id="chat-input-container">
             <input id="chatInput" type="text" placeholder="Type message...">
@@ -558,8 +726,8 @@
             // Function to add a message to the chat
             function addChatMessage(sender, message) {
                 const messageElement = document.createElement('div');
-                messageElement.style.marginBottom = '3px';
-                messageElement.innerHTML = `<span style="color: #ff00ff;">${sender}:</span> ${message}`;
+                messageElement.style.marginBottom = '5px';
+                messageElement.innerHTML = `<span style="color: #ff00ff; font-weight: bold;">${sender}:</span> ${message}`;
                 chatMessages.appendChild(messageElement);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }

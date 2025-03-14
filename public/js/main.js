@@ -3355,30 +3355,19 @@ class Game {
     
     // Create weapon key bindings legend
     createWeaponLegend() {
-        let legend = document.getElementById('weapon-legend');
-        if (legend) {
-            // Remove existing legend if it exists
-            legend.remove();
+        // No need to create the element as it's now part of the HTML
+        const legend = document.getElementById('weapon-legend');
+        if (!legend) return;
+        
+        // Update the weapon name in the legend
+        const currentWeapon = this.getCurrentWeapon();
+        const weaponName = currentWeapon ? currentWeapon.type.name : 'UNKNOWN WEAPON';
+        
+        // Find the first div (the weapon name) and update it
+        const firstDiv = legend.querySelector('div:first-child');
+        if (firstDiv) {
+            firstDiv.innerHTML = `⇒ ${weaponName}`;
         }
-        
-        // Create new legend with proper styling
-        legend = document.createElement('div');
-        legend.id = 'weapon-legend';
-        legend.className = 'hud-element';
-        
-        // No need to set most styles as they're defined in CSS
-        // Just ensure it doesn't have default hud-element padding
-        legend.style.padding = '8px 10px';
-        
-        legend.innerHTML = `
-            <div style="color: #00ffff; margin-bottom: 5px;">⇒ ${this.getCurrentWeapon()?.type?.name || 'Machine Gun'}</div>
-            <div>1-4: Switch Weapons</div>
-            <div>Q/E: Prev/Next Weapon</div>
-            <div>R: Reload</div>
-            <div>SPACE: Fire</div>
-        `;
-        
-        document.body.appendChild(legend);
     }
 
     // Debug method to help diagnose movement issues
@@ -4441,19 +4430,24 @@ class Game {
                 
                 const indicator = document.createElement('div');
                 indicator.className = 'powerup-indicator';
-                indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.5);
-                indicator.style.color = '#fff';
-                indicator.style.border = '1px solid ' + this.hexToRgba(powerupConfig.color, 0.8);
+                
+                // Set border color to match powerup
+                if (powerupConfig.color) {
+                    const colorHex = powerupConfig.color.toString(16).padStart(6, '0');
+                    indicator.style.borderBottomColor = '#' + colorHex;
+                    indicator.style.boxShadow = `0 0 15px #${colorHex}`;
+                }
                 
                 // Create icon
                 const icon = document.createElement('span');
-                icon.textContent = powerupConfig.icon;
-                icon.style.fontSize = '10px';
+                icon.textContent = powerupConfig.icon || '✦';
+                icon.style.fontSize = '16px';
+                icon.style.color = powerupConfig.color ? '#' + powerupConfig.color.toString(16).padStart(6, '0') : '#ffffff';
                 
                 // Create timer
                 const timer = document.createElement('span');
                 timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
-                timer.style.fontSize = '9px';
+                timer.style.fontSize = '14px';
                 
                 indicator.appendChild(icon);
                 indicator.appendChild(timer);
@@ -4630,28 +4624,16 @@ class Game {
         const currentWeapon = this.getCurrentWeapon();
         if (!currentWeapon) return;
         
+        // Get cooldown container and bar
+        const container = document.getElementById('cooldown-container');
+        if (!container) return;
+        
         // Get or create cooldown bar
         let cooldownBar = document.getElementById('cooldown-bar');
-        let container = document.getElementById('cooldown-container');
-        
-        if (!cooldownBar || !container) {
-            // Remove old elements if they exist
-            if (cooldownBar) cooldownBar.remove();
-            if (container) container.remove();
-            
-            // Create cooldown indicator container
-            container = document.createElement('div');
-            container.id = 'cooldown-container';
-            container.className = 'hud-element';
-            
-            // No need to set most styles as they're defined in CSS
-            
-            // Create cooldown bar
+        if (!cooldownBar) {
             cooldownBar = document.createElement('div');
             cooldownBar.id = 'cooldown-bar';
-            
             container.appendChild(cooldownBar);
-            document.body.appendChild(container);
         }
         
         try {
@@ -4664,8 +4646,10 @@ class Game {
             if (currentWeapon.type && currentWeapon.type.color) {
                 const colorHex = currentWeapon.type.color.toString(16).padStart(6, '0');
                 cooldownBar.style.backgroundColor = '#' + colorHex;
+                cooldownBar.style.boxShadow = `0 0 10px #${colorHex}`;
             } else {
                 cooldownBar.style.backgroundColor = '#00ffff';
+                cooldownBar.style.boxShadow = '0 0 10px #00ffff';
             }
             
             // Show/hide container based on cooldown status
@@ -4674,6 +4658,7 @@ class Game {
             console.log("Error updating cooldown indicator:", error);
             cooldownBar.style.width = '100%';
             cooldownBar.style.backgroundColor = '#00ffff';
+            cooldownBar.style.boxShadow = '0 0 10px #00ffff';
             container.style.opacity = '0.3';
         }
     }
