@@ -83,16 +83,18 @@
         
         #debugControls {
             position: fixed;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 100px;  /* Moved down to avoid overlap with notifications */
+            left: 20px; /* Place on the left side instead of center */
             background: rgba(0, 0, 0, 0.7);
             color: #ff00ff;
             font-family: 'Orbitron', sans-serif;
             padding: 10px;
             border-radius: 5px;
             z-index: 1000;
-            text-align: center;
+            text-align: left;
+            max-width: 250px;
+            border: 1px solid #ff00ff;
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
         }
         
         /* Audio toggle button - overridden by inline styles */
