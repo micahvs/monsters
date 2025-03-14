@@ -820,22 +820,29 @@ class Game {
                 this.checkWallCollisions();
             }
             
-            // Update weapons and their projectiles
-            if (this.weapons) {
+            // Update weapons and their projectiles - with safety checks
+            if (this.weapons && Array.isArray(this.weapons) && this.weapons.length > 0) {
                 // Update all weapons
                 this.weapons.forEach(weapon => {
-                    weapon.update();
+                    if (weapon && typeof weapon.update === 'function') {
+                        weapon.update();
+                    }
                 });
                 
-                // Update weapon display (will update cooldown indicator)
-                this.updateWeaponDisplay();
-                
-                // Check for projectile hits on enemies
-                this.checkProjectileHits();
+                // Only update display and check hits if we have valid weapons
+                if (this.getCurrentWeapon()) {
+                    // Update weapon display (will update cooldown indicator)
+                    this.updateWeaponDisplay();
+                    
+                    // Check for projectile hits on enemies
+                    if (typeof this.checkProjectileHits === 'function') {
+                        this.checkProjectileHits();
+                    }
+                }
             }
             
-            // Update weapon pickups
-            if (typeof this.updateWeaponPickups === 'function') {
+            // Update weapon pickups with safety check
+            if (typeof this.updateWeaponPickups === 'function' && Array.isArray(this.weaponPickups)) {
                 this.updateWeaponPickups();
             }
             
@@ -865,10 +872,14 @@ class Game {
             }
             
             // Update camera to follow truck
-            this.updateCamera();
+            if (typeof this.updateCamera === 'function' && this.camera && this.truck) {
+                this.updateCamera();
+            }
             
-            // Update HUD
-            this.updateHUD();
+            // Update HUD - with safety check
+            if (typeof this.updateHUD === 'function') {
+                this.updateHUD();
+            }
             
             // Update multiplayer
             if (this.multiplayer) {
@@ -881,6 +892,7 @@ class Game {
             }
         } catch (error) {
             console.error("Error in game update loop:", error);
+            console.error(error.stack); // Print stack trace for better debugging
         }
     }
     
@@ -1095,23 +1107,57 @@ class Game {
     updateCamera() {
         if (!this.camera || !this.truck) return;
         
-        // Zoomed out follow camera for better visibility
-        const cameraDistance = 8; // Increased from 5 for wider view
-        const cameraHeight = 5;   // Increased from 3 for higher perspective
-        
-        this.camera.position.x = this.truck.position.x - Math.sin(this.truck.rotation.y) * cameraDistance;
-        this.camera.position.z = this.truck.position.z - Math.cos(this.truck.rotation.y) * cameraDistance;
-        this.camera.position.y = cameraHeight;
-        
-        // Look at a point slightly ahead of the truck instead of directly at it
-        // This gives better visibility of what's in front of the player
-        const lookAtPoint = new THREE.Vector3(
-            this.truck.position.x + Math.sin(this.truck.rotation.y) * 2,
-            this.truck.position.y,
-            this.truck.position.z + Math.cos(this.truck.rotation.y) * 2
-        );
-        
-        this.camera.lookAt(lookAtPoint);
+        try {
+            // Zoomed out follow camera for better visibility
+            const cameraDistance = 8; // Increased from 5 for wider view
+            const cameraHeight = 5;   // Increased from 3 for higher perspective
+            
+            // Store original position to handle errors
+            const originalX = this.camera.position.x;
+            const originalZ = this.camera.position.z;
+            const originalY = this.camera.position.y;
+            
+            // Calculate new camera position
+            const newX = this.truck.position.x - Math.sin(this.truck.rotation.y) * cameraDistance;
+            const newZ = this.truck.position.z - Math.cos(this.truck.rotation.y) * cameraDistance;
+            
+            // Check if values are valid numbers
+            if (isNaN(newX) || isNaN(newZ)) {
+                console.error("Invalid camera position calculated. Using previous position.");
+                return;
+            }
+            
+            // Apply new position
+            this.camera.position.x = newX;
+            this.camera.position.z = newZ;
+            this.camera.position.y = cameraHeight;
+            
+            // Calculate look at point
+            const lookAtPoint = new THREE.Vector3(
+                this.truck.position.x + Math.sin(this.truck.rotation.y) * 2,
+                this.truck.position.y,
+                this.truck.position.z + Math.cos(this.truck.rotation.y) * 2
+            );
+            
+            // Check if values are valid
+            if (lookAtPoint.x === undefined || isNaN(lookAtPoint.x) || 
+                lookAtPoint.y === undefined || isNaN(lookAtPoint.y) || 
+                lookAtPoint.z === undefined || isNaN(lookAtPoint.z)) {
+                console.error("Invalid look at point. Skipping camera update.");
+                
+                // Restore original position
+                this.camera.position.x = originalX;
+                this.camera.position.z = originalZ;
+                this.camera.position.y = originalY;
+                return;
+            }
+            
+            // Apply look at
+            this.camera.lookAt(lookAtPoint);
+            
+        } catch (error) {
+            console.error("Error updating camera:", error);
+        }
     }
     
     animate() {
@@ -1671,33 +1717,47 @@ class Game {
 
     // Update HUD method
     updateHUD() {
-        // Update health display
-        const healthDisplay = document.getElementById('health');
-        if (healthDisplay && this.health !== undefined) {
-            // Color coding based on health percentage
-            const healthPercent = Math.floor((this.health / 100) * 100);
-            let healthColor = '#00ff00'; // Green
-            
-            if (healthPercent < 30) {
-                healthColor = '#ff0000'; // Red
-            } else if (healthPercent < 70) {
-                healthColor = '#ffff00'; // Yellow
+        try {
+            // Update health display
+            const healthDisplay = document.getElementById('health');
+            if (healthDisplay && this.health !== undefined) {
+                // Color coding based on health percentage
+                const healthPercent = Math.floor((this.health / 100) * 100);
+                let healthColor = '#00ff00'; // Green
+                
+                if (healthPercent < 30) {
+                    healthColor = '#ff0000'; // Red
+                } else if (healthPercent < 70) {
+                    healthColor = '#ffff00'; // Yellow
+                }
+                
+                healthDisplay.innerHTML = `HEALTH: <span style="color:${healthColor}">${healthPercent}%</span>`;
             }
             
-            healthDisplay.innerHTML = `HEALTH: <span style="color:${healthColor}">${healthPercent}%</span>`;
+            // Update speed display
+            if (typeof this.updateSpeedDisplay === 'function') {
+                this.updateSpeedDisplay();
+            }
+            
+            // Update weapon and ammo display only if weapons are initialized
+            if (this.weapons && Array.isArray(this.weapons) && this.weapons.length > 0 && this.getCurrentWeapon()) {
+                if (typeof this.updateWeaponDisplay === 'function') {
+                    this.updateWeaponDisplay();
+                }
+            }
+            
+            // Update powerup indicators
+            if (typeof this.updatePowerupIndicators === 'function') {
+                this.updatePowerupIndicators();
+            }
+            
+            // Update score display
+            if (typeof this.updateScoreDisplay === 'function') {
+                this.updateScoreDisplay();
+            }
+        } catch (error) {
+            console.error("Error in updateHUD:", error);
         }
-        
-        // Update speed display
-        this.updateSpeedDisplay();
-        
-        // Update weapon and ammo display
-        this.updateWeaponDisplay();
-        
-        // Update powerup indicators
-        this.updatePowerupIndicators();
-        
-        // Update score display
-        this.updateScoreDisplay();
     }
 
     // Add shooting mechanics to the Game class
@@ -2752,7 +2812,7 @@ class Game {
             legend = document.createElement('div');
             legend.id = 'weapon-legend';
             legend.style.position = 'absolute';
-            legend.style.top = '40px';
+            legend.style.top = '100px';  // Moved down to avoid overlap
             legend.style.left = '10px';
             legend.style.color = '#ffffff';
             legend.style.fontFamily = '"Orbitron", sans-serif';
@@ -2763,6 +2823,7 @@ class Game {
             legend.style.padding = '5px';
             legend.style.borderRadius = '5px';
             legend.style.maxWidth = '200px';
+            legend.style.zIndex = '100';  // Ensure it's above other elements
             
             legend.innerHTML = `
                 <div>1-4: Switch Weapons</div>
@@ -3735,48 +3796,71 @@ class Game {
     
     // Initialize weapons for the player
     initializeWeapons() {
-        if (!this.scene) return;
+        if (!this.scene) {
+            console.error("Cannot initialize weapons: Scene is not available");
+            return;
+        }
         
-        // Create all weapon types
-        this.weapons = [
-            new Weapon(this.scene, WeaponTypes.MACHINE_GUN),
-            new Weapon(this.scene, WeaponTypes.ROCKETS),
-            new Weapon(this.scene, WeaponTypes.SHOTGUN),
-            new Weapon(this.scene, WeaponTypes.MINES)
-        ];
+        console.log("Initializing weapons system...");
         
-        // Start with machine gun
-        this.currentWeaponIndex = 0;
-        
-        // Set keyboard bindings for weapon switching
-        window.addEventListener('keydown', (e) => {
-            // Number keys 1-4 for weapon selection
-            if (e.key >= '1' && e.key <= '4') {
-                const index = parseInt(e.key) - 1;
-                if (index >= 0 && index < this.weapons.length) {
-                    this.switchWeapon(index);
+        try {
+            // Create all weapon types
+            this.weapons = [
+                new Weapon(this.scene, WeaponTypes.MACHINE_GUN),
+                new Weapon(this.scene, WeaponTypes.ROCKETS),
+                new Weapon(this.scene, WeaponTypes.SHOTGUN),
+                new Weapon(this.scene, WeaponTypes.MINES)
+            ];
+            
+            // Start with machine gun
+            this.currentWeaponIndex = 0;
+            this.weaponPickups = []; // Ensure array exists
+            this.lastWeaponPickupSpawn = Date.now(); // Initialize spawn timer
+            
+            console.log("Weapons initialized successfully");
+            
+            // Set keyboard bindings for weapon switching
+            window.addEventListener('keydown', (e) => {
+                if (!this.weapons || !Array.isArray(this.weapons) || this.weapons.length === 0) {
+                    return; // Skip if weapons not initialized
                 }
-            }
-            
-            // Q key for previous weapon
-            if (e.key === 'q' || e.key === 'Q') {
-                this.prevWeapon();
-            }
-            
-            // E key for next weapon
-            if (e.key === 'e' || e.key === 'E') {
-                this.nextWeapon();
-            }
-            
-            // R key for manual reload
-            if (e.key === 'r' || e.key === 'R') {
-                this.getCurrentWeapon().startReload();
-            }
-        });
+                
+                // Number keys 1-4 for weapon selection
+                if (e.key >= '1' && e.key <= '4') {
+                    const index = parseInt(e.key) - 1;
+                    if (index >= 0 && index < this.weapons.length) {
+                        this.switchWeapon(index);
+                    }
+                }
+                
+                // Q key for previous weapon
+                if (e.key === 'q' || e.key === 'Q') {
+                    this.prevWeapon();
+                }
+                
+                // E key for next weapon
+                if (e.key === 'e' || e.key === 'E') {
+                    this.nextWeapon();
+                }
+                
+                // R key for manual reload
+                if (e.key === 'r' || e.key === 'R') {
+                    const weapon = this.getCurrentWeapon();
+                    if (weapon && typeof weapon.startReload === 'function') {
+                        weapon.startReload();
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error initializing weapons:", error);
+        }
     }
     
     // Get current weapon
     getCurrentWeapon() {
+        if (!this.weapons || this.weapons.length === 0) {
+            return null;
+        }
         return this.weapons[this.currentWeaponIndex];
     }
     
@@ -3806,16 +3890,23 @@ class Game {
     
     // Update weapon HUD display
     updateWeaponDisplay() {
+        if (!this.weapons || this.weapons.length === 0) return;
+        
         const weaponDisplay = document.getElementById('weapon');
         const ammoDisplay = document.getElementById('ammo');
         
+        // Get current weapon safely
+        const currentWeapon = this.getCurrentWeapon();
+        if (!currentWeapon) return;
+        
         if (weaponDisplay) {
-            const currentWeapon = this.getCurrentWeapon();
-            weaponDisplay.textContent = `${currentWeapon.type.icon} ${currentWeapon.type.name}`;
+            weaponDisplay.textContent = `${currentWeapon.type.icon || '🔫'} ${currentWeapon.type.name || 'Weapon'}`;
+            
+            // Reposition to avoid overlap
+            weaponDisplay.style.top = '70px';  // Move down below score/callsign
         }
         
         if (ammoDisplay) {
-            const currentWeapon = this.getCurrentWeapon();
             ammoDisplay.textContent = `AMMO: ${currentWeapon.ammo}/${currentWeapon.maxAmmo}`;
             
             // Add reload indicator if reloading
@@ -3830,6 +3921,12 @@ class Game {
     
     // Update weapon cooldown indicator
     updateCooldownIndicator() {
+        // Safety check for weapons
+        if (!this.weapons || this.weapons.length === 0) return;
+        
+        const currentWeapon = this.getCurrentWeapon();
+        if (!currentWeapon) return;
+        
         // Get or create cooldown bar
         let cooldownBar = document.getElementById('cooldown-bar');
         if (!cooldownBar) {
@@ -3857,13 +3954,24 @@ class Game {
             document.body.appendChild(container);
         }
         
-        // Update cooldown progress
-        const currentWeapon = this.getCurrentWeapon();
-        const progress = currentWeapon.update().cooldownProgress;
-        cooldownBar.style.width = `${progress * 100}%`;
-        
-        // Update cooldown bar color based on weapon type
-        cooldownBar.style.backgroundColor = '#' + currentWeapon.type.color.toString(16).padStart(6, '0');
+        try {
+            // Update cooldown progress
+            const weaponStatus = currentWeapon.update();
+            const progress = weaponStatus ? weaponStatus.cooldownProgress : 1;
+            cooldownBar.style.width = `${progress * 100}%`;
+            
+            // Update cooldown bar color based on weapon type
+            if (currentWeapon.type && currentWeapon.type.color) {
+                const colorHex = currentWeapon.type.color.toString(16).padStart(6, '0');
+                cooldownBar.style.backgroundColor = '#' + colorHex;
+            } else {
+                cooldownBar.style.backgroundColor = '#00ffff';
+            }
+        } catch (error) {
+            console.log("Error updating cooldown indicator:", error);
+            cooldownBar.style.width = '100%';
+            cooldownBar.style.backgroundColor = '#00ffff';
+        }
     }
     
     // Create weapon pickup
