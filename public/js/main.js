@@ -1911,12 +1911,12 @@ class Game {
         if (weaponNameElement && weaponStatsElement && this.weapons && this.currentWeaponIndex !== undefined) {
             const currentWeapon = this.weapons[this.currentWeaponIndex];
             if (currentWeapon) {
-                // Update weapon name
-                weaponNameElement.innerHTML = `<span style="color: #00ffff;">${currentWeapon.name || 'UNKNOWN WEAPON'}</span>`;
+                // Update weapon name - use type.name instead of name
+                weaponNameElement.innerHTML = `<span style="color: #00ffff;">${currentWeapon.type.name || 'UNKNOWN WEAPON'}</span>`;
                 
                 // Update weapon stats
-                let damageText = currentWeapon.damage || 20;
-                let fireRateText = currentWeapon.fireRate ? (currentWeapon.fireRate + 's') : '0.1s';
+                let damageText = currentWeapon.type.damage || 20;
+                let fireRateText = currentWeapon.type.cooldown ? ((currentWeapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s';
                 
                 weaponStatsElement.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
             }
@@ -3334,8 +3334,8 @@ class Game {
             }
             
             if (weaponStats && weapon) {
-                const damageText = weapon.damage || 20;
-                const fireRateText = weapon.fireRate ? (weapon.fireRate + 's') : '0.1s';
+                const damageText = weapon.type.damage || 20;
+                const fireRateText = weapon.type.cooldown ? ((weapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s';
                 weaponStats.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
             }
             
@@ -4592,8 +4592,8 @@ class Game {
         
         // Update weapon stats
         if (weaponStatsElement) {
-            const damageText = weapon.damage || 20;
-            const fireRateText = weapon.fireRate ? (weapon.fireRate + 's') : '0.1s';
+            const damageText = weapon.type.damage || 20;
+            const fireRateText = weapon.type.cooldown ? ((weapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s';
             weaponStatsElement.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
         }
         
