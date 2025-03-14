@@ -344,6 +344,23 @@ class Game {
         if (this.isMultiplayerEnabled) {
             this.initMultiplayer();
         }
+        
+        // Powerup sounds
+        this.powerupSounds = {
+            speed: new Audio('sounds/powerup_speed.mp3'),
+            shield: new Audio('sounds/powerup_shield.mp3'),
+            damage: new Audio('sounds/powerup_damage.mp3'),
+            health: new Audio('sounds/powerup_health.mp3'),
+            ammo: new Audio('sounds/powerup_ammo.mp3')
+        };
+        
+        // Set fallback sounds in case the specific ones aren't available
+        Object.keys(this.powerupSounds).forEach(key => {
+            this.powerupSounds[key].addEventListener('error', () => {
+                console.log(`Fallback for powerup sound: ${key}`);
+                this.powerupSounds[key].src = 'sounds/powerup_generic.mp3';
+            });
+        });
     }
     
     init() {
@@ -2600,23 +2617,62 @@ class Game {
         for (let i = this.sparks.length - 1; i >= 0; i--) {
             const spark = this.sparks[i];
             
-            // Update position
-            spark.mesh.position.x += spark.velocity.x;
-            spark.mesh.position.y += spark.velocity.y;
-            spark.mesh.position.z += spark.velocity.z;
+            // Skip if spark is undefined
+            if (!spark) {
+                this.sparks.splice(i, 1);
+                continue;
+            }
             
-            // Apply gravity
-            spark.velocity.y -= 0.01;
-            
-            // Reduce life
-            spark.life -= 0.02;
-            
-            // Scale down as life decreases
-            spark.mesh.scale.set(spark.life, spark.life, spark.life);
-            
-            // Remove if dead
-            if (spark.life <= 0) {
-                this.scene.remove(spark.mesh);
+            // Handle different spark object structures
+            if (spark.mesh) {
+                // Original spark structure with mesh property
+                // Update position
+                spark.mesh.position.x += spark.velocity.x;
+                spark.mesh.position.y += spark.velocity.y;
+                spark.mesh.position.z += spark.velocity.z;
+                
+                // Apply gravity
+                spark.velocity.y -= 0.01;
+                
+                // Reduce life
+                spark.life -= 0.02;
+                
+                // Scale down as life decreases
+                spark.mesh.scale.set(spark.life, spark.life, spark.life);
+                
+                // Remove if dead
+                if (spark.life <= 0) {
+                    this.scene.remove(spark.mesh);
+                    this.sparks.splice(i, 1);
+                }
+            } else if (spark.userData) {
+                // New spark structure (direct mesh with userData)
+                // Update position
+                spark.position.x += spark.userData.velocity.x;
+                spark.position.y += spark.userData.velocity.y;
+                spark.position.z += spark.userData.velocity.z;
+                
+                // Apply gravity
+                spark.userData.velocity.y -= 0.01;
+                
+                // Reduce life
+                spark.userData.life -= 0.02;
+                
+                // Scale down as life decreases
+                const scale = Math.max(0.01, spark.userData.life);
+                spark.scale.set(scale, scale, scale);
+                
+                // Remove if dead
+                if (spark.userData.life <= 0) {
+                    this.scene.remove(spark);
+                    this.sparks.splice(i, 1);
+                }
+            } else {
+                // Unknown spark structure, remove it
+                console.warn('Unknown spark structure:', spark);
+                if (spark.isObject3D) {
+                    this.scene.remove(spark);
+                }
                 this.sparks.splice(i, 1);
             }
         }
@@ -2836,96 +2892,52 @@ class Game {
     }
 
     applyPowerup(type) {
+        if (!this.powerupTypes[type]) return;
+        
         const powerupConfig = this.powerupTypes[type];
-        if (!powerupConfig) {
-            console.error(`Unknown powerup type: ${type}`);
-            return;
+        
+        // Play sound effect
+        if (this.powerupSounds[type]) {
+            // Clone the audio to allow overlapping sounds
+            const sound = this.powerupSounds[type].cloneNode();
+            sound.volume = 0.4;
+            sound.play().catch(e => console.log('Error playing powerup sound:', e));
         }
-        
-        console.log(`Applying powerup: ${powerupConfig.name}`);
-        
-        // Apply the powerup effect
-        powerupConfig.apply();
-        
-        // Show powerup notification
-        this.showPowerupNotification(powerupConfig.name, powerupConfig.effect);
-        
-        // Play powerup sound
-        this.playPowerupSound(type);
         
         // Create visual effect
         this.createPowerupEffect(type);
         
-        // For powerups with duration, add to active powerups and set timeout to remove
-        if (powerupConfig.duration > 0) {
-            // If this powerup is already active, clear its timeout
-            if (this.activePowerups.has(type)) {
-                clearTimeout(this.activePowerups.get(type).timeoutId);
-            }
-            
-            // Set timeout to remove the powerup effect
-            const timeoutId = setTimeout(() => {
-                powerupConfig.remove();
-                this.activePowerups.delete(type);
-                this.updatePowerupIndicators();
-                console.log(`Powerup expired: ${powerupConfig.name}`);
-            }, powerupConfig.duration);
-            
-            // Add to active powerups
-            this.activePowerups.set(type, {
-                config: powerupConfig,
-                startTime: Date.now(),
-                endTime: Date.now() + powerupConfig.duration,
-                timeoutId: timeoutId
-            });
-            
-            // Update powerup indicators
-            this.updatePowerupIndicators();
-        }
-    }
-    
-    // Play powerup collection sound
-    playPowerupSound(type) {
-        // Create audio context if it doesn't exist
-        if (!this.audioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Apply powerup effect
+        switch (type) {
+            case 'speed':
+                this.activePowerups.speed = {
+                    timeRemaining: powerupConfig.duration,
+                    multiplier: powerupConfig.multiplier
+                };
+                break;
+            case 'shield':
+                this.activePowerups.shield = {
+                    timeRemaining: powerupConfig.duration,
+                    strength: powerupConfig.strength
+                };
+                break;
+            case 'damage':
+                this.activePowerups.damage = {
+                    timeRemaining: powerupConfig.duration,
+                    multiplier: powerupConfig.multiplier
+                };
+                break;
+            case 'health':
+                // Instant effect - restore health
+                this.health = Math.min(100, this.health + powerupConfig.amount);
+                break;
+            case 'ammo':
+                // Instant effect - add ammo
+                this.ammo = Math.min(this.maxAmmo, this.ammo + powerupConfig.amount);
+                break;
         }
         
-        // Create oscillator
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-        
-        // Set properties based on powerup type
-        switch(type) {
-            case 'SPEED_BOOST':
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(440, this.audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(880, this.audioContext.currentTime + 0.2);
-                gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
-                break;
-            case 'INVINCIBILITY':
-                oscillator.type = 'square';
-                oscillator.frequency.setValueAtTime(330, this.audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(660, this.audioContext.currentTime + 0.1);
-                oscillator.frequency.exponentialRampToValueAtTime(990, this.audioContext.currentTime + 0.2);
-                gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
-                break;
-            case 'REPAIR':
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(523.25, this.audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(783.99, this.audioContext.currentTime + 0.1);
-                oscillator.frequency.exponentialRampToValueAtTime(1046.50, this.audioContext.currentTime + 0.2);
-                gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
-                break;
-            case 'AMMO_REFILL':
-                oscillator.type = 'sawtooth';
-                oscillator.frequency.setValueAtTime(220, this.audioContext.currentTime);
-                oscillator.frequency.exponentialRampToValueAtTime(440, this.audioContext.currentTime + 0.1);
-                this.health = Math.min(100, this.health + 50);
-        }
+        console.log(`Powerup applied: ${powerupConfig.name}`);
     }
 
     // Update any multiplayer-related methods to check if enabled
@@ -3083,6 +3095,205 @@ class Game {
         const b = hex & 255;
         
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    // Create visual effect for powerup collection
+    createPowerupEffect(type) {
+        if (!this.truck) return;
+        
+        const powerupConfig = this.powerupTypes[type];
+        
+        // Create particles around the truck
+        const particleCount = 20;
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create particle
+            const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+            const particleMaterial = new THREE.MeshPhongMaterial({
+                color: powerupConfig.color,
+                emissive: powerupConfig.emissive,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // Position around truck
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 3;
+            particle.position.set(
+                this.truck.position.x + Math.cos(angle) * radius,
+                this.truck.position.y + Math.random() * 3,
+                this.truck.position.z + Math.sin(angle) * radius
+            );
+            
+            // Set velocity - outward from truck
+            const speed = Math.random() * 0.2 + 0.1;
+            const velocity = {
+                x: Math.cos(angle) * speed,
+                y: Math.random() * 0.2 + 0.1,
+                z: Math.sin(angle) * speed
+            };
+            
+            // Create spark with the expected structure
+            const spark = {
+                mesh: particle,
+                velocity: velocity,
+                life: 1.0
+            };
+            
+            this.scene.add(particle);
+            this.sparks.push(spark);
+        }
+        
+        // Add a flash of light
+        const light = new THREE.PointLight(powerupConfig.color, 2, 10);
+        light.position.copy(this.truck.position);
+        light.position.y += 2;
+        this.scene.add(light);
+        
+        // Fade out and remove light
+        let lightLife = 10;
+        const fadeLight = () => {
+            lightLife--;
+            if (lightLife > 0) {
+                light.intensity = lightLife / 10 * 2;
+                requestAnimationFrame(fadeLight);
+            } else {
+                this.scene.remove(light);
+            }
+        };
+        
+        fadeLight();
+    }
+
+    // Create fade effect for expiring powerups
+    createPowerupFadeEffect(type) {
+        if (!this.truck) return;
+        
+        const powerupConfig = this.powerupTypes[type];
+        
+        // Create particles around the truck
+        const particleCount = 10;
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create particle
+            const particleGeometry = new THREE.SphereGeometry(0.15, 6, 6);
+            const particleMaterial = new THREE.MeshPhongMaterial({
+                color: powerupConfig.color,
+                emissive: powerupConfig.emissive,
+                emissiveIntensity: 0.3,
+                transparent: true,
+                opacity: 0.5
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // Position around truck
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 2;
+            particle.position.set(
+                this.truck.position.x + Math.cos(angle) * radius,
+                this.truck.position.y + Math.random() * 2,
+                this.truck.position.z + Math.sin(angle) * radius
+            );
+            
+            // Set velocity - downward and outward
+            const speed = Math.random() * 0.1 + 0.05;
+            const velocity = {
+                x: Math.cos(angle) * speed,
+                y: -Math.random() * 0.1,
+                z: Math.sin(angle) * speed
+            };
+            
+            // Create spark with the expected structure
+            const spark = {
+                mesh: particle,
+                velocity: velocity,
+                life: 0.7
+            };
+            
+            this.scene.add(particle);
+            this.sparks.push(spark);
+        }
+    }
+    
+    // Update HUD to show active powerups
+    updatePowerupIndicators() {
+        const container = document.getElementById('powerup-indicators');
+        if (!container) {
+            // Create container if it doesn't exist
+            const newContainer = document.createElement('div');
+            newContainer.id = 'powerup-indicators';
+            newContainer.style.position = 'absolute';
+            newContainer.style.bottom = '10px';
+            newContainer.style.right = '10px';
+            newContainer.style.display = 'flex';
+            newContainer.style.flexDirection = 'column';
+            newContainer.style.alignItems = 'flex-end';
+            document.body.appendChild(newContainer);
+        }
+        
+        const powerupContainer = document.getElementById('powerup-indicators');
+        powerupContainer.innerHTML = ''; // Clear existing indicators
+        
+        // Add indicators for active powerups
+        for (const [type, data] of Object.entries(this.activePowerups)) {
+            if (data.timeRemaining > 0) {
+                const powerupConfig = this.powerupTypes[type];
+                
+                const indicator = document.createElement('div');
+                indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.7);
+                indicator.style.color = '#fff';
+                indicator.style.padding = '5px 10px';
+                indicator.style.margin = '5px';
+                indicator.style.borderRadius = '5px';
+                indicator.style.fontWeight = 'bold';
+                indicator.style.textShadow = '1px 1px 2px rgba(0,0,0,0.7)';
+                indicator.style.display = 'flex';
+                indicator.style.alignItems = 'center';
+                indicator.style.justifyContent = 'space-between';
+                indicator.style.width = '150px';
+                
+                // Create icon
+                const icon = document.createElement('span');
+                icon.textContent = powerupConfig.icon;
+                icon.style.marginRight = '10px';
+                icon.style.fontSize = '20px';
+                
+                // Create label
+                const label = document.createElement('span');
+                label.textContent = powerupConfig.name;
+                
+                // Create timer
+                const timer = document.createElement('span');
+                timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
+                timer.style.marginLeft = '10px';
+                
+                indicator.appendChild(icon);
+                indicator.appendChild(label);
+                indicator.appendChild(timer);
+                
+                powerupContainer.appendChild(indicator);
+                
+                // Pulse effect for indicators about to expire
+                if (data.timeRemaining < 180) { // Less than 3 seconds
+                    indicator.style.animation = 'pulse 0.5s infinite alternate';
+                    if (!document.getElementById('powerup-pulse-style')) {
+                        const style = document.createElement('style');
+                        style.id = 'powerup-pulse-style';
+                        style.textContent = `
+                            @keyframes pulse {
+                                from { opacity: 1; }
+                                to { opacity: 0.6; }
+                            }
+                        `;
+                        document.head.appendChild(style);
+                    }
+                }
+            }
+        }
     }
 }
 
