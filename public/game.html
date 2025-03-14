@@ -152,8 +152,21 @@
     <!-- Game Canvas -->
     <canvas id="game"></canvas>
 
+    <!-- Audio Controls -->
+    <div id="audioControls" style="position: fixed; bottom: 100px; right: 20px; display: flex; gap: 15px; z-index: 1000;">
+        <!-- Play/Pause Button -->
+        <button id="playPauseButton" style="background: rgba(0, 0, 0, 0.7); color: #ff00ff; border: 2px solid #ff00ff; border-radius: 50%; width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 0 10px rgba(255, 0, 255, 0.5); transition: all 0.3s ease;">
+            <i class="fas fa-play"></i>
+        </button>
+        
+        <!-- Audio Toggle Button -->
+        <div id="audioToggle" style="background: rgba(0, 0, 0, 0.7); color: #ff00ff; border: 2px solid #ff00ff; border-radius: 50%; width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 0 10px rgba(255, 0, 255, 0.5); transition: all 0.3s ease;">
+            <i class="fas fa-volume-up"></i>
+        </div>
+    </div>
+
     <!-- Audio Element -->
-    <audio id="backgroundMusic" preload="auto" loop>
+    <audio id="backgroundMusic" preload="auto">
         <source src="pattern_bar_live_part00.mp3" type="audio/mpeg">
     </audio>
 
@@ -174,11 +187,6 @@
     <button id="playButton" style="position: fixed; bottom: 100px; right: 80px; background: rgba(0, 0, 0, 0.7); color: #ff00ff; border: 2px solid #ff00ff; border-radius: 5px; padding: 10px; font-family: 'Orbitron', sans-serif; cursor: pointer; z-index: 1000; box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);">
         PLAY MUSIC
     </button>
-    
-    <!-- Audio Toggle Button -->
-    <div id="audioToggle" style="position: fixed; bottom: 100px; right: 20px; background: rgba(0, 0, 0, 0.7); color: #ff00ff; border: 2px solid #ff00ff; border-radius: 50%; width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 1000; box-shadow: 0 0 10px rgba(255, 0, 255, 0.5); transition: all 0.3s ease; pointer-events: auto;">
-        <i class="fas fa-volume-up"></i>
-    </div>
     
     <!-- Chat Interface -->
     <div id="chatContainer" style="position: fixed; bottom: 160px; right: 20px; width: 300px; background: rgba(0, 0, 0, 0.7); border: 2px solid #ff00ff; border-radius: 5px; z-index: 1000; display: flex; flex-direction: column; max-height: 200px; overflow: hidden;">
@@ -209,11 +217,39 @@
             }
         };
         
-        // Audio controls - simplified version
+        // Audio controls - improved version
         document.addEventListener('DOMContentLoaded', function() {
             const audioElement = document.getElementById('backgroundMusic');
             const audioToggle = document.getElementById('audioToggle');
+            const playPauseButton = document.getElementById('playPauseButton');
             const audioIcon = audioToggle.querySelector('i');
+            const playPauseIcon = playPauseButton.querySelector('i');
+            
+            let currentAudioPart = 0;
+            const totalAudioParts = 19; // We have parts 0-18
+            let isPlaying = false;
+            
+            // Function to play the next audio part
+            function playNextAudioPart() {
+                currentAudioPart = (currentAudioPart + 1) % totalAudioParts;
+                const nextFile = `pattern_bar_live_part${currentAudioPart.toString().padStart(2, '0')}.mp3`;
+                console.log(`Loading next part: ${nextFile}`);
+                
+                audioElement.src = nextFile;
+                audioElement.load();
+                
+                if (isPlaying) {
+                    audioElement.play().catch(error => {
+                        console.error(`Error playing next part: ${error.message}`);
+                    });
+                }
+            }
+            
+            // When one audio part ends, play the next one
+            audioElement.addEventListener('ended', function() {
+                console.log('Audio ended, playing next part');
+                playNextAudioPart();
+            });
             
             // Check if audio was previously muted
             const audioMuted = localStorage.getItem('monsterTruckAudioMuted') === 'true';
@@ -235,14 +271,6 @@
                     audioToggle.classList.remove('muted');
                     audioIcon.className = 'fas fa-volume-up';
                     localStorage.setItem('monsterTruckAudioMuted', 'false');
-                    
-                    // Try to play if it wasn't playing
-                    if (audioElement.paused) {
-                        audioElement.play().catch(e => {
-                            console.error('Cannot play audio:', e);
-                            alert('Click anywhere on the screen to enable audio');
-                        });
-                    }
                 } else {
                     audioElement.muted = true;
                     audioToggle.classList.add('muted');
@@ -251,40 +279,39 @@
                 }
             });
             
-            // Try to play audio when game starts
-            window.addEventListener('click', function playOnFirstClick() {
-                console.log('User clicked, trying to play audio');
-                audioElement.play().catch(e => console.error('Error playing audio:', e));
-                window.removeEventListener('click', playOnFirstClick);
-            }, { once: true });
-            
-            // Add event listener for the play button
-            const playButton = document.getElementById('playButton');
-            if (playButton) {
-                playButton.addEventListener('click', function() {
-                    console.log('Play button clicked');
+            // Play/Pause button functionality
+            playPauseButton.addEventListener('click', function() {
+                if (isPlaying) {
+                    audioElement.pause();
+                    isPlaying = false;
+                    playPauseIcon.className = 'fas fa-play';
+                } else {
                     audioElement.play().catch(e => {
-                        console.error('Error playing audio from button:', e);
-                        alert('Your browser may be blocking autoplay. Please check your browser settings.');
+                        console.error('Cannot play audio:', e);
+                        alert('Click again to enable audio. Your browser may be blocking autoplay.');
                     });
-                });
-            }
-            
-            // Also try when loading screen is removed
-            const loadingScreen = document.getElementById('loadingScreen');
-            const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.target.style.display === 'none') {
-                        console.log('Loading screen removed, trying to play audio');
-                        audioElement.play().catch(e => {
-                            console.error('Audio autoplay prevented:', e);
-                        });
-                        observer.disconnect();
-                    }
-                });
+                    isPlaying = true;
+                    playPauseIcon.className = 'fas fa-pause';
+                }
             });
             
-            observer.observe(loadingScreen, { attributes: true, attributeFilter: ['style'] });
+            // Update play/pause button when audio plays or pauses
+            audioElement.addEventListener('play', function() {
+                isPlaying = true;
+                playPauseIcon.className = 'fas fa-pause';
+            });
+            
+            audioElement.addEventListener('pause', function() {
+                isPlaying = false;
+                playPauseIcon.className = 'fas fa-play';
+            });
+            
+            // Handle audio errors
+            audioElement.addEventListener('error', function(e) {
+                console.error('Audio error:', e);
+                // Try the next part if this one fails
+                playNextAudioPart();
+            });
         });
 
         // Chat functionality
