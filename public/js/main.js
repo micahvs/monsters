@@ -193,8 +193,7 @@ class Game {
             ' ': false,
             'd': false, // Debug key
             'm': false, // Debug movement
-            'M': false, // Audio mute toggle
-            'p': false  // Debug powerup spawn key
+            'M': false  // Audio mute toggle
         };
         
         // Game state
@@ -1116,15 +1115,6 @@ class Game {
             this.toggleAudio();
         }
         
-        // Debug key to spawn powerups with 'P' key
-        if (this.keys['p']) {
-            this.keys['p'] = false; // Reset key to prevent multiple spawns
-            if (this.debugMode) {
-                console.log("Debug: Forcing powerup spawn");
-                this.createPowerup();
-                this.showMessage("Debug: Powerup spawned");
-            }
-        }
     }
     
     updateTruck(deltaTime = 1) {
@@ -4336,11 +4326,12 @@ class Game {
             const newContainer = document.createElement('div');
             newContainer.id = 'powerup-indicators';
             newContainer.style.position = 'absolute';
-            newContainer.style.bottom = '10px';
+            newContainer.style.bottom = '80px'; // Moved higher to avoid overlap
             newContainer.style.right = '10px';
             newContainer.style.display = 'flex';
             newContainer.style.flexDirection = 'column';
             newContainer.style.alignItems = 'flex-end';
+            newContainer.style.zIndex = '1002'; // Ensure it's above other elements
             document.body.appendChild(newContainer);
         }
         
@@ -4353,7 +4344,7 @@ class Game {
             if (!powerupConfig) continue; // Skip if config not found
             
             const indicator = document.createElement('div');
-            indicator.style.backgroundColor = this.hexToRgba(powerupConfig.color, 0.7);
+            indicator.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'; // Dark background for better readability
             indicator.style.color = '#fff';
             indicator.style.padding = '5px 10px';
             indicator.style.margin = '5px';
@@ -4363,26 +4354,37 @@ class Game {
             indicator.style.display = 'flex';
             indicator.style.alignItems = 'center';
             indicator.style.justifyContent = 'space-between';
-            indicator.style.width = '150px';
+            indicator.style.width = '180px'; // Slightly wider
+            indicator.style.border = `2px solid ${this.hexToRgba(powerupConfig.color, 1.0)}`; // Colored border
+            indicator.style.boxShadow = `0 0 10px ${this.hexToRgba(powerupConfig.color, 0.7)}`; // Glow effect
             
             // Create label
             const label = document.createElement('span');
             label.textContent = powerupConfig.name;
+            // Set label color to match powerup
+            label.style.color = this.hexToRgba(powerupConfig.color, 1.0);
+            label.style.textShadow = `0 0 5px ${this.hexToRgba(powerupConfig.color, 0.7)}`;
             
             // Create timer
             const timer = document.createElement('span');
             const timeRemaining = Math.ceil((data.expirationTime - Date.now()) / 1000); // Convert ms to seconds
             timer.textContent = timeRemaining + 's';
             timer.style.marginLeft = '10px';
+            timer.style.color = '#ffffff'; // Keep timer white for readability
             
             indicator.appendChild(label);
             indicator.appendChild(timer);
             
             powerupContainer.appendChild(indicator);
             
-            // Pulse effect for indicators about to expire
+            // Enhanced pulse effect for indicators about to expire
             if (timeRemaining < 3) { // Less than 3 seconds
-                indicator.style.animation = 'pulse 0.5s infinite alternate';
+                indicator.style.animation = 'pulse-urgent 0.5s infinite alternate';
+                
+                // Make timer flash red for urgency
+                timer.style.color = '#ff0000';
+                timer.style.fontWeight = 'bold';
+                
                 if (!document.getElementById('powerup-pulse-style')) {
                     const style = document.createElement('style');
                     style.id = 'powerup-pulse-style';
@@ -4390,6 +4392,17 @@ class Game {
                         @keyframes pulse {
                             from { opacity: 1; }
                             to { opacity: 0.6; }
+                        }
+                        
+                        @keyframes pulse-urgent {
+                            from { 
+                                transform: scale(1);
+                                box-shadow: 0 0 10px ${this.hexToRgba(powerupConfig.color, 0.7)};
+                            }
+                            to { 
+                                transform: scale(1.05);
+                                box-shadow: 0 0 15px ${this.hexToRgba(powerupConfig.color, 1.0)};
+                            }
                         }
                     `;
                     document.head.appendChild(style);
