@@ -3808,16 +3808,22 @@ class Game {
     }
 
     showMessage(message) {
-        // Check if there are any existing messages and position this one accordingly
+        // Get existing messages
         const existingMessages = document.querySelectorAll('.game-message');
-        const messageCount = existingMessages.length;
+        
+        // If we already have 3 messages, remove the oldest one
+        if (existingMessages.length >= 3) {
+            existingMessages[0].remove();
+        }
+        
+        // Recount after potential removal
+        const messageCount = document.querySelectorAll('.game-message').length;
         
         const messageDiv = document.createElement('div');
         messageDiv.className = 'game-message';
         messageDiv.style.position = 'fixed';
-        messageDiv.style.top = `${120 + (messageCount * 50)}px`; // Start lower to avoid health display
-        messageDiv.style.left = '50%'; // Center horizontally
-        messageDiv.style.transform = 'translateX(-50%)'; // Center properly
+        messageDiv.style.left = '20px'; // Position on left side
+        messageDiv.style.top = `${window.innerHeight/2 - 75 + (messageCount * 60)}px`; // Middle of screen height with offset
         messageDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
         messageDiv.style.color = '#ff00ff';
         messageDiv.style.padding = '10px 20px';
@@ -3826,8 +3832,8 @@ class Game {
         messageDiv.style.zIndex = '1001';
         messageDiv.style.border = '1px solid #ff00ff';
         messageDiv.style.boxShadow = '0 0 10px rgba(255, 0, 255, 0.5)';
-        messageDiv.style.maxWidth = '400px';
-        messageDiv.style.textAlign = 'center';
+        messageDiv.style.maxWidth = '300px';
+        messageDiv.style.textAlign = 'left';
         messageDiv.style.borderLeft = '3px solid #ff00ff';
         messageDiv.textContent = message;
         
@@ -3836,15 +3842,18 @@ class Game {
         // Set up animation for smooth appearance and removal
         messageDiv.style.transition = 'opacity 0.5s, transform 0.5s';
         messageDiv.style.opacity = '0';
+        messageDiv.style.transform = 'translateX(-20px)';
         
         // Animate in
         setTimeout(() => {
             messageDiv.style.opacity = '1';
+            messageDiv.style.transform = 'translateX(0)';
         }, 10);
         
         // Set up removal
         setTimeout(() => {
             messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translateX(-20px)';
             
             setTimeout(() => {
                 messageDiv.remove();
@@ -3852,7 +3861,7 @@ class Game {
                 // Reposition remaining messages to fill the gap
                 const remainingMessages = document.querySelectorAll('.game-message');
                 remainingMessages.forEach((msg, index) => {
-                    msg.style.top = `${120 + (index * 50)}px`;
+                    msg.style.top = `${window.innerHeight/2 - 75 + (index * 60)}px`;
                 });
             }, 500);
         }, 5000);
