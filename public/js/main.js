@@ -3815,18 +3815,20 @@ class Game {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'game-message';
         messageDiv.style.position = 'fixed';
-        messageDiv.style.top = `${60 + (messageCount * 50)}px`; // Stack messages with 50px spacing
-        messageDiv.style.right = '20px'; // Position on right side instead of center
-        messageDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        messageDiv.style.top = `${120 + (messageCount * 50)}px`; // Start lower to avoid health display
+        messageDiv.style.left = '50%'; // Center horizontally
+        messageDiv.style.transform = 'translateX(-50%)'; // Center properly
+        messageDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
         messageDiv.style.color = '#ff00ff';
         messageDiv.style.padding = '10px 20px';
-        messageDiv.style.borderRadius = '5px';
+        messageDiv.style.borderRadius = '0';
         messageDiv.style.fontFamily = "'Orbitron', sans-serif";
         messageDiv.style.zIndex = '1001';
         messageDiv.style.border = '1px solid #ff00ff';
         messageDiv.style.boxShadow = '0 0 10px rgba(255, 0, 255, 0.5)';
-        messageDiv.style.maxWidth = '300px';
-        messageDiv.style.textAlign = 'right';
+        messageDiv.style.maxWidth = '400px';
+        messageDiv.style.textAlign = 'center';
+        messageDiv.style.borderLeft = '3px solid #ff00ff';
         messageDiv.textContent = message;
         
         document.body.appendChild(messageDiv);
@@ -3834,18 +3836,15 @@ class Game {
         // Set up animation for smooth appearance and removal
         messageDiv.style.transition = 'opacity 0.5s, transform 0.5s';
         messageDiv.style.opacity = '0';
-        messageDiv.style.transform = 'translateX(50px)';
         
         // Animate in
         setTimeout(() => {
             messageDiv.style.opacity = '1';
-            messageDiv.style.transform = 'translateX(0)';
         }, 10);
         
         // Set up removal
         setTimeout(() => {
             messageDiv.style.opacity = '0';
-            messageDiv.style.transform = 'translateX(50px)';
             
             setTimeout(() => {
                 messageDiv.remove();
@@ -3853,7 +3852,7 @@ class Game {
                 // Reposition remaining messages to fill the gap
                 const remainingMessages = document.querySelectorAll('.game-message');
                 remainingMessages.forEach((msg, index) => {
-                    msg.style.top = `${60 + (index * 50)}px`;
+                    msg.style.top = `${120 + (index * 50)}px`;
                 });
             }, 500);
         }, 5000);
