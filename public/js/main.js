@@ -217,6 +217,101 @@ class Game {
         this.lastPowerupSpawn = 0;
         this.powerupSpawnInterval = 10000; // Spawn every 10 seconds
         
+        // Powerup definitions
+        this.powerupTypes = {
+            SPEED_BOOST: {
+                name: 'Speed Boost',
+                duration: 5000,
+                effect: 'Doubles speed',
+                color: 0x00ff00,
+                emissive: 0x00ff00,
+                model: 'lightning',
+                apply: () => {
+                    this.truck.maxSpeed *= 2;
+                },
+                remove: () => {
+                    this.truck.maxSpeed /= 2;
+                }
+            },
+            INVINCIBILITY: {
+                name: 'Invincibility',
+                duration: 3000,
+                effect: 'No damage',
+                color: 0xffff00,
+                emissive: 0xffff00,
+                model: 'star',
+                apply: () => {
+                    this.truck.isInvincible = true;
+                },
+                remove: () => {
+                    this.truck.isInvincible = false;
+                }
+            },
+            REPAIR: {
+                name: 'Repair',
+                duration: 0, // Instant effect
+                effect: 'Restore 50 health',
+                color: 0xff0000,
+                emissive: 0xff0000,
+                model: 'heart',
+                apply: () => {
+                    this.health = Math.min(100, this.health + 50);
+                    if (this.monsterTruck) {
+                        this.monsterTruck.health = Math.min(this.monsterTruck.maxHealth, this.monsterTruck.health + 50);
+                    }
+                },
+                remove: () => {} // No removal needed for instant effects
+            },
+            AMMO_REFILL: {
+                name: 'Ammo Refill',
+                duration: 0, // Instant effect
+                effect: 'Refill ammo',
+                color: 0x0000ff,
+                emissive: 0x0000ff,
+                model: 'ammo',
+                apply: () => {
+                    this.ammo = this.maxAmmo;
+                    this.updateAmmoDisplay();
+                },
+                remove: () => {} // No removal needed for instant effects
+            },
+            DAMAGE_BOOST: {
+                name: 'Damage Boost',
+                duration: 8000,
+                effect: 'Double damage',
+                color: 0xff00ff,
+                emissive: 0xff00ff,
+                model: 'lightning',
+                apply: () => {
+                    this.damageMultiplier = 2;
+                },
+                remove: () => {
+                    this.damageMultiplier = 1;
+                }
+            },
+            SHIELD: {
+                name: 'Shield',
+                duration: 10000,
+                effect: 'Absorbs one hit',
+                color: 0x00ffff,
+                emissive: 0x00ffff,
+                model: 'shield',
+                apply: () => {
+                    this.hasShield = true;
+                    this.createShieldEffect();
+                },
+                remove: () => {
+                    this.hasShield = false;
+                    this.removeShieldEffect();
+                }
+            }
+        };
+        
+        // Initialize damage multiplier
+        this.damageMultiplier = 1;
+        this.hasShield = false;
+        this.shieldMesh = null;
+        
         // Start initialization
         this.init();
 
@@ -708,6 +803,11 @@ class Game {
                 this.updateProjectiles();
             }
             
+            // Update powerups
+            if (typeof this.updatePowerups === 'function') {
+                this.updatePowerups();
+            }
+            
             // Update turrets
             if (typeof this.updateTurrets === 'function') {
                 this.updateTurrets();
@@ -739,7 +839,7 @@ class Game {
                 window.updateDebugInfo(this.truck.position);
             }
         } catch (error) {
-            console.error("Error in update:", error);
+            console.error("Error in game update loop:", error);
         }
     }
     
@@ -1078,6 +1178,31 @@ class Game {
 
     // Take damage method
     takeDamage(amount) {
+        // Check if invincible
+        if (this.truck && this.truck.isInvincible) {
+            console.log("Damage blocked by invincibility");
+            return 0;
+        }
+        
+        // Check if shield is active
+        if (this.hasShield) {
+            console.log("Damage blocked by shield");
+            this.showShieldHitEffect();
+            
+            // Remove shield
+            this.hasShield = false;
+            this.removeShieldEffect();
+            
+            // Remove from active powerups
+            if (this.activePowerups.has('SHIELD')) {
+                clearTimeout(this.activePowerups.get('SHIELD').timeoutId);
+                this.activePowerups.delete('SHIELD');
+                this.updatePowerupIndicators();
+            }
+            
+            return 0;
+        }
+        
         // Use the provided damage amount directly for better balance
         // Minor minimum to ensure feedback but not too harsh
         const minDamage = 5;
@@ -1100,11 +1225,14 @@ class Game {
                 
                 console.log(`Damage: ${actualDamage} points. Health: ${this.health}`);
                 
-                // Add subtle camera shake for good feedback
+                // Add subtle camera shake based on impact
                 this.shakeCamera(actualDamage / 6);
+                
+                return actualDamage;
             } else {
                 // Still showing hit but not applying damage during cooldown
                 console.log("Hit during damage cooldown - reduced effect");
+                return 0;
             }
         } else {
             // Legacy fallback behavior
@@ -1118,41 +1246,83 @@ class Game {
             
             // Add subtle camera shake
             this.shakeCamera(appliedAmount / 6);
+            
+            return appliedAmount;
         }
         
         // Update HUD
         const healthDisplay = document.getElementById('health');
         if (healthDisplay) {
-            // Color coding based on health percentage
-            const healthPercent = Math.floor((this.health / this.maxHealth) * 100);
-            let healthColor = '#00ff00'; // Green
-            
-            if (healthPercent < 30) {
-                healthColor = '#ff0000'; // Red
-            } else if (healthPercent < 70) {
-                healthColor = '#ffff00'; // Yellow
-            }
-            
-            healthDisplay.innerHTML = `HEALTH: <span style="color:${healthColor}">${healthPercent}%</span>`;
-            
-            // Subtle flash on the HUD element for feedback
-            if (this.monsterTruck && this.monsterTruck.damageTimeout <= 0) {
-                healthDisplay.style.transition = 'none';
-                healthDisplay.style.backgroundColor = 'rgba(255, 0, 0, 0.3)';
-                
-                setTimeout(() => {
-                    healthDisplay.style.transition = 'background-color 0.5s ease';
-                    healthDisplay.style.backgroundColor = 'transparent';
-                }, 50);
-            }
+            healthDisplay.textContent = `HEALTH: ${this.health}`;
         }
         
         // Check for game over
         if (this.health <= 0) {
             this.gameOver();
         }
+    }
+    
+    // Show shield hit effect
+    showShieldHitEffect() {
+        if (!this.shieldMesh) return;
         
-        return appliedAmount; // Return the amount of damage that was actually applied
+        // Flash the shield
+        const originalOpacity = this.shieldMesh.material.opacity;
+        this.shieldMesh.material.opacity = 0.8;
+        
+        // Create particles at impact point
+        const particleCount = 15;
+        const particles = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create particle
+            const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+            const particleMaterial = new THREE.MeshPhongMaterial({
+                color: 0x00ffff,
+                emissive: 0x00ffff,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // Position at random point on shield surface
+            const phi = Math.random() * Math.PI * 2;
+            const theta = Math.random() * Math.PI;
+            const radius = 4;
+            
+            particle.position.set(
+                this.truck.position.x + radius * Math.sin(theta) * Math.cos(phi),
+                this.truck.position.y + radius * Math.sin(theta) * Math.sin(phi),
+                this.truck.position.z + radius * Math.cos(theta)
+            );
+            
+            // Set velocity - outward from shield
+            const direction = new THREE.Vector3()
+                .subVectors(particle.position, this.truck.position)
+                .normalize();
+            
+            const speed = Math.random() * 0.3 + 0.2;
+            particle.userData = {
+                velocity: {
+                    x: direction.x * speed,
+                    y: direction.y * speed,
+                    z: direction.z * speed
+                },
+                life: 1.0
+            };
+            
+            this.scene.add(particle);
+            this.sparks.push(particle);
+        }
+        
+        // Reset opacity after a short delay
+        setTimeout(() => {
+            if (this.shieldMesh) {
+                this.shieldMesh.material.opacity = originalOpacity;
+            }
+        }, 200);
     }
     
     // Add screen flash effect for damage
@@ -1353,12 +1523,30 @@ class Game {
 
     // Update HUD method
     updateHUD() {
-        // Update speed display
-        const speedDisplay = document.getElementById('speed');
-        if (speedDisplay && this.truck) {
-            const speedMPH = Math.abs(Math.round(this.truck.velocity * 100));
-            speedDisplay.textContent = `SPEED: ${speedMPH} MPH`;
+        // Update health display
+        const healthDisplay = document.getElementById('health');
+        if (healthDisplay && this.health !== undefined) {
+            // Color coding based on health percentage
+            const healthPercent = Math.floor((this.health / 100) * 100);
+            let healthColor = '#00ff00'; // Green
+            
+            if (healthPercent < 30) {
+                healthColor = '#ff0000'; // Red
+            } else if (healthPercent < 70) {
+                healthColor = '#ffff00'; // Yellow
+            }
+            
+            healthDisplay.innerHTML = `HEALTH: <span style="color:${healthColor}">${healthPercent}%</span>`;
         }
+        
+        // Update speed display
+        this.updateSpeedDisplay();
+        
+        // Update ammo display
+        this.updateAmmoDisplay();
+        
+        // Update powerup indicators
+        this.updatePowerupIndicators();
     }
 
     // Add shooting mechanics to the Game class
@@ -1401,12 +1589,16 @@ class Game {
         // Add to scene
         this.scene.add(projectile);
         
+        // Apply damage multiplier if active
+        const baseDamage = 20;
+        const damage = baseDamage * (this.damageMultiplier || 1);
+        
         // Store projectile data
         this.projectiles.push({
             mesh: projectile,
             direction: truckDirection,
             speed: 2.0, // Fast projectile
-            damage: 20,
+            damage: damage,
             lifetime: 100, // Frames before despawning
             source: 'player'
         });
@@ -1416,11 +1608,8 @@ class Game {
             this.multiplayer.sendProjectileCreated(this.projectiles[this.projectiles.length - 1]);
         }
         
-        // Add muzzle flash effect
-        this.createMuzzleFlash(projectile.position.clone(), truckDirection);
-        
-        // Add recoil effect
-        this.truck.velocity -= 0.02; // Small backward push
+        // Create muzzle flash effect
+        this.createMuzzleFlash(projectile.position, truckDirection);
     }
 
     // Create muzzle flash effect
@@ -2564,47 +2753,177 @@ class Game {
     }
 
     createPowerup() {
-        const types = ['SPEED_BOOST', 'INVINCIBILITY', 'REPAIR'];
+        // Get all powerup types
+        const types = Object.keys(this.powerupTypes);
         const randomType = types[Math.floor(Math.random() * types.length)];
+        const powerupConfig = this.powerupTypes[randomType];
         
-        const geometry = new THREE.BoxGeometry(2, 2, 2);
-        const material = new THREE.MeshPhongMaterial({
-            color: randomType === 'SPEED_BOOST' ? 0x00ff00 : 
-                   randomType === 'INVINCIBILITY' ? 0xffff00 : 0xff0000,
-            emissive: 0x444444,
-            shininess: 100
+        // Create container for the powerup
+        const container = new THREE.Object3D();
+        
+        // Create base geometry based on powerup type
+        let geometry;
+        let material;
+        
+        switch(powerupConfig.model) {
+            case 'lightning':
+                // Create a lightning bolt shape
+                geometry = new THREE.ConeGeometry(0.7, 2, 4);
+                geometry.rotateX(Math.PI / 2);
+                break;
+            case 'star':
+                // Create a star shape (using octahedron as approximation)
+                geometry = new THREE.OctahedronGeometry(1, 0);
+                break;
+            case 'heart':
+                // Create a heart-like shape (using sphere as base)
+                geometry = new THREE.SphereGeometry(1, 8, 8);
+                break;
+            case 'ammo':
+                // Create an ammo box shape
+                geometry = new THREE.BoxGeometry(1, 0.8, 1.5);
+                break;
+            case 'shield':
+                // Create a shield shape
+                geometry = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+                geometry.scale(1.2, 1.2, 0.8);
+                break;
+            default:
+                // Default cube
+                geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+        }
+        
+        // Create material with glow effect
+        material = new THREE.MeshPhongMaterial({
+            color: powerupConfig.color,
+            emissive: powerupConfig.emissive,
+            emissiveIntensity: 0.5,
+            shininess: 100,
+            transparent: true,
+            opacity: 0.9
         });
         
-        const powerup = new THREE.Mesh(geometry, material);
+        const powerupMesh = new THREE.Mesh(geometry, material);
+        container.add(powerupMesh);
         
+        // Add a point light to make it glow
+        const light = new THREE.PointLight(powerupConfig.color, 1, 5);
+        light.position.set(0, 0, 0);
+        container.add(light);
+        
+        // Position the powerup in the arena
         const angle = Math.random() * Math.PI * 2;
-        const radius = Math.random() * 80;
-        powerup.position.x = Math.cos(angle) * radius;
-        powerup.position.z = Math.sin(angle) * radius;
-        powerup.position.y = 2;
+        const radius = Math.random() * 100 + 50; // Between 50 and 150 units from center
+        container.position.x = Math.cos(angle) * radius;
+        container.position.z = Math.sin(angle) * radius;
+        container.position.y = 2; // Slightly above ground
         
-        powerup.userData.type = randomType;
-        powerup.userData.rotationSpeed = 0.02;
+        // Store powerup type and other data
+        container.userData = {
+            type: randomType,
+            rotationSpeed: 0.02,
+            floatSpeed: 0.01,
+            floatHeight: 0.5,
+            floatOffset: Math.random() * Math.PI * 2, // Random starting phase
+            creationTime: Date.now()
+        };
         
-        this.powerups.push(powerup);
-        this.scene.add(powerup);
+        // Add to powerups array and scene
+        this.powerups.push(container);
+        this.scene.add(container);
+        
+        console.log(`Created powerup: ${randomType} at position (${container.position.x.toFixed(2)}, ${container.position.y.toFixed(2)}, ${container.position.z.toFixed(2)})`);
     }
 
     applyPowerup(type) {
+        const powerupConfig = this.powerupTypes[type];
+        if (!powerupConfig) {
+            console.error(`Unknown powerup type: ${type}`);
+            return;
+        }
+        
+        console.log(`Applying powerup: ${powerupConfig.name}`);
+        
+        // Apply the powerup effect
+        powerupConfig.apply();
+        
+        // Show powerup notification
+        this.showPowerupNotification(powerupConfig.name, powerupConfig.effect);
+        
+        // Play powerup sound
+        this.playPowerupSound(type);
+        
+        // Create visual effect
+        this.createPowerupEffect(type);
+        
+        // For powerups with duration, add to active powerups and set timeout to remove
+        if (powerupConfig.duration > 0) {
+            // If this powerup is already active, clear its timeout
+            if (this.activePowerups.has(type)) {
+                clearTimeout(this.activePowerups.get(type).timeoutId);
+            }
+            
+            // Set timeout to remove the powerup effect
+            const timeoutId = setTimeout(() => {
+                powerupConfig.remove();
+                this.activePowerups.delete(type);
+                this.updatePowerupIndicators();
+                console.log(`Powerup expired: ${powerupConfig.name}`);
+            }, powerupConfig.duration);
+            
+            // Add to active powerups
+            this.activePowerups.set(type, {
+                config: powerupConfig,
+                startTime: Date.now(),
+                endTime: Date.now() + powerupConfig.duration,
+                timeoutId: timeoutId
+            });
+            
+            // Update powerup indicators
+            this.updatePowerupIndicators();
+        }
+    }
+    
+    // Play powerup collection sound
+    playPowerupSound(type) {
+        // Create audio context if it doesn't exist
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        // Create oscillator
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+        
+        // Set properties based on powerup type
         switch(type) {
             case 'SPEED_BOOST':
-                this.truck.maxSpeed *= 2;
-                setTimeout(() => {
-                    this.truck.maxSpeed /= 2;
-                }, 5000);
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(440, this.audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(880, this.audioContext.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
                 break;
             case 'INVINCIBILITY':
-                this.truck.isInvincible = true;
-                setTimeout(() => {
-                    this.truck.isInvincible = false;
-                }, 3000);
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(330, this.audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(660, this.audioContext.currentTime + 0.1);
+                oscillator.frequency.exponentialRampToValueAtTime(990, this.audioContext.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
                 break;
             case 'REPAIR':
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(523.25, this.audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(783.99, this.audioContext.currentTime + 0.1);
+                oscillator.frequency.exponentialRampToValueAtTime(1046.50, this.audioContext.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+                break;
+            case 'AMMO_REFILL':
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(220, this.audioContext.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(440, this.audioContext.currentTime + 0.1);
                 this.health = Math.min(100, this.health + 50);
         }
     }
@@ -2665,6 +2984,105 @@ class Game {
             this.isMuted = true;
             this.showMessage('Audio Off');
         }
+    }
+
+    // Update powerups - animations and collision detection
+    updatePowerups() {
+        if (!this.powerups || !this.truck) return;
+        
+        const now = Date.now();
+        
+        // Check if we should spawn a new powerup
+        if (now - this.lastPowerupSpawn > this.powerupSpawnInterval) {
+            this.createPowerup();
+            this.lastPowerupSpawn = now;
+        }
+        
+        // Update existing powerups
+        for (let i = this.powerups.length - 1; i >= 0; i--) {
+            const powerup = this.powerups[i];
+            
+            // Rotate powerup
+            powerup.rotation.y += powerup.userData.rotationSpeed;
+            
+            // Make powerup float up and down
+            const floatOffset = Math.sin(now * 0.001 + powerup.userData.floatOffset) * powerup.userData.floatHeight;
+            powerup.position.y = 2 + floatOffset;
+            
+            // Check for collision with truck
+            const distance = powerup.position.distanceTo(this.truck.position);
+            if (distance < 4) { // Collision radius
+                // Apply powerup effect
+                this.applyPowerup(powerup.userData.type);
+                
+                // Remove powerup from scene and array
+                this.scene.remove(powerup);
+                this.powerups.splice(i, 1);
+                continue;
+            }
+            
+            // Make powerups disappear after 30 seconds
+            if (now - powerup.userData.creationTime > 30000) {
+                // Create fade-out effect
+                this.createPowerupFadeEffect(powerup);
+                
+                // Remove powerup from scene and array
+                this.scene.remove(powerup);
+                this.powerups.splice(i, 1);
+            }
+        }
+        
+        // Update shield effect if active
+        if (this.hasShield && this.shieldMesh) {
+            this.updateShieldEffect();
+        }
+    }
+    
+    // Create fade-out effect when powerup disappears
+    createPowerupFadeEffect(powerup) {
+        // Create particles at powerup position
+        const particleCount = 10;
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create particle
+            const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+            const particleMaterial = new THREE.MeshPhongMaterial({
+                color: powerup.children[0].material.color,
+                emissive: powerup.children[0].material.emissive,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            
+            // Position at powerup position
+            particle.position.copy(powerup.position);
+            
+            // Set velocity - outward in all directions
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 0.2 + 0.1;
+            particle.userData = {
+                velocity: {
+                    x: Math.cos(angle) * speed,
+                    y: Math.random() * 0.2 + 0.1,
+                    z: Math.sin(angle) * speed
+                },
+                life: 1.0
+            };
+            
+            this.scene.add(particle);
+            this.sparks.push(particle);
+        }
+    }
+
+    // Helper function to convert hex color to rgba
+    hexToRgba(hex, alpha) {
+        const r = (hex >> 16) & 255;
+        const g = (hex >> 8) & 255;
+        const b = hex & 255;
+        
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
 }
 
