@@ -23,7 +23,7 @@ export const WeaponTypes = {
         projectileSize: 0.3,
         color: 0xff0000,
         ammoPerMagazine: 10,
-        icon: "=€",
+        icon: "=ï¿½",
         projectilesPerShot: 1,
         spread: 0,
         description: "Slower, high damage rockets with area effect"
@@ -49,7 +49,7 @@ export const WeaponTypes = {
         projectileSize: 0.4,
         color: 0xff00ff,
         ammoPerMagazine: 8,
-        icon: "=£",
+        icon: "=ï¿½",
         projectilesPerShot: 1,
         spread: 0,
         description: "Drop proximity mines behind your vehicle"
@@ -103,11 +103,11 @@ export class Weapon {
             
             // Create projectile mesh
             let geometry;
-            if (this.type === WeaponTypes.ROCKETS) {
+            if (this.type.name === "Rockets") {
                 // Rocket shape
                 geometry = new THREE.ConeGeometry(this.type.projectileSize, this.type.projectileSize * 3, 8);
                 geometry.rotateX(Math.PI / 2); // Point forward
-            } else if (this.type === WeaponTypes.MINES) {
+            } else if (this.type.name === "Mines") {
                 // Mine shape
                 geometry = new THREE.SphereGeometry(this.type.projectileSize, 8, 8);
             } else {
@@ -226,7 +226,7 @@ export class Weapon {
             // Remove if lifetime ended
             if (projectile.lifetime <= 0) {
                 // Create explosion for rockets and mines
-                if (projectile.type === WeaponTypes.ROCKETS || projectile.type === WeaponTypes.MINES) {
+                if (projectile.type.name === "Rockets" || projectile.type.name === "Mines") {
                     this.createExplosion(projectile.mesh.position.clone(), projectile.type);
                 }
                 
@@ -389,7 +389,7 @@ export class Weapon {
     
     createExplosion(position, type) {
         // Explosion size based on weapon type
-        const size = type === WeaponTypes.ROCKETS ? 1.5 : 2.0; // Mines have bigger explosions
+        const size = type.name === "Rockets" ? 1.5 : 2.0; // Mines have bigger explosions
         
         // Create flash
         const explosionLight = new THREE.PointLight(0xff5500, 3, size * 10);
@@ -475,17 +475,17 @@ export class Weapon {
             const projectile = this.projectiles[i];
             
             // Skip unarmed mines
-            if (projectile.type === WeaponTypes.MINES && !projectile.armed) {
+            if (projectile.type.name === "Mines" && !projectile.armed) {
                 continue;
             }
             
             const distance = position.distanceTo(projectile.mesh.position);
-            const hitRadius = projectile.type === WeaponTypes.MINES ? 5 : radius;
+            const hitRadius = projectile.type.name === "Mines" ? 5 : radius;
             
             if (distance < hitRadius) {
                 // Calculate damage based on distance for explosives
                 let damage = projectile.damage;
-                if (projectile.type === WeaponTypes.MINES || projectile.type === WeaponTypes.ROCKETS) {
+                if (projectile.type.name === "Mines" || projectile.type.name === "Rockets") {
                     // Damage falls off with distance
                     const falloff = 1 - (distance / hitRadius);
                     damage = projectile.damage * falloff;
@@ -517,7 +517,7 @@ export class Weapon {
     
     createImpactEffect(projectile) {
         // Create different effects based on weapon type
-        if (projectile.type === WeaponTypes.ROCKETS || projectile.type === WeaponTypes.MINES) {
+        if (projectile.type.name === "Rockets" || projectile.type.name === "Mines") {
             // For explosives, create explosion
             this.createExplosion(projectile.mesh.position.clone(), projectile.type);
         } else {

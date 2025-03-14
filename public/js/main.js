@@ -182,6 +182,7 @@ class Game {
         this.isInitialized = false;
         this.debugMode = true; // Enable debug mode
         this.isGameOver = false;
+        this.frameCount = 0; // For timing various events
         
         // Controls
         this.keys = {
@@ -1020,40 +1021,51 @@ class Game {
             const currentWeapon = this.getCurrentWeapon();
             
             if (currentWeapon) {
-                // Calculate shooting position and direction
-                const shootPos = new THREE.Vector3();
-                this.truck.getWorldPosition(shootPos);
-                shootPos.y += 0.5; // Raise slightly
-                
-                // Calculate forward direction from truck rotation
-                const direction = new THREE.Vector3(
-                    Math.sin(this.truck.rotation.y),
-                    0,
-                    Math.cos(this.truck.rotation.y)
-                );
-                
-                // Handle mines differently - they're dropped behind the truck
-                if (currentWeapon.type === WeaponTypes.MINES) {
-                    // Drop behind the truck
-                    const shootPosBehind = new THREE.Vector3();
-                    this.truck.getWorldPosition(shootPosBehind);
+                try {
+                    console.log("Attempting to shoot with weapon:", currentWeapon.type.name);
                     
-                    // Move position behind truck
-                    shootPosBehind.x -= direction.x * 2;
-                    shootPosBehind.z -= direction.z * 2;
+                    // Calculate shooting position and direction
+                    const shootPos = new THREE.Vector3(
+                        this.truck.position.x,
+                        this.truck.position.y + 0.5,
+                        this.truck.position.z
+                    );
                     
-                    // Direction is down
-                    const downDirection = new THREE.Vector3(0, -1, 0);
+                    // Calculate forward direction from truck rotation
+                    const direction = new THREE.Vector3(
+                        Math.sin(this.truck.rotation.y),
+                        0,
+                        Math.cos(this.truck.rotation.y)
+                    );
                     
-                    // Shoot the mine
-                    currentWeapon.shoot(shootPosBehind, downDirection);
-                } else {
-                    // Shoot regular weapon
-                    currentWeapon.shoot(shootPos, direction);
+                    // Handle mines differently - they're dropped behind the truck
+                    if (currentWeapon.type.name === "Mines") {
+                        // Drop behind the truck
+                        const shootPosBehind = new THREE.Vector3(
+                            this.truck.position.x - direction.x * 2,
+                            this.truck.position.y,
+                            this.truck.position.z - direction.z * 2
+                        );
+                        
+                        // Direction is down
+                        const downDirection = new THREE.Vector3(0, -1, 0);
+                        
+                        // Shoot the mine
+                        const result = currentWeapon.shoot(shootPosBehind, downDirection);
+                        console.log("Mine shot result:", result);
+                    } else {
+                        // Shoot regular weapon
+                        const result = currentWeapon.shoot(shootPos, direction);
+                        console.log("Weapon shot result:", result);
+                    }
+                    
+                    // Update weapon display
+                    this.updateWeaponDisplay();
+                } catch (error) {
+                    console.error("Error while shooting:", error);
                 }
-                
-                // Update weapon display
-                this.updateWeaponDisplay();
+            } else {
+                console.warn("No current weapon available");
             }
         }
         
@@ -1166,6 +1178,9 @@ class Game {
         requestAnimationFrame(() => this.animate());
         
         try {
+            // Increment frame counter
+            this.frameCount++;
+            
             // Update game state
             this.update();
             
@@ -3069,86 +3084,116 @@ class Game {
     }
 
     createPowerup() {
-        // Get all powerup types
-        const types = Object.keys(this.powerupTypes);
-        const randomType = types[Math.floor(Math.random() * types.length)];
-        const powerupConfig = this.powerupTypes[randomType];
-        
-        // Create container for the powerup
-        const container = new THREE.Object3D();
-        
-        // Create base geometry based on powerup type
-        let geometry;
-        let material;
-        
-        switch(powerupConfig.model) {
-            case 'lightning':
-                // Create a lightning bolt shape
-                geometry = new THREE.ConeGeometry(0.7, 2, 4);
-                geometry.rotateX(Math.PI / 2);
-                break;
-            case 'star':
-                // Create a star shape (using octahedron as approximation)
-                geometry = new THREE.OctahedronGeometry(1, 0);
-                break;
-            case 'heart':
-                // Create a heart-like shape (using sphere as base)
-                geometry = new THREE.SphereGeometry(1, 8, 8);
-                break;
-            case 'ammo':
-                // Create an ammo box shape
-                geometry = new THREE.BoxGeometry(1, 0.8, 1.5);
-                break;
-            case 'shield':
-                // Create a shield shape
-                geometry = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-                geometry.scale(1.2, 1.2, 0.8);
-                break;
-            default:
-                // Default cube
-                geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+        if (!this.scene) {
+            console.error("Cannot create powerup: Scene is not available");
+            return null;
         }
         
-        // Create material with glow effect
-        material = new THREE.MeshPhongMaterial({
-            color: powerupConfig.color,
-            emissive: powerupConfig.emissive,
-            emissiveIntensity: 0.5,
-            shininess: 100,
-            transparent: true,
-            opacity: 0.9
-        });
-        
-        const powerupMesh = new THREE.Mesh(geometry, material);
-        container.add(powerupMesh);
-        
-        // Add a point light to make it glow
-        const light = new THREE.PointLight(powerupConfig.color, 1, 5);
-        light.position.set(0, 0, 0);
-        container.add(light);
-        
-        // Position the powerup in the arena
-        const angle = Math.random() * Math.PI * 2;
-        const radius = Math.random() * 100 + 50; // Between 50 and 150 units from center
-        container.position.x = Math.cos(angle) * radius;
-        container.position.z = Math.sin(angle) * radius;
-        container.position.y = 2; // Slightly above ground
-        
-        // Store powerup type and other data
-        container.userData = {
-            type: randomType,
-            rotationSpeed: 0.02,
-            floatSpeed: 0.01,
-            floatHeight: 0.5,
-            floatOffset: Math.random() * Math.PI * 2, // Random starting phase
-            creationTime: Date.now()
-        };
-        
-        // Add to powerups array and scene
-        this.powerups.push(container);
-        this.scene.add(container);
-        
-        console.log(`Created powerup: ${randomType} at position (${container.position.x.toFixed(2)}, ${container.position.y.toFixed(2)}, ${container.position.z.toFixed(2)})`);
+        try {
+            // Get all powerup types
+            const types = Object.keys(this.powerupTypes);
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            const powerupConfig = this.powerupTypes[randomType];
+            
+            console.log(`Creating powerup of type: ${randomType}`);
+            
+            // Create container for the powerup
+            const container = new THREE.Object3D();
+            
+            // Create base geometry based on powerup type
+            let geometry;
+            let material;
+            
+            switch(powerupConfig.model) {
+                case 'lightning':
+                    // Create a lightning bolt shape
+                    geometry = new THREE.ConeGeometry(0.7, 2, 4);
+                    geometry.rotateX(Math.PI / 2);
+                    break;
+                case 'star':
+                    // Create a star shape (using octahedron as approximation)
+                    geometry = new THREE.OctahedronGeometry(1, 0);
+                    break;
+                case 'heart':
+                    // Create a heart-like shape (using sphere as base)
+                    geometry = new THREE.SphereGeometry(1, 8, 8);
+                    break;
+                case 'ammo':
+                    // Create an ammo box shape
+                    geometry = new THREE.BoxGeometry(1, 0.8, 1.5);
+                    break;
+                case 'shield':
+                    // Create a shield shape
+                    geometry = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+                    geometry.scale(1.2, 1.2, 0.8);
+                    break;
+                default:
+                    // Default cube
+                    geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            }
+            
+            // Create material with glow effect
+            material = new THREE.MeshPhongMaterial({
+                color: powerupConfig.color,
+                emissive: powerupConfig.emissive,
+                emissiveIntensity: 0.5,
+                shininess: 100,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            const powerupMesh = new THREE.Mesh(geometry, material);
+            container.add(powerupMesh);
+            
+            // Add a point light to make it glow
+            const light = new THREE.PointLight(powerupConfig.color, 1, 5);
+            light.position.set(0, 0, 0);
+            container.add(light);
+            
+            // Position the powerup in the arena - make them more visible near the player's starting area
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.random() * 50 + 20; // Between 20 and 70 units from center (closer to player)
+            container.position.x = Math.cos(angle) * radius;
+            container.position.z = Math.sin(angle) * radius;
+            container.position.y = 2; // Slightly above ground
+            
+            // Store powerup type and other data
+            container.userData = {
+                type: randomType,
+                rotationSpeed: 0.02,
+                floatSpeed: 0.01,
+                floatHeight: 0.5,
+                floatOffset: Math.random() * Math.PI * 2, // Random starting phase
+                creationTime: Date.now()
+            };
+            
+            // Add to powerups array
+            if (!this.powerups) {
+                this.powerups = [];
+            }
+            this.powerups.push(container);
+            
+            // Add to scene
+            this.scene.add(container);
+            
+            console.log(`Created powerup: ${randomType} at position (${container.position.x.toFixed(2)}, ${container.position.y.toFixed(2)}, ${container.position.z.toFixed(2)})`);
+            
+            // Initialize lastPowerupSpawn if needed
+            if (!this.lastPowerupSpawn) {
+                this.lastPowerupSpawn = Date.now();
+            }
+            
+            // Force immediate powerup spawning for testing
+            // Spawn 3 initial powerups to make sure they appear
+            if (this.powerups.length < 3) {
+                setTimeout(() => this.createPowerup(), 500);
+            }
+            
+            return container;
+        } catch (error) {
+            console.error("Error creating powerup:", error);
+            return null;
+        }
     }
 
     applyPowerup(type) {
@@ -3280,12 +3325,31 @@ class Game {
 
     // Update powerups - animations and collision detection
     updatePowerups() {
-        if (!this.powerups || !this.truck) return;
+        if (!this.scene || !this.truck) {
+            return;
+        }
+        
+        // Make sure powerups array exists
+        if (!this.powerups) {
+            this.powerups = [];
+        }
         
         const now = Date.now();
         
-        // Check if we should spawn a new powerup
-        if (now - this.lastPowerupSpawn > this.powerupSpawnInterval) {
+        // Log powerup count for debugging
+        if (this.frameCount % 60 === 0) { // Once per second (assuming 60fps)
+            console.log(`Current powerups in game: ${this.powerups.length}`);
+        }
+        
+        // Initialize lastPowerupSpawn if needed
+        if (!this.lastPowerupSpawn) {
+            this.lastPowerupSpawn = now - this.powerupSpawnInterval; // Force immediate spawn
+            console.log("Initializing powerup spawn timer");
+        }
+        
+        // Check if we should spawn a new powerup - ensure we always have at least one
+        if (now - this.lastPowerupSpawn > this.powerupSpawnInterval || this.powerups.length === 0) {
+            console.log("Spawning new powerup - time elapsed:", (now - this.lastPowerupSpawn));
             this.createPowerup();
             this.lastPowerupSpawn = now;
         }
@@ -3294,32 +3358,67 @@ class Game {
         for (let i = this.powerups.length - 1; i >= 0; i--) {
             const powerup = this.powerups[i];
             
-            // Rotate powerup
-            powerup.rotation.y += powerup.userData.rotationSpeed;
-            
-            // Make powerup float up and down
-            const floatOffset = Math.sin(now * 0.001 + powerup.userData.floatOffset) * powerup.userData.floatHeight;
-            powerup.position.y = 2 + floatOffset;
-            
-            // Check for collision with truck
-            const distance = powerup.position.distanceTo(this.truck.position);
-            if (distance < 4) { // Collision radius
-                // Apply powerup effect
-                this.applyPowerup(powerup.userData.type);
-                
-                // Remove powerup from scene and array
-                this.scene.remove(powerup);
+            // Skip invalid powerups
+            if (!powerup || !powerup.userData) {
+                console.warn("Invalid powerup found, removing:", powerup);
+                if (powerup && this.scene) {
+                    this.scene.remove(powerup);
+                }
                 this.powerups.splice(i, 1);
                 continue;
             }
             
-            // Make powerups disappear after 30 seconds
-            if (now - powerup.userData.creationTime > 30000) {
-                // Create fade-out effect
-                this.createPowerupFadeEffect(powerup);
+            try {
+                // Rotate powerup
+                powerup.rotation.y += powerup.userData.rotationSpeed;
                 
-                // Remove powerup from scene and array
-                this.scene.remove(powerup);
+                // Make powerup float up and down
+                const floatOffset = Math.sin(now * 0.001 + powerup.userData.floatOffset) * powerup.userData.floatHeight;
+                powerup.position.y = 2 + floatOffset;
+                
+                // Make powerups stand out more - pulse the light
+                if (powerup.children && powerup.children.length > 1) {
+                    const light = powerup.children[1];
+                    if (light && light.isLight) {
+                        light.intensity = 1 + Math.sin(now * 0.003) * 0.5;
+                    }
+                }
+                
+                // Check for collision with truck
+                const distance = powerup.position.distanceTo(this.truck.position);
+                if (distance < 6) { // Increased collision radius for better gameplay
+                    console.log(`Powerup collected! Type: ${powerup.userData.type}, distance: ${distance.toFixed(2)}`);
+                    
+                    // Apply powerup effect
+                    this.applyPowerup(powerup.userData.type);
+                    
+                    // Create visual effect
+                    this.createPowerupEffect(powerup.userData.type);
+                    
+                    // Remove powerup from scene and array
+                    this.scene.remove(powerup);
+                    this.powerups.splice(i, 1);
+                    
+                    // Show message
+                    this.showMessage(`Collected ${this.powerupTypes[powerup.userData.type].name}`);
+                    continue;
+                }
+                
+                // Make powerups disappear after 30 seconds
+                if (now - powerup.userData.creationTime > 30000) {
+                    // Create fade-out effect
+                    this.createPowerupFadeEffect(powerup);
+                    
+                    // Remove powerup from scene and array
+                    this.scene.remove(powerup);
+                    this.powerups.splice(i, 1);
+                }
+            } catch (error) {
+                console.error("Error updating powerup:", error);
+                // Remove problematic powerup
+                if (powerup && this.scene) {
+                    this.scene.remove(powerup);
+                }
                 this.powerups.splice(i, 1);
             }
         }
