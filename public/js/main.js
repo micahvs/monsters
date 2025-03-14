@@ -3311,21 +3311,13 @@ class Game {
         const health = document.getElementById('health');
         const score = document.getElementById('score');
         const ammo = document.getElementById('ammo');
+        const currentWeapon = document.getElementById('currentWeapon');
+        const weaponStats = document.getElementById('weaponStats');
         
-        // Create weapon display if it doesn't exist
-        let weaponDisplay = document.getElementById('weapon');
-        if (!weaponDisplay) {
-            weaponDisplay = document.createElement('div');
-            weaponDisplay.id = 'weapon';
-            weaponDisplay.style.position = 'absolute';
-            weaponDisplay.style.top = '10px';
-            weaponDisplay.style.left = '10px';
-            weaponDisplay.style.color = '#ffffff';
-            weaponDisplay.style.fontFamily = '"Orbitron", sans-serif';
-            weaponDisplay.style.fontSize = '18px';
-            weaponDisplay.style.fontWeight = 'bold';
-            weaponDisplay.style.textShadow = '2px 2px 4px rgba(0, 0, 0, 0.5)';
-            document.body.appendChild(weaponDisplay);
+        // Remove old weapon display if it exists
+        const oldWeaponDisplay = document.getElementById('weapon');
+        if (oldWeaponDisplay) {
+            oldWeaponDisplay.remove();
         }
         
         // Set initial values
@@ -3335,18 +3327,26 @@ class Game {
         
         // Set weapon and ammo display if weapons are initialized
         if (this.weapons && this.weapons.length > 0) {
-            const currentWeapon = this.getCurrentWeapon();
+            const weapon = this.getCurrentWeapon();
             
-            if (weaponDisplay) {
-                weaponDisplay.textContent = `${currentWeapon.type.icon} ${currentWeapon.type.name}`;
+            if (currentWeapon && weapon) {
+                currentWeapon.innerHTML = `<span style="color: #00ffff;">${weapon.type.name || 'MACHINE GUN'}</span>`;
             }
             
-            if (ammo) {
-                ammo.textContent = `AMMO: ${currentWeapon.ammo}/${currentWeapon.maxAmmo}`;
+            if (weaponStats && weapon) {
+                const damageText = weapon.damage || 20;
+                const fireRateText = weapon.fireRate ? (weapon.fireRate + 's') : '0.1s';
+                weaponStats.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
             }
             
-            // Initialize cooldown indicator
-            this.updateCooldownIndicator();
+            if (ammo && weapon) {
+                ammo.innerHTML = `AMMO: <span style="color: #00ffff;">${weapon.ammo}/${weapon.maxAmmo}</span>`;
+                
+                // Update ammo bar
+                if (window.updateStatBars) {
+                    window.updateStatBars(this.health, weapon.ammo, weapon.maxAmmo);
+                }
+            }
         }
         
         // Create weapon key bindings legend
@@ -3356,32 +3356,33 @@ class Game {
     // Create weapon key bindings legend
     createWeaponLegend() {
         let legend = document.getElementById('weapon-legend');
-        if (!legend) {
-            legend = document.createElement('div');
-            legend.id = 'weapon-legend';
-            legend.style.position = 'absolute';
-            legend.style.top = '100px';  // Moved down to avoid overlap
-            legend.style.left = '10px';
-            legend.style.color = '#ffffff';
-            legend.style.fontFamily = '"Orbitron", sans-serif';
-            legend.style.fontSize = '12px';
-            legend.style.fontWeight = 'bold';
-            legend.style.textShadow = '1px 1px 2px rgba(0, 0, 0, 0.5)';
-            legend.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-            legend.style.padding = '5px';
-            legend.style.borderRadius = '5px';
-            legend.style.maxWidth = '200px';
-            legend.style.zIndex = '100';  // Ensure it's above other elements
-            
-            legend.innerHTML = `
-                <div>1-4: Switch Weapons</div>
-                <div>Q/E: Prev/Next Weapon</div>
-                <div>R: Reload</div>
-                <div>SPACE: Fire</div>
-            `;
-            
-            document.body.appendChild(legend);
+        if (legend) {
+            // Remove existing legend if it exists
+            legend.remove();
         }
+        
+        // Create new legend with proper styling
+        legend = document.createElement('div');
+        legend.id = 'weapon-legend';
+        legend.className = 'hud-element';
+        legend.style.position = 'fixed';
+        legend.style.top = '120px';
+        legend.style.left = '10px';
+        legend.style.padding = '8px 10px';
+        legend.style.borderLeft = '2px solid #00ffff';
+        legend.style.zIndex = '100';
+        legend.style.fontSize = '11px';
+        legend.style.lineHeight = '1.5';
+        
+        legend.innerHTML = `
+            <div style="color: #00ffff; margin-bottom: 5px;">⇒ ${this.getCurrentWeapon()?.type?.name || 'Machine Gun'}</div>
+            <div>1-4: Switch Weapons</div>
+            <div>Q/E: Prev/Next Weapon</div>
+            <div>R: Reload</div>
+            <div>SPACE: Fire</div>
+        `;
+        
+        document.body.appendChild(legend);
     }
 
     // Debug method to help diagnose movement issues
@@ -4586,31 +4587,43 @@ class Game {
     updateWeaponDisplay() {
         if (!this.weapons || this.weapons.length === 0) return;
         
-        const weaponDisplay = document.getElementById('weapon');
-        const ammoDisplay = document.getElementById('ammo');
+        const currentWeaponElement = document.getElementById('currentWeapon');
+        const weaponStatsElement = document.getElementById('weaponStats');
+        const ammoElement = document.getElementById('ammo');
         
         // Get current weapon safely
-        const currentWeapon = this.getCurrentWeapon();
-        if (!currentWeapon) return;
+        const weapon = this.getCurrentWeapon();
+        if (!weapon) return;
         
-        if (weaponDisplay) {
-            weaponDisplay.textContent = `${currentWeapon.type.icon || '🔫'} ${currentWeapon.type.name || 'Weapon'}`;
-            
-            // Reposition to avoid overlap
-            weaponDisplay.style.top = '70px';  // Move down below score/callsign
+        // Update weapon name
+        if (currentWeaponElement) {
+            currentWeaponElement.innerHTML = `<span style="color: #00ffff;">${weapon.type.name || 'UNKNOWN WEAPON'}</span>`;
         }
         
-        if (ammoDisplay) {
-            ammoDisplay.textContent = `AMMO: ${currentWeapon.ammo}/${currentWeapon.maxAmmo}`;
-            
+        // Update weapon stats
+        if (weaponStatsElement) {
+            const damageText = weapon.damage || 20;
+            const fireRateText = weapon.fireRate ? (weapon.fireRate + 's') : '0.1s';
+            weaponStatsElement.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
+        }
+        
+        // Update ammo display
+        if (ammoElement) {
             // Add reload indicator if reloading
-            if (currentWeapon.isReloading) {
-                ammoDisplay.innerHTML = `<span style="color: #ff0000;">RELOADING...</span>`;
+            if (weapon.isReloading) {
+                ammoElement.innerHTML = `AMMO: <span style="color: #ff0000;">RELOADING...</span>`;
+            } else {
+                ammoElement.innerHTML = `AMMO: <span style="color: #00ffff;">${weapon.ammo}/${weapon.maxAmmo}</span>`;
+            }
+            
+            // Update ammo bar
+            if (window.updateStatBars) {
+                window.updateStatBars(this.health, weapon.ammo, weapon.maxAmmo);
             }
         }
         
-        // Update cooldown indicator
-        this.updateCooldownIndicator();
+        // Update weapon legend to show current weapon
+        this.createWeaponLegend();
     }
     
     // Update weapon cooldown indicator
@@ -4623,17 +4636,26 @@ class Game {
         
         // Get or create cooldown bar
         let cooldownBar = document.getElementById('cooldown-bar');
-        if (!cooldownBar) {
+        let container = document.getElementById('cooldown-container');
+        
+        if (!cooldownBar || !container) {
+            // Remove old elements if they exist
+            if (cooldownBar) cooldownBar.remove();
+            if (container) container.remove();
+            
             // Create cooldown indicator container
-            const container = document.createElement('div');
+            container = document.createElement('div');
             container.id = 'cooldown-container';
-            container.style.position = 'absolute';
-            container.style.bottom = '70px';
+            container.className = 'hud-element';
+            container.style.position = 'fixed';
+            container.style.bottom = '50px';
             container.style.left = '10px';
-            container.style.width = '200px';
-            container.style.height = '10px';
-            container.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-            container.style.borderRadius = '5px';
+            container.style.width = '150px';
+            container.style.height = '4px';
+            container.style.padding = '0';
+            container.style.borderLeft = '2px solid #00ffff';
+            container.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
+            container.style.borderRadius = '0';
             container.style.overflow = 'hidden';
             
             // Create cooldown bar
@@ -4661,10 +4683,14 @@ class Game {
             } else {
                 cooldownBar.style.backgroundColor = '#00ffff';
             }
+            
+            // Show/hide container based on cooldown status
+            container.style.opacity = progress < 1 ? '1' : '0.3';
         } catch (error) {
             console.log("Error updating cooldown indicator:", error);
             cooldownBar.style.width = '100%';
             cooldownBar.style.backgroundColor = '#00ffff';
+            container.style.opacity = '0.3';
         }
     }
     
