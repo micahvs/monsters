@@ -219,6 +219,8 @@ export default class Multiplayer {
         
         // When receiving a chat message
         this.socket.on('chat', (chatData) => {
+            console.log('Received chat message in Multiplayer.js:', chatData);
+            // Always process the message, regardless of who sent it
             this.receiveChatMessage(chatData);
         });
     }
@@ -741,19 +743,32 @@ export default class Multiplayer {
     }
     
     receiveChatMessage(chatData) {
-        if (!this.chatMessages) return;
+        console.log('Processing chat message:', chatData);
         
-        // Add message to chat history
-        this.chatMessages.push(chatData);
+        if (!chatData || !chatData.message) {
+            console.error('Invalid chat data received:', chatData);
+            return;
+        }
         
         // If we have the global chat function from game.html, use it
         if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+            console.log('Using window.addChatMessage to display chat');
             const sender = chatData.playerId === this.localPlayerId ? 'You' : chatData.nickname;
             window.addChatMessage(sender, chatData.message);
             return;
         }
         
         // Otherwise use our own chat UI
+        if (!this.chatMessages) {
+            console.error('Chat messages container not found');
+            return;
+        }
+        
+        // Add message to chat history if it's an array
+        if (Array.isArray(this.chatMessages)) {
+            this.chatMessages.push(chatData);
+        }
+        
         // Create message element
         const messageElement = document.createElement('div');
         messageElement.style.marginBottom = '5px';

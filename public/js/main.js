@@ -3546,7 +3546,22 @@ class Game {
             
             // Initialize chat socket listeners if the function exists
             if (typeof window.initChatSocketListeners === 'function') {
+                console.log('Calling initChatSocketListeners from main.js');
                 window.initChatSocketListeners();
+            } else {
+                console.error('initChatSocketListeners function not found');
+            }
+            
+            // Force a direct connection to ensure chat works
+            if (this.multiplayer.socket) {
+                console.log('Setting up direct chat listener in main.js');
+                this.multiplayer.socket.on('chat', (chatData) => {
+                    console.log('Direct chat message received in main.js:', chatData);
+                    if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                        const sender = chatData.playerId === this.multiplayer.localPlayerId ? 'You' : chatData.nickname;
+                        window.addChatMessage(sender, chatData.message);
+                    }
+                });
             }
         } catch (error) {
             console.error('Failed to initialize multiplayer:', error);

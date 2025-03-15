@@ -183,14 +183,20 @@ io.on('connection', (socket) => {
 
   // Handle chat messages
   socket.on('chat', (data) => {
+    console.log('Received chat message from client:', socket.id, data);
     const player = gameState.players[socket.id];
     if (player) {
-      io.emit('chat', {
+      const chatMessage = {
         playerId: socket.id,
         nickname: data.nickname || player.nickname,
         message: data.message,
         timestamp: Date.now()
-      });
+      };
+      console.log('Broadcasting chat message to all clients:', chatMessage);
+      // Use broadcast.emit to send to all clients EXCEPT the sender
+      socket.broadcast.emit('chat', chatMessage);
+      // Also send back to the sender so they get the same formatted message
+      socket.emit('chat', chatMessage);
     }
   });
 });

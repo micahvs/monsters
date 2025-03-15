@@ -781,24 +781,49 @@
             
             // Set up a function to initialize chat socket listeners after game is loaded
             window.initChatSocketListeners = function() {
-                if (window.gameInstance && window.gameInstance.multiplayer && window.gameInstance.multiplayer.socket) {
-                    console.log('Setting up chat socket listeners');
-                    
-                    // Remove any existing listeners to prevent duplicates
-                    window.gameInstance.multiplayer.socket.off('chat');
-                    
-                    // Listen for chat messages from server
-                    window.gameInstance.multiplayer.socket.on('chat', function(chatData) {
-                        console.log('Received chat message:', chatData);
-                        // Only handle messages from other players (our own messages are handled when sent)
-                        if (chatData.playerId !== window.gameInstance.multiplayer.localPlayerId) {
-                            addChatMessage(chatData.nickname, chatData.message);
-                        }
-                    });
-                } else {
-                    console.warn('Game instance or multiplayer not available for chat initialization');
+                console.log('Initializing chat socket listeners');
+                
+                if (!window.gameInstance) {
+                    console.error('Game instance not available for chat initialization');
+                    return;
                 }
+                
+                if (!window.gameInstance.multiplayer) {
+                    console.error('Multiplayer not available for chat initialization');
+                    return;
+                }
+                
+                if (!window.gameInstance.multiplayer.socket) {
+                    console.error('Socket not available for chat initialization');
+                    return;
+                }
+                
+                console.log('Setting up chat socket listeners');
+                
+                // Remove any existing listeners to prevent duplicates
+                window.gameInstance.multiplayer.socket.off('chat');
+                
+                // Listen for chat messages from server
+                window.gameInstance.multiplayer.socket.on('chat', function(chatData) {
+                    console.log('Received chat message in game.html:', chatData);
+                    
+                    // Handle all messages, including our own
+                    addChatMessage(
+                        chatData.playerId === window.gameInstance.multiplayer.localPlayerId ? 'You' : chatData.nickname, 
+                        chatData.message
+                    );
+                });
+                
+                console.log('Chat socket listeners initialized');
             };
+            
+            // Call initChatSocketListeners when the page loads
+            // This will be called again when the game instance is created
+            setTimeout(function() {
+                if (window.gameInstance && window.gameInstance.multiplayer) {
+                    window.initChatSocketListeners();
+                }
+            }, 2000);
         });
         
         // Update health and ammo bars
