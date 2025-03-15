@@ -787,6 +787,11 @@ class Game {
         this.camera.position.set(0, 5, -halfSize + 40);
         
         console.log("Teleported to arena edge at", this.truck.position);
+        
+        // Send position update to server if in multiplayer mode
+        if (this.multiplayer && this.multiplayer.isConnected) {
+            this.multiplayer.sendLocalPlayerUpdate();
+        }
     }
     
     removeLoadingScreen() {
