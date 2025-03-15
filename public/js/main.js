@@ -417,6 +417,10 @@ class Game {
             // Create turrets (after stadium is created)
             this.createTurrets();
             
+            // Initialize particle pools for effects
+            this.initializeParticlePools();
+            console.log("Particle pools initialized");
+            
             // Initialize HUD
             this.initHUD();
             
@@ -857,8 +861,11 @@ class Game {
             }
             
             // Update projectiles every frame (essential for gameplay)
-            if (typeof this.updateProjectiles === 'function') {
-                this.updateProjectiles(deltaTime);
+            this.updateProjectiles(deltaTime);
+            
+            // Update explosions every frame (for smooth animation)
+            if (this.activeExplosions && this.activeExplosions.length > 0) {
+                this.updateExplosions(deltaTime);
             }
             
             // Distribute heavy updates across frames to prevent spikes
@@ -3233,235 +3240,6 @@ class Game {
         }, 10000); // 10 seconds
     }
 
-    // Create explosion effect
-    createExplosion(position, type = 'standard') {
-        // Create flash
-        const explosionLight = new THREE.PointLight(0xff5500, 5, 30);
-        explosionLight.position.copy(position);
-        explosionLight.position.y += 2;
-        this.scene.add(explosionLight);
-        
-        // Create shockwave ring
-        const shockwaveGeometry = new THREE.RingGeometry(0.5, 1.5, 32);
-        const shockwaveMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff7700,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide
-        });
-        
-        const shockwave = new THREE.Mesh(shockwaveGeometry, shockwaveMaterial);
-        shockwave.position.copy(position);
-        shockwave.position.y += 0.1;
-        shockwave.rotation.x = -Math.PI / 2; // Flat on the ground
-        this.scene.add(shockwave);
-        
-        // Create explosion particles
-        const particleCount = type === 'large' ? 60 : 30;
-        const particles = [];
-        const debrisCount = type === 'large' ? 15 : 8;
-        const debris = [];
-        
-        // Create fire and smoke particles
-        for (let i = 0; i < particleCount; i++) {
-            const size = Math.random() * 0.8 + 0.3;
-            const particleGeometry = new THREE.SphereGeometry(size, 8, 8);
-            
-            // Alternate between fire and smoke colors
-            const isSmoke = i % 3 === 0;
-            const particleColor = isSmoke ? 0x555555 : (i % 2 === 0 ? 0xff5500 : 0xffff00);
-            
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: particleColor,
-                transparent: true,
-                opacity: isSmoke ? 0.7 : 1
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            particle.position.copy(position);
-            particle.position.y += 1 + Math.random() * 2;
-            
-            // Random velocity with more upward momentum
-            const angle = Math.random() * Math.PI * 2;
-            const horizontalSpeed = Math.random() * 0.4 + 0.1;
-            const verticalSpeed = Math.random() * 0.5 + 0.3;
-            
-            particle.velocity = {
-                x: Math.cos(angle) * horizontalSpeed,
-                y: verticalSpeed,
-                z: Math.sin(angle) * horizontalSpeed
-            };
-            
-            // Add rotation to particles
-            particle.rotation.set(
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2
-            );
-            
-            particle.rotationSpeed = {
-                x: (Math.random() - 0.5) * 0.2,
-                y: (Math.random() - 0.5) * 0.2,
-                z: (Math.random() - 0.5) * 0.2
-            };
-            
-            particle.isSmoke = isSmoke;
-            particle.size = size;
-            particle.initialSize = size;
-            
-            this.scene.add(particle);
-            particles.push(particle);
-        }
-        
-        // Create debris pieces
-        for (let i = 0; i < debrisCount; i++) {
-            // Create random shaped debris
-            const debrisGeometry = new THREE.TetrahedronGeometry(Math.random() * 0.5 + 0.2, 0);
-            const debrisMaterial = new THREE.MeshStandardMaterial({
-                color: 0x333333,
-                roughness: 0.7,
-                metalness: 0.2
-            });
-            
-            const debrisPiece = new THREE.Mesh(debrisGeometry, debrisMaterial);
-            debrisPiece.position.copy(position);
-            debrisPiece.position.y += 0.5;
-            
-            // Random velocity with more horizontal movement
-            const angle = Math.random() * Math.PI * 2;
-            const speed = Math.random() * 0.6 + 0.3;
-            debrisPiece.velocity = {
-                x: Math.cos(angle) * speed,
-                y: Math.random() * 0.7 + 0.5, // Higher initial upward velocity
-                z: Math.sin(angle) * speed
-            };
-            
-            // Add rotation to debris
-            debrisPiece.rotation.set(
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2
-            );
-            
-            debrisPiece.rotationSpeed = {
-                x: (Math.random() - 0.5) * 0.3,
-                y: (Math.random() - 0.5) * 0.3,
-                z: (Math.random() - 0.5) * 0.3
-            };
-            
-            this.scene.add(debrisPiece);
-            debris.push(debrisPiece);
-        }
-        
-        // Apply camera shake based on explosion type and distance
-        const shakeIntensity = type === 'large' ? 0.4 : 0.2;
-        if (this.truck) {
-            const distanceToPlayer = position.distanceTo(this.truck.position);
-            if (distanceToPlayer < 30) {
-                const adjustedIntensity = shakeIntensity * (1 - (distanceToPlayer / 30));
-                this.shakeCamera(adjustedIntensity);
-            }
-        }
-        
-        // Animate explosion
-        let explosionLife = type === 'large' ? 90 : 60;
-        const maxShockwaveSize = type === 'large' ? 15 : 10;
-        
-        const animateExplosion = () => {
-            explosionLife--;
-            
-            if (explosionLife > 0) {
-                // Update light
-                explosionLight.intensity = (explosionLife / (type === 'large' ? 18 : 12)) * 5;
-                
-                // Update shockwave
-                const shockwaveProgress = 1 - (explosionLife / (type === 'large' ? 90 : 60));
-                const currentSize = maxShockwaveSize * shockwaveProgress;
-                shockwave.scale.set(currentSize, currentSize, 1);
-                shockwave.material.opacity = 0.8 * (1 - shockwaveProgress);
-                
-                // Update particles
-                for (const particle of particles) {
-                    // Update position
-                    particle.position.x += particle.velocity.x;
-                    particle.position.y += particle.velocity.y;
-                    particle.position.z += particle.velocity.z;
-                    
-                    // Apply gravity
-                    particle.velocity.y -= 0.015;
-                    
-                    // Apply drag (more for smoke)
-                    const drag = particle.isSmoke ? 0.05 : 0.02;
-                    particle.velocity.x *= (1 - drag);
-                    particle.velocity.z *= (1 - drag);
-                    
-                    // Update rotation
-                    particle.rotation.x += particle.rotationSpeed.x;
-                    particle.rotation.y += particle.rotationSpeed.y;
-                    particle.rotation.z += particle.rotationSpeed.z;
-                    
-                    // Smoke particles grow larger over time
-                    if (particle.isSmoke) {
-                        const growFactor = 1 + (0.02 * (1 - explosionLife / 60));
-                        particle.scale.set(growFactor, growFactor, growFactor);
-                    }
-                    
-                    // Fade out
-                    particle.material.opacity = particle.isSmoke ? 
-                        (explosionLife / 60) * 0.7 : // Smoke fades normally
-                        (explosionLife < 30 ? explosionLife / 30 : 1); // Fire stays bright longer
-                }
-                
-                // Update debris
-                for (const debrisPiece of debris) {
-                    // Update position
-                    debrisPiece.position.x += debrisPiece.velocity.x;
-                    debrisPiece.position.y += debrisPiece.velocity.y;
-                    debrisPiece.position.z += debrisPiece.velocity.z;
-                    
-                    // Apply gravity (stronger for debris)
-                    debrisPiece.velocity.y -= 0.03;
-                    
-                    // Update rotation
-                    debrisPiece.rotation.x += debrisPiece.rotationSpeed.x;
-                    debrisPiece.rotation.y += debrisPiece.rotationSpeed.y;
-                    debrisPiece.rotation.z += debrisPiece.rotationSpeed.z;
-                    
-                    // Bounce if hitting ground
-                    if (debrisPiece.position.y <= 0.2) {
-                        debrisPiece.position.y = 0.2;
-                        debrisPiece.velocity.y = -debrisPiece.velocity.y * 0.4; // Bounce with energy loss
-                        debrisPiece.velocity.x *= 0.8; // Friction
-                        debrisPiece.velocity.z *= 0.8; // Friction
-                    }
-                }
-                
-                requestAnimationFrame(animateExplosion);
-            } else {
-                // Remove all explosion elements
-                this.scene.remove(explosionLight);
-                this.scene.remove(shockwave);
-                
-                for (const particle of particles) {
-                    this.scene.remove(particle);
-                }
-                
-                for (const debrisPiece of debris) {
-                    this.scene.remove(debrisPiece);
-                }
-            }
-        };
-        
-        animateExplosion();
-        
-        // Apply area damage if this is a player's explosion
-        if (type === 'large') {
-            this.applyAreaDamage(position, 15, 50);
-        } else {
-            this.applyAreaDamage(position, 10, 30);
-        }
-    }
-
     // Initialize with weapon and ammo display
     initHUD() {
         const playerName = document.getElementById('playerName');
@@ -4914,6 +4692,470 @@ class Game {
                     this.weaponPickups.splice(i, 1);
                 }
             }
+        }
+    }
+
+    // Initialize particle pools for effects
+    initializeParticlePools() {
+        // Create pools for different types of particles
+        this.particlePools = {
+            explosionParticles: [],
+            explosionDebris: [],
+            smokeParticles: []
+        };
+        
+        // Pre-allocate explosion particles
+        for (let i = 0; i < 100; i++) {
+            // Fire particles
+            const size = Math.random() * 0.8 + 0.3;
+            const particleGeometry = new THREE.SphereGeometry(size, 8, 8);
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: i % 2 === 0 ? 0xff5500 : 0xffff00,
+                transparent: true,
+                opacity: 0
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.visible = false;
+            particle.scale.set(1, 1, 1);
+            this.scene.add(particle);
+            this.particlePools.explosionParticles.push({
+                mesh: particle,
+                inUse: false
+            });
+            
+            // Smoke particles
+            if (i < 50) {
+                const smokeGeometry = new THREE.SphereGeometry(size, 8, 8);
+                const smokeMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x555555,
+                    transparent: true,
+                    opacity: 0
+                });
+                
+                const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial);
+                smoke.visible = false;
+                this.scene.add(smoke);
+                this.particlePools.smokeParticles.push({
+                    mesh: smoke,
+                    inUse: false
+                });
+            }
+            
+            // Debris pieces
+            if (i < 30) {
+                const debrisGeometry = new THREE.TetrahedronGeometry(Math.random() * 0.5 + 0.2, 0);
+                const debrisMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x333333,
+                    roughness: 0.7,
+                    metalness: 0.2,
+                    transparent: true,
+                    opacity: 0
+                });
+                
+                const debris = new THREE.Mesh(debrisGeometry, debrisMaterial);
+                debris.visible = false;
+                this.scene.add(debris);
+                this.particlePools.explosionDebris.push({
+                    mesh: debris,
+                    inUse: false
+                });
+            }
+        }
+        
+        // Create shockwave ring template
+        this.shockwaveGeometry = new THREE.RingGeometry(0.5, 1.5, 32);
+        this.shockwaveMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff7700,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide
+        });
+        
+        this.shockwavePool = [];
+        for (let i = 0; i < 5; i++) {
+            const shockwave = new THREE.Mesh(this.shockwaveGeometry, this.shockwaveMaterial.clone());
+            shockwave.rotation.x = -Math.PI / 2; // Flat on the ground
+            shockwave.visible = false;
+            this.scene.add(shockwave);
+            this.shockwavePool.push({
+                mesh: shockwave,
+                inUse: false
+            });
+        }
+        
+        // Create explosion light pool
+        this.explosionLightPool = [];
+        for (let i = 0; i < 10; i++) {
+            const light = new THREE.PointLight(0xff5500, 0, 30);
+            light.visible = false;
+            this.scene.add(light);
+            this.explosionLightPool.push({
+                light: light,
+                inUse: false
+            });
+        }
+        
+        // Track active effects for updating
+        this.activeExplosions = [];
+    }
+    
+    // Get particle from pool
+    getParticleFromPool(poolName) {
+        const pool = this.particlePools[poolName];
+        if (!pool) return null;
+        
+        // Find first available particle
+        for (let i = 0; i < pool.length; i++) {
+            if (!pool[i].inUse) {
+                pool[i].inUse = true;
+                pool[i].mesh.visible = true;
+                return pool[i];
+            }
+        }
+        
+        // If no particles available, reuse the oldest one
+        console.warn(`No available particles in ${poolName} pool, reusing oldest`);
+        pool[0].mesh.visible = true;
+        return pool[0];
+    }
+    
+    // Get shockwave from pool
+    getShockwaveFromPool() {
+        for (let i = 0; i < this.shockwavePool.length; i++) {
+            if (!this.shockwavePool[i].inUse) {
+                this.shockwavePool[i].inUse = true;
+                this.shockwavePool[i].mesh.visible = true;
+                return this.shockwavePool[i];
+            }
+        }
+        
+        // If no shockwaves available, reuse the first one
+        this.shockwavePool[0].mesh.visible = true;
+        return this.shockwavePool[0];
+    }
+    
+    // Get explosion light from pool
+    getLightFromPool() {
+        for (let i = 0; i < this.explosionLightPool.length; i++) {
+            if (!this.explosionLightPool[i].inUse) {
+                this.explosionLightPool[i].inUse = true;
+                this.explosionLightPool[i].light.visible = true;
+                return this.explosionLightPool[i];
+            }
+        }
+        
+        // If no lights available, reuse the first one
+        this.explosionLightPool[0].light.visible = true;
+        return this.explosionLightPool[0];
+    }
+    
+    // Update all active explosions
+    updateExplosions(deltaTime = 1) {
+        // Process each active explosion
+        for (let i = this.activeExplosions.length - 1; i >= 0; i--) {
+            const explosion = this.activeExplosions[i];
+            
+            // Update explosion lifetime
+            explosion.life -= deltaTime;
+            
+            if (explosion.life <= 0) {
+                // Release all resources back to pools
+                
+                // Release light
+                if (explosion.light) {
+                    explosion.light.inUse = false;
+                    explosion.light.light.visible = false;
+                    explosion.light.light.intensity = 0;
+                }
+                
+                // Release shockwave
+                if (explosion.shockwave) {
+                    explosion.shockwave.inUse = false;
+                    explosion.shockwave.mesh.visible = false;
+                    explosion.shockwave.mesh.material.opacity = 0;
+                }
+                
+                // Release particles
+                for (const particle of explosion.particles) {
+                    particle.inUse = false;
+                    particle.mesh.visible = false;
+                    particle.mesh.material.opacity = 0;
+                }
+                
+                // Release debris
+                for (const debris of explosion.debris) {
+                    debris.inUse = false;
+                    debris.mesh.visible = false;
+                    debris.mesh.material.opacity = 0;
+                }
+                
+                // Remove from active explosions
+                this.activeExplosions.splice(i, 1);
+                continue;
+            }
+            
+            // Calculate progress
+            const progress = 1 - (explosion.life / explosion.maxLife);
+            
+            // Update light
+            if (explosion.light) {
+                explosion.light.light.intensity = (1 - progress) * explosion.lightIntensity;
+            }
+            
+            // Update shockwave
+            if (explosion.shockwave) {
+                const currentSize = explosion.maxShockwaveSize * progress;
+                explosion.shockwave.mesh.scale.set(currentSize, currentSize, 1);
+                explosion.shockwave.mesh.material.opacity = 0.8 * (1 - progress);
+            }
+            
+            // Update particles
+            for (const particle of explosion.particles) {
+                // Update position
+                particle.mesh.position.x += particle.velocity.x * deltaTime;
+                particle.mesh.position.y += particle.velocity.y * deltaTime;
+                particle.mesh.position.z += particle.velocity.z * deltaTime;
+                
+                // Apply gravity
+                particle.velocity.y -= 0.015 * deltaTime;
+                
+                // Apply drag
+                const drag = particle.isSmoke ? 0.05 : 0.02;
+                particle.velocity.x *= (1 - drag * deltaTime);
+                particle.velocity.z *= (1 - drag * deltaTime);
+                
+                // Update rotation
+                if (particle.rotationSpeed) {
+                    particle.mesh.rotation.x += particle.rotationSpeed.x * deltaTime;
+                    particle.mesh.rotation.y += particle.rotationSpeed.y * deltaTime;
+                    particle.mesh.rotation.z += particle.rotationSpeed.z * deltaTime;
+                }
+                
+                // Smoke particles grow larger over time
+                if (particle.isSmoke) {
+                    const growFactor = 1 + (0.02 * progress);
+                    particle.mesh.scale.set(growFactor, growFactor, growFactor);
+                }
+                
+                // Fade out
+                particle.mesh.material.opacity = particle.isSmoke ? 
+                    (1 - progress) * 0.7 : // Smoke fades normally
+                    (progress > 0.5 ? (1 - (progress - 0.5) * 2) : 1); // Fire stays bright longer
+            }
+            
+            // Update debris
+            for (const debris of explosion.debris) {
+                // Update position
+                debris.mesh.position.x += debris.velocity.x * deltaTime;
+                debris.mesh.position.y += debris.velocity.y * deltaTime;
+                debris.mesh.position.z += debris.velocity.z * deltaTime;
+                
+                // Apply gravity
+                debris.velocity.y -= 0.03 * deltaTime;
+                
+                // Update rotation
+                if (debris.rotationSpeed) {
+                    debris.mesh.rotation.x += debris.rotationSpeed.x * deltaTime;
+                    debris.mesh.rotation.y += debris.rotationSpeed.y * deltaTime;
+                    debris.mesh.rotation.z += debris.rotationSpeed.z * deltaTime;
+                }
+                
+                // Bounce if hitting ground
+                if (debris.mesh.position.y <= 0.2) {
+                    debris.mesh.position.y = 0.2;
+                    debris.velocity.y = -debris.velocity.y * 0.4; // Bounce with energy loss
+                    debris.velocity.x *= 0.8; // Friction
+                    debris.velocity.z *= 0.8; // Friction
+                }
+                
+                // Fade out near end of life
+                if (progress > 0.7) {
+                    debris.mesh.material.opacity = 1 - ((progress - 0.7) / 0.3);
+                }
+            }
+        }
+    }
+
+    // Create explosion effect using object pooling
+    createExplosion(position, type = 'standard') {
+        // Ensure particle pools are initialized
+        if (!this.particlePools) {
+            this.initializeParticlePools();
+        }
+        
+        // Configure explosion based on type
+        const isLarge = type === 'large';
+        const maxLife = isLarge ? 90 : 60;
+        const particleCount = isLarge ? 40 : 20;
+        const debrisCount = isLarge ? 10 : 5;
+        const smokeCount = isLarge ? 15 : 8;
+        const maxShockwaveSize = isLarge ? 15 : 10;
+        const lightIntensity = isLarge ? 5 : 3;
+        
+        // Create explosion data structure
+        const explosion = {
+            position: position.clone(),
+            life: maxLife,
+            maxLife: maxLife,
+            type: type,
+            particles: [],
+            debris: [],
+            maxShockwaveSize: maxShockwaveSize,
+            lightIntensity: lightIntensity
+        };
+        
+        // Get light from pool
+        const lightObj = this.getLightFromPool();
+        lightObj.light.position.copy(position);
+        lightObj.light.position.y += 2;
+        lightObj.light.color.set(0xff5500);
+        lightObj.light.intensity = lightIntensity;
+        lightObj.light.distance = 30;
+        explosion.light = lightObj;
+        
+        // Get shockwave from pool
+        const shockwaveObj = this.getShockwaveFromPool();
+        shockwaveObj.mesh.position.copy(position);
+        shockwaveObj.mesh.position.y += 0.1;
+        shockwaveObj.mesh.scale.set(1, 1, 1);
+        shockwaveObj.mesh.material.opacity = 0.8;
+        explosion.shockwave = shockwaveObj;
+        
+        // Create fire particles
+        for (let i = 0; i < particleCount; i++) {
+            const particleObj = this.getParticleFromPool('explosionParticles');
+            if (!particleObj) continue;
+            
+            const particle = particleObj.mesh;
+            particle.position.copy(position);
+            particle.position.y += 1 + Math.random() * 2;
+            
+            // Random velocity with more upward momentum
+            const angle = Math.random() * Math.PI * 2;
+            const horizontalSpeed = Math.random() * 0.4 + 0.1;
+            const verticalSpeed = Math.random() * 0.5 + 0.3;
+            
+            particleObj.velocity = {
+                x: Math.cos(angle) * horizontalSpeed,
+                y: verticalSpeed,
+                z: Math.sin(angle) * horizontalSpeed
+            };
+            
+            // Add rotation to particles
+            particle.rotation.set(
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2
+            );
+            
+            particleObj.rotationSpeed = {
+                x: (Math.random() - 0.5) * 0.2,
+                y: (Math.random() - 0.5) * 0.2,
+                z: (Math.random() - 0.5) * 0.2
+            };
+            
+            particleObj.isSmoke = false;
+            particle.material.opacity = 1;
+            particle.material.color.set(i % 2 === 0 ? 0xff5500 : 0xffff00);
+            
+            explosion.particles.push(particleObj);
+        }
+        
+        // Create smoke particles
+        for (let i = 0; i < smokeCount; i++) {
+            const smokeObj = this.getParticleFromPool('smokeParticles');
+            if (!smokeObj) continue;
+            
+            const smoke = smokeObj.mesh;
+            smoke.position.copy(position);
+            smoke.position.y += 1 + Math.random() * 2;
+            
+            // Random velocity with more upward momentum
+            const angle = Math.random() * Math.PI * 2;
+            const horizontalSpeed = Math.random() * 0.3 + 0.05;
+            const verticalSpeed = Math.random() * 0.4 + 0.2;
+            
+            smokeObj.velocity = {
+                x: Math.cos(angle) * horizontalSpeed,
+                y: verticalSpeed,
+                z: Math.sin(angle) * horizontalSpeed
+            };
+            
+            // Add rotation to particles
+            smoke.rotation.set(
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2
+            );
+            
+            smokeObj.rotationSpeed = {
+                x: (Math.random() - 0.5) * 0.1,
+                y: (Math.random() - 0.5) * 0.1,
+                z: (Math.random() - 0.5) * 0.1
+            };
+            
+            smokeObj.isSmoke = true;
+            smoke.material.opacity = 0.7;
+            smoke.scale.set(1, 1, 1);
+            
+            explosion.particles.push(smokeObj);
+        }
+        
+        // Create debris pieces
+        for (let i = 0; i < debrisCount; i++) {
+            const debrisObj = this.getParticleFromPool('explosionDebris');
+            if (!debrisObj) continue;
+            
+            const debris = debrisObj.mesh;
+            debris.position.copy(position);
+            debris.position.y += 0.5;
+            
+            // Random velocity with more horizontal movement
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 0.6 + 0.3;
+            debrisObj.velocity = {
+                x: Math.cos(angle) * speed,
+                y: Math.random() * 0.7 + 0.5, // Higher initial upward velocity
+                z: Math.sin(angle) * speed
+            };
+            
+            // Add rotation to debris
+            debris.rotation.set(
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2,
+                Math.random() * Math.PI * 2
+            );
+            
+            debrisObj.rotationSpeed = {
+                x: (Math.random() - 0.5) * 0.3,
+                y: (Math.random() - 0.5) * 0.3,
+                z: (Math.random() - 0.5) * 0.3
+            };
+            
+            debris.material.opacity = 1;
+            
+            explosion.debris.push(debrisObj);
+        }
+        
+        // Add to active explosions
+        this.activeExplosions.push(explosion);
+        
+        // Apply camera shake based on explosion type and distance
+        const shakeIntensity = isLarge ? 0.4 : 0.2;
+        if (this.truck) {
+            const distanceToPlayer = position.distanceTo(this.truck.position);
+            if (distanceToPlayer < 30) {
+                const adjustedIntensity = shakeIntensity * (1 - (distanceToPlayer / 30));
+                this.shakeCamera(adjustedIntensity);
+            }
+        }
+        
+        // Apply area damage
+        if (isLarge) {
+            this.applyAreaDamage(position, 15, 50);
+        } else {
+            this.applyAreaDamage(position, 10, 30);
         }
     }
 }
