@@ -241,6 +241,11 @@ export class Weapon {
             this.updateTrails();
         }
         
+        // Update active muzzle flashes
+        if (this.activeFlashes && this.activeFlashes.length > 0) {
+            this.updateMuzzleFlashes();
+        }
+        
         return {
             ammo: this.ammo,
             maxAmmo: this.maxAmmo,
@@ -262,52 +267,206 @@ export class Weapon {
         this.isReloading = false;
     }
     
-    createMuzzleFlash(position, direction) {
-        // Create point light for flash
-        const flashLight = new THREE.PointLight(this.type.color, 2, 5);
-        flashLight.position.copy(position);
-        this.scene.add(flashLight);
+    // Initialize muzzle flash pool
+    initializeMuzzleFlashPool() {
+        if (this.muzzleFlashPool) return; // Already initialized
         
-        // Create flash geometry based on weapon type
-        let flashGeometry;
-        if (this.type === WeaponTypes.ROCKETS) {
-            flashGeometry = new THREE.ConeGeometry(0.5, 1, 8);
-        } else if (this.type === WeaponTypes.SHOTGUN) {
-            flashGeometry = new THREE.CylinderGeometry(0.3, 0.6, 0.5, 8);
-        } else {
-            flashGeometry = new THREE.PlaneGeometry(0.6, 0.6);
+        this.muzzleFlashPool = {
+            lights: [],
+            meshes: {
+                rocket: [],
+                shotgun: [],
+                machineGun: []
+            }
+        };
+        
+        this.activeFlashes = [];
+        
+        // Create lights
+        for (let i = 0; i < 20; i++) {
+            const light = new THREE.PointLight(0xffffff, 0, 5);
+            light.visible = false;
+            this.scene.add(light);
+            
+            this.muzzleFlashPool.lights.push({
+                light: light,
+                inUse: false
+            });
         }
         
-        const flashMaterial = new THREE.MeshBasicMaterial({
-            color: this.type.color,
-            transparent: true,
-            opacity: 1
-        });
+        // Create meshes for each weapon type
+        // Rocket flashes
+        for (let i = 0; i < 5; i++) {
+            const geometry = new THREE.ConeGeometry(0.5, 1, 8);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.visible = false;
+            this.scene.add(mesh);
+            
+            this.muzzleFlashPool.meshes.rocket.push({
+                mesh: mesh,
+                inUse: false
+            });
+        }
         
-        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
-        flash.position.copy(position);
-        flash.lookAt(
+        // Shotgun flashes
+        for (let i = 0; i < 5; i++) {
+            const geometry = new THREE.CylinderGeometry(0.3, 0.6, 0.5, 8);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.visible = false;
+            this.scene.add(mesh);
+            
+            this.muzzleFlashPool.meshes.shotgun.push({
+                mesh: mesh,
+                inUse: false
+            });
+        }
+        
+        // Machine gun flashes
+        for (let i = 0; i < 10; i++) {
+            const geometry = new THREE.PlaneGeometry(0.6, 0.6);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.visible = false;
+            this.scene.add(mesh);
+            
+            this.muzzleFlashPool.meshes.machineGun.push({
+                mesh: mesh,
+                inUse: false
+            });
+        }
+    }
+    
+    // Get flash light from pool
+    getFlashLightFromPool() {
+        if (!this.muzzleFlashPool) {
+            this.initializeMuzzleFlashPool();
+        }
+        
+        // Find first available light
+        for (let i = 0; i < this.muzzleFlashPool.lights.length; i++) {
+            if (!this.muzzleFlashPool.lights[i].inUse) {
+                this.muzzleFlashPool.lights[i].inUse = true;
+                this.muzzleFlashPool.lights[i].light.visible = true;
+                return this.muzzleFlashPool.lights[i];
+            }
+        }
+        
+        // If no lights available, reuse the first one
+        this.muzzleFlashPool.lights[0].light.visible = true;
+        return this.muzzleFlashPool.lights[0];
+    }
+    
+    // Get flash mesh from pool
+    getFlashMeshFromPool(weaponType) {
+        if (!this.muzzleFlashPool) {
+            this.initializeMuzzleFlashPool();
+        }
+        
+        let meshType = 'machineGun'; // Default
+        
+        if (weaponType === WeaponTypes.ROCKETS) {
+            meshType = 'rocket';
+        } else if (weaponType === WeaponTypes.SHOTGUN) {
+            meshType = 'shotgun';
+        }
+        
+        // Find first available mesh of the right type
+        const meshes = this.muzzleFlashPool.meshes[meshType];
+        for (let i = 0; i < meshes.length; i++) {
+            if (!meshes[i].inUse) {
+                meshes[i].inUse = true;
+                meshes[i].mesh.visible = true;
+                return meshes[i];
+            }
+        }
+        
+        // If no meshes available, reuse the first one
+        meshes[0].mesh.visible = true;
+        return meshes[0];
+    }
+    
+    // Update all active muzzle flashes
+    updateMuzzleFlashes() {
+        for (let i = this.activeFlashes.length - 1; i >= 0; i--) {
+            const flash = this.activeFlashes[i];
+            
+            // Update lifetime
+            flash.life--;
+            
+            if (flash.life <= 0) {
+                // Release back to pool
+                flash.lightObj.inUse = false;
+                flash.lightObj.light.visible = false;
+                flash.lightObj.light.intensity = 0;
+                
+                flash.meshObj.inUse = false;
+                flash.meshObj.mesh.visible = false;
+                flash.meshObj.mesh.material.opacity = 0;
+                
+                // Remove from active flashes
+                this.activeFlashes.splice(i, 1);
+                continue;
+            }
+            
+            // Update intensity and opacity
+            const progress = flash.life / flash.maxLife;
+            flash.lightObj.light.intensity = progress * 2;
+            flash.meshObj.mesh.material.opacity = progress;
+        }
+    }
+    
+    createMuzzleFlash(position, direction) {
+        // Initialize muzzle flash pool if needed
+        if (!this.muzzleFlashPool) {
+            this.initializeMuzzleFlashPool();
+        }
+        
+        // Get light from pool
+        const lightObj = this.getFlashLightFromPool();
+        lightObj.light.position.copy(position);
+        lightObj.light.color.set(this.type.color);
+        lightObj.light.intensity = 2;
+        
+        // Get mesh from pool
+        const meshObj = this.getFlashMeshFromPool(this.type);
+        meshObj.mesh.position.copy(position);
+        meshObj.mesh.material.color.set(this.type.color);
+        meshObj.mesh.material.opacity = 1;
+        
+        // Orient the flash
+        meshObj.mesh.lookAt(
             position.x + direction.x, 
             position.y + direction.y, 
             position.z + direction.z
         );
-        this.scene.add(flash);
         
-        // Fade out and remove
-        let flashLife = 5;
-        const fadeFlash = () => {
-            flashLife--;
-            if (flashLife > 0) {
-                flashLight.intensity = flashLife / 5 * 2;
-                flash.material.opacity = flashLife / 5;
-                requestAnimationFrame(fadeFlash);
-            } else {
-                this.scene.remove(flashLight);
-                this.scene.remove(flash);
-            }
+        // Create flash data
+        const flashData = {
+            lightObj: lightObj,
+            meshObj: meshObj,
+            life: 5,
+            maxLife: 5
         };
         
-        fadeFlash();
+        // Add to active flashes
+        this.activeFlashes.push(flashData);
     }
     
     // Initialize trail particle pool
