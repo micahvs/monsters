@@ -610,11 +610,12 @@
 
     <!-- Audio Element -->
     <audio id="backgroundMusic" preload="auto">
-        <source src="music/pattern_bar_live_part00.mp3" type="audio/mpeg">
+        <source src="/music/pattern_bar_live_part00.mp3" type="audio/mpeg">
     </audio>
 
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>
+    <script src="js/music-player.js"></script>
     <script>
         // Update debug info
         window.updateDebugInfo = function(position) {
@@ -632,129 +633,6 @@
             });
         });
         
-        // Audio controls - improved version with alphabetical sorting
-        document.addEventListener('DOMContentLoaded', function() {
-            const audioElement = document.getElementById('backgroundMusic');
-            const audioToggle = document.getElementById('audioToggle');
-            const playPauseButton = document.getElementById('playPauseButton');
-            const audioIcon = audioToggle.querySelector('i');
-            const playPauseIcon = playPauseButton.querySelector('i');
-            
-            // Music tracks in alphabetical order
-            const musicTracks = [
-                'music/fallback.mp3',
-                'music/pattern_bar_live_part00.mp3',
-                'music/pattern_bar_live_part01.mp3',
-                'music/pattern_bar_live_part02.mp3',
-                'music/pattern_bar_live_part03.mp3',
-                'music/pattern_bar_live_part04.mp3',
-                'music/pattern_bar_live_part05.mp3',
-                'music/pattern_bar_live_part06.mp3',
-                'music/pattern_bar_live_part07.mp3',
-                'music/pattern_bar_live_part08.mp3',
-                'music/pattern_bar_live_part09.mp3',
-                'music/pattern_bar_live_part10.mp3',
-                'music/pattern_bar_live_part11.mp3',
-                'music/pattern_bar_live_part12.mp3',
-                'music/pattern_bar_live_part13.mp3',
-                'music/pattern_bar_live_part14.mp3',
-                'music/pattern_bar_live_part15.mp3',
-                'music/pattern_bar_live_part16.mp3',
-                'music/pattern_bar_live_part17.mp3',
-                'music/pattern_bar_live_part18.mp3'
-            ].sort(); // Sort alphabetically
-            
-            let currentTrackIndex = 0;
-            let isPlaying = false;
-            
-            // Function to play the next track
-            function playNextTrack() {
-                currentTrackIndex = (currentTrackIndex + 1) % musicTracks.length;
-                const nextFile = musicTracks[currentTrackIndex];
-                console.log(`Loading next track: ${nextFile}`);
-                
-                audioElement.src = nextFile;
-                audioElement.load();
-                
-                if (isPlaying) {
-                    audioElement.play().catch(error => {
-                        console.error(`Error playing next track: ${error.message}`);
-                    });
-                }
-            }
-            
-            // Set initial track
-            audioElement.src = musicTracks[0];
-            
-            // When one track ends, play the next one
-            audioElement.addEventListener('ended', function() {
-                console.log('Audio ended, playing next track');
-                playNextTrack();
-            });
-            
-            // Check if audio was previously muted
-            const audioMuted = localStorage.getItem('monsterTruckAudioMuted') === 'true';
-            
-            // Set initial state
-            audioElement.muted = audioMuted;
-            if (audioMuted) {
-                audioToggle.classList.add('muted');
-                audioIcon.className = 'fas fa-volume-mute';
-            } else {
-                audioToggle.classList.remove('muted');
-                audioIcon.className = 'fas fa-volume-up';
-            }
-            
-            // Toggle audio on button click
-            audioToggle.addEventListener('click', function() {
-                if (audioElement.muted) {
-                    audioElement.muted = false;
-                    audioToggle.classList.remove('muted');
-                    audioIcon.className = 'fas fa-volume-up';
-                    localStorage.setItem('monsterTruckAudioMuted', 'false');
-                } else {
-                    audioElement.muted = true;
-                    audioToggle.classList.add('muted');
-                    audioIcon.className = 'fas fa-volume-mute';
-                    localStorage.setItem('monsterTruckAudioMuted', 'true');
-                }
-            });
-            
-            // Play/Pause button functionality
-            playPauseButton.addEventListener('click', function() {
-                if (isPlaying) {
-                    audioElement.pause();
-                    isPlaying = false;
-                    playPauseIcon.className = 'fas fa-play';
-                } else {
-                    audioElement.play().catch(e => {
-                        console.error('Cannot play audio:', e);
-                        alert('Click again to enable audio. Your browser may be blocking autoplay.');
-                    });
-                    isPlaying = true;
-                    playPauseIcon.className = 'fas fa-pause';
-                }
-            });
-            
-            // Update play/pause button when audio plays or pauses
-            audioElement.addEventListener('play', function() {
-                isPlaying = true;
-                playPauseIcon.className = 'fas fa-pause';
-            });
-            
-            audioElement.addEventListener('pause', function() {
-                isPlaying = false;
-                playPauseIcon.className = 'fas fa-play';
-            });
-            
-            // Handle audio errors
-            audioElement.addEventListener('error', function(e) {
-                console.error('Audio error:', e);
-                // Try the next track if this one fails
-                playNextTrack();
-            });
-        });
-
         // Chat functionality
         document.addEventListener('DOMContentLoaded', function() {
             const chatInput = document.getElementById('chatInput');
