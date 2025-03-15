@@ -3539,6 +3539,15 @@ class Game {
             // Direct initialization
             this.multiplayer = new Multiplayer(this);
             console.log('Multiplayer initialized');
+            
+            // Set player name and color for chat
+            this.playerName = localStorage.getItem('monsterTruckNickname') || 'Player';
+            this.playerColor = localStorage.getItem('monsterTruckColor') || '#ff00ff';
+            
+            // Initialize chat socket listeners if the function exists
+            if (typeof window.initChatSocketListeners === 'function') {
+                window.initChatSocketListeners();
+            }
         } catch (error) {
             console.error('Failed to initialize multiplayer:', error);
             this.showMessage('Multiplayer initialization failed - playing in single player mode');

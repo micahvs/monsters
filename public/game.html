@@ -759,10 +759,13 @@
                     
                     // Send message to server if multiplayer is enabled
                     if (window.gameInstance && window.gameInstance.multiplayer && window.gameInstance.multiplayer.socket) {
-                        window.gameInstance.multiplayer.socket.emit('chat', {
+                        const chatData = {
                             message: message,
                             nickname: window.gameInstance.playerName || 'Player'
-                        });
+                        };
+                        
+                        console.log('Sending chat message:', chatData);
+                        window.gameInstance.multiplayer.socket.emit('chat', chatData);
                     }
                     
                     // Clear input
@@ -770,21 +773,32 @@
                 }
             }
             
-            // Listen for chat messages from server
-            if (window.gameInstance && window.gameInstance.multiplayer && window.gameInstance.multiplayer.socket) {
-                window.gameInstance.multiplayer.socket.on('chat', function(chatData) {
-                    // Only handle messages from other players (our own messages are handled when sent)
-                    if (chatData.playerId !== window.gameInstance.multiplayer.localPlayerId) {
-                        addChatMessage(chatData.nickname, chatData.message);
-                    }
-                });
-            }
-            
             // Add a welcome message
             addChatMessage('System', 'Welcome to Monster Truck Stadium Chat!');
             
             // Expose the addChatMessage function globally so it can be called from the game
             window.addChatMessage = addChatMessage;
+            
+            // Set up a function to initialize chat socket listeners after game is loaded
+            window.initChatSocketListeners = function() {
+                if (window.gameInstance && window.gameInstance.multiplayer && window.gameInstance.multiplayer.socket) {
+                    console.log('Setting up chat socket listeners');
+                    
+                    // Remove any existing listeners to prevent duplicates
+                    window.gameInstance.multiplayer.socket.off('chat');
+                    
+                    // Listen for chat messages from server
+                    window.gameInstance.multiplayer.socket.on('chat', function(chatData) {
+                        console.log('Received chat message:', chatData);
+                        // Only handle messages from other players (our own messages are handled when sent)
+                        if (chatData.playerId !== window.gameInstance.multiplayer.localPlayerId) {
+                            addChatMessage(chatData.nickname, chatData.message);
+                        }
+                    });
+                } else {
+                    console.warn('Game instance or multiplayer not available for chat initialization');
+                }
+            };
         });
         
         // Update health and ammo bars

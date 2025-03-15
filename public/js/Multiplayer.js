@@ -46,6 +46,9 @@ export default class Multiplayer {
             // Set up all event handlers
             this.setupSocketEvents();
             
+            // Start sending updates and listening for chat toggle
+            this.startUpdates();
+            
         } catch (error) {
             console.log('Socket initialization error:', error);
             if (this.game && this.game.showMessage) {
