@@ -236,6 +236,11 @@ export class Weapon {
             }
         }
         
+        // Update active trails
+        if (this.activeTrails && this.activeTrails.length > 0) {
+            this.updateTrails();
+        }
+        
         return {
             ammo: this.ammo,
             maxAmmo: this.maxAmmo,
@@ -305,59 +310,159 @@ export class Weapon {
         fadeFlash();
     }
     
+    // Initialize trail particle pool
+    initializeTrailPool() {
+        if (this.trailPool) return; // Already initialized
+        
+        this.trailPool = [];
+        this.activeTrails = [];
+        
+        // Create small trail particles for regular weapons
+        for (let i = 0; i < 100; i++) {
+            // Regular weapon trails (smaller)
+            const trailGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+            const trailMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff, // Will be set to weapon color when used
+                transparent: true,
+                opacity: 0
+            });
+            
+            const trail = new THREE.Mesh(trailGeometry, trailMaterial);
+            trail.visible = false;
+            this.scene.add(trail);
+            
+            this.trailPool.push({
+                mesh: trail,
+                inUse: false,
+                type: 'regular'
+            });
+            
+            // Rocket trails (larger)
+            if (i < 50) {
+                const rocketTrailGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+                const rocketTrailMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0
+                });
+                
+                const rocketTrail = new THREE.Mesh(rocketTrailGeometry, rocketTrailMaterial);
+                rocketTrail.visible = false;
+                this.scene.add(rocketTrail);
+                
+                this.trailPool.push({
+                    mesh: rocketTrail,
+                    inUse: false,
+                    type: 'rocket'
+                });
+            }
+        }
+    }
+    
+    // Get trail from pool
+    getTrailFromPool(isRocket) {
+        if (!this.trailPool) {
+            this.initializeTrailPool();
+        }
+        
+        const trailType = isRocket ? 'rocket' : 'regular';
+        
+        // Find first available trail of the right type
+        for (let i = 0; i < this.trailPool.length; i++) {
+            if (!this.trailPool[i].inUse && this.trailPool[i].type === trailType) {
+                this.trailPool[i].inUse = true;
+                this.trailPool[i].mesh.visible = true;
+                return this.trailPool[i];
+            }
+        }
+        
+        // If no trails available, reuse the oldest one of the right type
+        for (let i = 0; i < this.trailPool.length; i++) {
+            if (this.trailPool[i].type === trailType) {
+                this.trailPool[i].mesh.visible = true;
+                return this.trailPool[i];
+            }
+        }
+        
+        // Fallback to any available trail
+        return this.trailPool[0];
+    }
+    
+    // Update all active trails
+    updateTrails() {
+        for (let i = this.activeTrails.length - 1; i >= 0; i--) {
+            const trail = this.activeTrails[i];
+            
+            // Update lifetime
+            trail.life--;
+            
+            if (trail.life <= 0) {
+                // Release back to pool
+                trail.trailObj.inUse = false;
+                trail.trailObj.mesh.visible = false;
+                trail.trailObj.mesh.material.opacity = 0;
+                
+                // Remove from active trails
+                this.activeTrails.splice(i, 1);
+                continue;
+            }
+            
+            // Update position for rocket trails to create smoke effect
+            if (trail.velocity) {
+                trail.trailObj.mesh.position.x += trail.velocity.x;
+                trail.trailObj.mesh.position.y += trail.velocity.y;
+                trail.trailObj.mesh.position.z += trail.velocity.z;
+            }
+            
+            // Update opacity
+            const progress = 1 - (trail.life / trail.maxLife);
+            trail.trailObj.mesh.material.opacity = (1 - progress) * 0.7;
+            
+            // Shrink trail over time
+            trail.trailObj.mesh.scale.multiplyScalar(0.95);
+        }
+    }
+    
     createProjectileTrail(projectile) {
         // Skip trail for mines
         if (projectile.type === WeaponTypes.MINES) return;
         
-        // Create small trail particles
-        const trailGeometry = new THREE.SphereGeometry(
-            projectile.type === WeaponTypes.ROCKETS ? 0.2 : 0.05, 
-            8, 
-            8
-        );
+        // Initialize trail pool if needed
+        if (!this.trailPool) {
+            this.initializeTrailPool();
+        }
         
-        const trailMaterial = new THREE.MeshBasicMaterial({
-            color: projectile.type.color,
-            transparent: true,
-            opacity: 0.7
-        });
+        // Get trail from pool
+        const isRocket = projectile.type === WeaponTypes.ROCKETS;
+        const trailObj = this.getTrailFromPool(isRocket);
         
-        const trail = new THREE.Mesh(trailGeometry, trailMaterial);
+        // Set trail properties
+        const trail = trailObj.mesh;
         trail.position.copy(projectile.mesh.position);
-        this.scene.add(trail);
+        trail.material.color.set(projectile.type.color);
+        trail.material.opacity = 0.7;
+        trail.scale.set(1, 1, 1);
+        
+        // Create trail data
+        const trailData = {
+            trailObj: trailObj,
+            life: isRocket ? 20 : 10,
+            maxLife: isRocket ? 20 : 10,
+            velocity: null
+        };
         
         // Add velocity for rocket trails
-        let velocity = null;
-        if (projectile.type === WeaponTypes.ROCKETS) {
+        if (isRocket) {
             const angle = Math.random() * Math.PI * 2;
-            velocity = {
+            trailData.velocity = {
                 x: Math.cos(angle) * 0.05,
                 y: Math.random() * 0.05,
                 z: Math.sin(angle) * 0.05
             };
         }
         
-        // Fade out and remove
-        let trailLife = projectile.type === WeaponTypes.ROCKETS ? 20 : 10;
-        const fadeTrail = () => {
-            trailLife--;
-            if (trailLife > 0) {
-                // Update position for rocket trails to create smoke effect
-                if (velocity) {
-                    trail.position.x += velocity.x;
-                    trail.position.y += velocity.y;
-                    trail.position.z += velocity.z;
-                }
-                
-                trail.material.opacity = trailLife / (projectile.type === WeaponTypes.ROCKETS ? 20 : 10) * 0.7;
-                trail.scale.multiplyScalar(0.95);
-                requestAnimationFrame(fadeTrail);
-            } else {
-                this.scene.remove(trail);
-            }
-        };
-        
-        fadeTrail();
+        // Add to active trails
+        this.activeTrails.push(trailData);
     }
     
     addMinePulse(projectile) {
