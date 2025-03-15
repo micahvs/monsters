@@ -754,8 +754,9 @@
             function sendChatMessage() {
                 const message = chatInput.value.trim();
                 if (message) {
-                    // Add message to local chat
-                    addChatMessage('You', message);
+                    // Don't add message to local chat immediately
+                    // We'll wait for the server to echo it back
+                    console.log('Sending chat message, waiting for server echo:', message);
                     
                     // Check if multiplayer is initialized using the global flag
                     if (window.isMultiplayerInitialized && window.gameInstance && window.gameInstance.multiplayer && window.gameInstance.multiplayer.socket) {
@@ -775,6 +776,9 @@
                     } else {
                         console.error('Cannot send chat message: multiplayer not initialized');
                         addChatMessage('System', 'Error: Multiplayer not initialized. Message not sent.');
+                        
+                        // In single player mode, just show the message locally
+                        addChatMessage('You', message);
                         
                         // Check specific conditions to provide better error messages
                         if (!window.gameInstance) {
@@ -838,11 +842,9 @@
                         return;
                     }
                     
-                    // Handle all messages, including our own
-                    addChatMessage(
-                        chatData.playerId === window.gameInstance.multiplayer.localPlayerId ? 'You' : chatData.nickname, 
-                        chatData.message
-                    );
+                    // Display the message - the server will echo back our own messages
+                    const sender = chatData.playerId === window.gameInstance.multiplayer.localPlayerId ? 'You' : chatData.nickname;
+                    addChatMessage(sender, chatData.message);
                 });
                 
                 // Verify socket connection

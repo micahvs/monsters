@@ -182,30 +182,24 @@ io.on('connection', (socket) => {
   });
 
   // Handle chat messages
-  socket.on('chat', (data) => {
-    console.log('Received chat message from client:', socket.id, data);
-    const player = gameState.players[socket.id];
-    if (player) {
-      const chatMessage = {
-        playerId: socket.id,
-        nickname: data.nickname || player.nickname,
-        message: data.message,
-        timestamp: Date.now()
-      };
-      console.log('Broadcasting chat message to ALL clients:', chatMessage);
-      // Use io.emit to send to ALL clients including the sender in one operation
-      io.emit('chat', chatMessage);
-    } else {
-      console.error('Player not found in gameState for chat message:', socket.id);
-      // Still try to broadcast the message even if player not found
-      const chatMessage = {
-        playerId: socket.id,
-        nickname: data.nickname || 'Unknown Player',
-        message: data.message,
-        timestamp: Date.now()
-      };
-      io.emit('chat', chatMessage);
+  socket.on('chat', (chatData) => {
+    console.log(`Chat message from ${socket.id} (${chatData.nickname}): ${chatData.message}`);
+    
+    // Validate chat data
+    if (!chatData || !chatData.message || !chatData.nickname) {
+      console.error('Invalid chat data received:', chatData);
+      return;
     }
+    
+    // Add player ID and timestamp to the message
+    const enhancedChatData = {
+      ...chatData,
+      playerId: socket.id,
+      timestamp: Date.now()
+    };
+    
+    // Broadcast to all clients (including sender)
+    io.emit('chat', enhancedChatData);
   });
 });
 
