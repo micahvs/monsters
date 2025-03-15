@@ -14,9 +14,14 @@ export default class Multiplayer {
         this.chatMessages = [];
         this.isChatVisible = false;
         this.updateRate = 50; // ms between updates
+        this.radarBlips = new Map(); // Store radar blips for each player
+        this.radarRange = 200; // Radar range in game units
         
         // Initialize chat UI
         this.initChatUI();
+        
+        // Initialize radar UI
+        this.initRadarUI();
         
         // Bind methods
         this.setupSocketEvents = this.setupSocketEvents.bind(this);
@@ -234,7 +239,7 @@ export default class Multiplayer {
         });
         
         // When receiving a chat message
-        this.socket.on('chatMessage', (chatData) => {
+        this.socket.on('chat', (chatData) => {
             this.receiveChatMessage(chatData);
         });
     }
@@ -353,11 +358,13 @@ export default class Multiplayer {
     }
     
     sendChatMessage(message) {
-        if (!this.isConnected || !this.socket) return;
+        if (!message || !this.socket) return;
         
-        if (message.trim().length > 0) {
-            this.socket.emit('chatMessage', message);
-        }
+        // Send message to server
+        this.socket.emit('chat', {
+            message: message,
+            nickname: this.game.playerName || 'Player'
+        });
     }
     
     // REMOTE PLAYER MANAGEMENT
@@ -623,6 +630,13 @@ export default class Multiplayer {
     // CHAT SYSTEM
     
     initChatUI() {
+        // Check if game.html chat UI exists
+        if (document.getElementById('chat-container')) {
+            console.log('Using existing chat UI from game.html');
+            this.chatMessages = document.getElementById('chat-messages');
+            return;
+        }
+        
         // Create chat container
         const chatContainer = document.createElement('div');
         chatContainer.id = 'chatContainer';
@@ -630,35 +644,36 @@ export default class Multiplayer {
             position: fixed;
             bottom: 20px;
             left: 20px;
-            width: 300px;
-            height: 200px;
-            background-color: rgba(0, 0, 0, 0.7);
-            border: 2px solid #ff00ff;
-            box-shadow: 0 0 10px #ff00ff;
-            display: flex;
-            flex-direction: column;
+            width: 280px;
+            background: rgba(0, 0, 0, 0.7);
+            border-left: 3px solid #ff00ff;
             display: none;
-            z-index: 1000;
+            flex-direction: column;
+            max-height: 200px;
+            overflow: hidden;
+            z-index: 100;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
         `;
         
         // Create chat messages area
         const chatMessages = document.createElement('div');
         chatMessages.id = 'chatMessages';
         chatMessages.style.cssText = `
-            flex: 1;
             overflow-y: auto;
-            padding: 10px;
-            color: white;
+            max-height: 150px;
+            padding: 12px;
+            color: #fff;
+            font-size: 14px;
             font-family: 'Orbitron', sans-serif;
-            font-size: 12px;
         `;
         
         // Create chat input area
         const chatInputContainer = document.createElement('div');
         chatInputContainer.style.cssText = `
             display: flex;
-            padding: 5px;
+            padding: 8px;
             border-top: 1px solid #ff00ff;
+            background: rgba(0, 0, 0, 0.5);
         `;
         
         const chatInput = document.createElement('input');
@@ -667,14 +682,14 @@ export default class Multiplayer {
         chatInput.placeholder = 'Type message and press Enter';
         chatInput.style.cssText = `
             flex: 1;
-            background-color: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.5);
             border: 1px solid #ff00ff;
-            color: white;
-            padding: 5px;
+            color: #fff;
+            padding: 8px;
+            font-size: 14px;
             font-family: 'Orbitron', sans-serif;
         `;
         
-        // Add event listener for Enter key
         chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 const message = chatInput.value.trim();
@@ -700,6 +715,32 @@ export default class Multiplayer {
     }
     
     toggleChat() {
+        // If using game.html chat UI
+        const gameChatContainer = document.getElementById('chat-container');
+        if (gameChatContainer) {
+            this.isChatVisible = !this.isChatVisible;
+            
+            // Toggle visibility
+            if (this.isChatVisible) {
+                gameChatContainer.style.display = 'flex';
+                document.getElementById('chatInput').focus();
+                
+                // Disable game controls temporarily
+                if (this.game.controls) {
+                    this.game.controls.enabled = false;
+                }
+            } else {
+                gameChatContainer.style.display = 'none';
+                
+                // Re-enable game controls
+                if (this.game.controls) {
+                    this.game.controls.enabled = true;
+                }
+            }
+            return;
+        }
+        
+        // If using our own chat UI
         if (!this.chatContainer) return;
         
         this.isChatVisible = !this.isChatVisible;
@@ -708,17 +749,14 @@ export default class Multiplayer {
         if (this.isChatVisible) {
             this.chatInput.focus();
             
-            // Temporarily disable game controls
-            if (this.game.keys) {
-                this.previousKeyState = { ...this.game.keys };
-                Object.keys(this.game.keys).forEach(key => {
-                    this.game.keys[key] = false;
-                });
+            // Disable game controls temporarily
+            if (this.game.controls) {
+                this.game.controls.enabled = false;
             }
         } else {
             // Re-enable game controls
-            if (this.previousKeyState) {
-                this.game.keys = { ...this.previousKeyState };
+            if (this.game.controls) {
+                this.game.controls.enabled = true;
             }
         }
     }
@@ -729,29 +767,33 @@ export default class Multiplayer {
         // Add message to chat history
         this.chatMessages.push(chatData);
         
+        // If we have the global chat function from game.html, use it
+        if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+            const sender = chatData.playerId === this.localPlayerId ? 'You' : chatData.nickname;
+            window.addChatMessage(sender, chatData.message);
+            return;
+        }
+        
+        // Otherwise use our own chat UI
         // Create message element
         const messageElement = document.createElement('div');
-        messageElement.style.cssText = `
-            margin-bottom: 5px;
-            word-wrap: break-word;
-        `;
+        messageElement.style.marginBottom = '5px';
         
         // Format timestamp
         const timestamp = new Date(chatData.timestamp).toLocaleTimeString();
         
-        // Get player color
-        let playerColor = '#ffffff';
+        // Determine player color
+        let playerColor = '#ff00ff'; // Default color
         if (chatData.playerId === this.localPlayerId) {
-            playerColor = '#00ffff'; // Local player messages
+            playerColor = this.game.playerColor || '#ff00ff';
         } else if (this.players.has(chatData.playerId)) {
             playerColor = this.players.get(chatData.playerId).color;
         }
         
-        // Set message HTML
+        // Format message with timestamp, nickname, and message
         messageElement.innerHTML = `
-            <span style="color: ${playerColor}; font-weight: bold;">${chatData.nickname}</span>
-            <span style="color: #888888; font-size: 10px;"> ${timestamp}</span>
-            <br>
+            <span style="color: #888;">[${timestamp}]</span> 
+            <span style="color: ${playerColor}; font-weight: bold;">${chatData.nickname}</span>: 
             <span>${this.escapeHTML(chatData.message)}</span>
         `;
         
@@ -1055,8 +1097,8 @@ export default class Multiplayer {
     }
     
     update() {
-        // Update remote player positions with interpolation
         this.updatePlayerPositions();
+        this.updateRadar();
     }
     
     checkProjectileHits(projectile) {
@@ -1138,5 +1180,150 @@ export default class Multiplayer {
         if (this.chatContainer) {
             this.chatContainer.remove();
         }
+        
+        // Clean up radar blips
+        this.radarBlips.forEach(blip => blip.remove());
+        this.radarBlips.clear();
+    }
+    
+    // Initialize radar UI
+    initRadarUI() {
+        this.radarContainer = document.getElementById('radar-container');
+        this.radar = document.getElementById('radar');
+        this.radarPlayer = document.getElementById('radar-player');
+        
+        if (!this.radarContainer || !this.radar || !this.radarPlayer) {
+            console.error('Radar UI elements not found');
+            return;
+        }
+        
+        // Set radar styles
+        this.radar.style.position = 'relative';
+        this.radar.style.borderRadius = '50%';
+        this.radar.style.border = '2px solid rgba(255, 0, 255, 0.5)';
+        
+        // Add radar grid lines
+        const gridLine1 = document.createElement('div');
+        gridLine1.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: rgba(255, 0, 255, 0.3);
+            transform: translateY(-50%);
+        `;
+        
+        const gridLine2 = document.createElement('div');
+        gridLine2.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 1px;
+            height: 100%;
+            background: rgba(255, 0, 255, 0.3);
+            transform: translateX(-50%);
+        `;
+        
+        const gridCircle = document.createElement('div');
+        gridCircle.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50%;
+            height: 50%;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 0, 255, 0.3);
+            transform: translate(-50%, -50%);
+        `;
+        
+        this.radar.appendChild(gridLine1);
+        this.radar.appendChild(gridLine2);
+        this.radar.appendChild(gridCircle);
+    }
+    
+    // Update radar with player positions
+    updateRadar() {
+        if (!this.radar || !this.game.truck) return;
+        
+        const localPlayerPos = this.game.truck.position;
+        const localPlayerRotation = this.game.truck.rotation.y;
+        
+        // Update each remote player on radar
+        this.players.forEach((player, playerId) => {
+            if (playerId === this.localPlayerId) return;
+            
+            // Get or create blip for this player
+            let blip = this.radarBlips.get(playerId);
+            if (!blip) {
+                blip = document.createElement('div');
+                blip.className = 'radar-blip';
+                blip.style.cssText = `
+                    position: absolute;
+                    width: 6px;
+                    height: 6px;
+                    background-color: ${player.color || '#00ffff'};
+                    border-radius: 50%;
+                    box-shadow: 0 0 5px ${player.color || '#00ffff'};
+                    transform: translate(-50%, -50%);
+                    pointer-events: none;
+                    z-index: 2;
+                `;
+                this.radar.appendChild(blip);
+                this.radarBlips.set(playerId, blip);
+            }
+            
+            // Calculate relative position (accounting for player rotation)
+            const dx = player.truckMesh.position.x - localPlayerPos.x;
+            const dz = player.truckMesh.position.z - localPlayerPos.z;
+            
+            // Rotate coordinates based on player's facing direction
+            const rotatedX = dx * Math.cos(-localPlayerRotation) - dz * Math.sin(-localPlayerRotation);
+            const rotatedZ = dx * Math.sin(-localPlayerRotation) + dz * Math.cos(-localPlayerRotation);
+            
+            // Scale to radar size
+            const radarRadius = this.radar.clientWidth / 2;
+            const radarX = (rotatedX / this.radarRange) * radarRadius;
+            const radarZ = (rotatedZ / this.radarRange) * radarRadius;
+            
+            // Calculate distance for scaling blip size (closer = larger)
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            const isInRange = distance <= this.radarRange;
+            
+            // Position blip on radar (center is 50%, 50%)
+            if (isInRange) {
+                blip.style.display = 'block';
+                blip.style.left = `${50 + radarX / radarRadius * 100}%`;
+                blip.style.top = `${50 + radarZ / radarRadius * 100}%`;
+                
+                // Scale blip size based on distance (closer = larger)
+                const scaleFactor = Math.max(0.6, 1 - (distance / this.radarRange));
+                blip.style.transform = `translate(-50%, -50%) scale(${scaleFactor})`;
+                
+                // Add player name tooltip
+                blip.title = player.nickname;
+            } else {
+                // If player is out of radar range, position at edge of radar in correct direction
+                const angle = Math.atan2(rotatedZ, rotatedX);
+                const edgeX = Math.cos(angle) * radarRadius;
+                const edgeZ = Math.sin(angle) * radarRadius;
+                
+                blip.style.display = 'block';
+                blip.style.left = `${50 + edgeX / radarRadius * 100}%`;
+                blip.style.top = `${50 + edgeZ / radarRadius * 100}%`;
+                blip.style.transform = 'translate(-50%, -50%) scale(0.6)';
+                
+                // Add distance to tooltip
+                blip.title = `${player.nickname} (${Math.round(distance)}m)`;
+            }
+        });
+        
+        // Remove blips for players who have left
+        this.radarBlips.forEach((blip, playerId) => {
+            if (!this.players.has(playerId)) {
+                blip.remove();
+                this.radarBlips.delete(playerId);
+            }
+        });
     }
 }

@@ -182,13 +182,13 @@ io.on('connection', (socket) => {
   });
 
   // Handle chat messages
-  socket.on('chatMessage', (message) => {
+  socket.on('chat', (data) => {
     const player = gameState.players[socket.id];
     if (player) {
-      io.emit('chatMessage', {
+      io.emit('chat', {
         playerId: socket.id,
-        nickname: player.nickname,
-        message: message,
+        nickname: data.nickname || player.nickname,
+        message: data.message,
         timestamp: Date.now()
       });
     }

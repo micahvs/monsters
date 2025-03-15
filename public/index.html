@@ -287,6 +287,42 @@
         .slider.round:before {
             border-radius: 50%;
         }
+        
+        /* Add ON/OFF labels to the toggle */
+        .slider:after {
+            position: absolute;
+            content: "OFF";
+            color: #ff00ff;
+            font-size: 12px;
+            font-weight: bold;
+            right: 8px;
+            top: 8px;
+            transition: .4s;
+        }
+        
+        input:checked + .slider:after {
+            content: "ON";
+            left: 8px;
+            right: auto;
+        }
+        
+        /* Multiplayer status indicator */
+        .multiplayer-status {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .status-on {
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+        }
+        
+        .status-off {
+            color: #ff5555;
+            text-shadow: 0 0 5px #ff5555;
+        }
     </style>
 </head>
 <body>
@@ -385,6 +421,7 @@
                         <input type="checkbox" id="multiplayer" checked>
                         <span class="slider round"></span>
                     </label>
+                    <span class="multiplayer-status status-on">ONLINE</span>
                 </div>
             </div>
 
@@ -616,12 +653,31 @@
             
             // Set initial multiplayer toggle state from localStorage
             const multiplayerToggle = document.getElementById('multiplayer');
+            const multiplayerStatus = document.querySelector('.multiplayer-status');
             const savedMultiplayerState = localStorage.getItem('monsterTruckMultiplayer');
             multiplayerToggle.checked = savedMultiplayerState === null ? true : savedMultiplayerState === 'true';
+            
+            // Update status indicator based on initial state
+            if (multiplayerToggle.checked) {
+                multiplayerStatus.textContent = 'ONLINE';
+                multiplayerStatus.className = 'multiplayer-status status-on';
+            } else {
+                multiplayerStatus.textContent = 'OFFLINE';
+                multiplayerStatus.className = 'multiplayer-status status-off';
+            }
             
             // Update multiplayer state when toggle changes
             multiplayerToggle.addEventListener('change', function() {
                 localStorage.setItem('monsterTruckMultiplayer', this.checked);
+                
+                // Update status indicator
+                if (this.checked) {
+                    multiplayerStatus.textContent = 'ONLINE';
+                    multiplayerStatus.className = 'multiplayer-status status-on';
+                } else {
+                    multiplayerStatus.textContent = 'OFFLINE';
+                    multiplayerStatus.className = 'multiplayer-status status-off';
+                }
             });
             
             // Handle the Enter the Arena button click
