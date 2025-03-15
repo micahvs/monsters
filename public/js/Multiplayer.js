@@ -34,6 +34,8 @@ export default class Multiplayer {
     
     connect() {
         try {
+            console.log('Connecting to multiplayer server...');
+            
             // Initialize socket without Promise
             this.socket = io('https://monster-truck-game-server.fly.dev', {
                 withCredentials: true,
@@ -51,8 +53,12 @@ export default class Multiplayer {
             
         } catch (error) {
             console.log('Socket initialization error:', error);
+            window.isMultiplayerInitialized = false;
             if (this.game && this.game.showMessage) {
                 this.game.showMessage('Multiplayer initialization failed - playing in single player mode');
+            }
+            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                window.addChatMessage('System', 'Error: Multiplayer initialization failed. Chat will not work.');
             }
         }
     }
@@ -66,18 +72,35 @@ export default class Multiplayer {
             this.isConnected = true;
             this.localPlayerId = this.socket.id;
             
+            // Set global multiplayer initialization status
+            window.isMultiplayerInitialized = true;
+            
             // Send initial player data
             this.sendPlayerInfo();
             
             // Show connected message
             this.showNotification(`Connected to multiplayer server`);
+            
+            // Notify chat system
+            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                window.addChatMessage('System', 'Connected to multiplayer server!');
+            }
         });
         
         // When disconnected from the server
         this.socket.on('disconnect', () => {
             console.log('Disconnected from multiplayer server');
             this.isConnected = false;
+            
+            // Update global multiplayer initialization status
+            window.isMultiplayerInitialized = false;
+            
             this.showNotification('Disconnected from server', 'error');
+            
+            // Notify chat system
+            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                window.addChatMessage('System', 'Disconnected from multiplayer server. Chat will not work until reconnected.');
+            }
         });
         
         // When a connection error occurs

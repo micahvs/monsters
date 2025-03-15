@@ -373,6 +373,10 @@ class Game {
         console.log("Initializing game");
         
         try {
+            // Set global game instance reference
+            window.gameInstance = this;
+            console.log("Game instance set globally");
+            
             // Create scene
             this.scene = new THREE.Scene();
             this.scene.background = new THREE.Color(0x120023);
@@ -3530,8 +3534,15 @@ class Game {
     
     // Initialize multiplayer functionality
     initMultiplayer() {
+        // Set global multiplayer status flag
+        window.isMultiplayerInitialized = false;
+        
         if (!this.isMultiplayerEnabled) {
             console.log('Multiplayer disabled - running in single player mode');
+            // Notify chat system that multiplayer is disabled
+            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                window.addChatMessage('System', 'Multiplayer disabled - running in single player mode');
+            }
             return;
         }
 
@@ -3550,21 +3561,38 @@ class Game {
             // Verify socket connection
             if (!this.multiplayer.socket) {
                 console.error('Socket not initialized in multiplayer instance');
+                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                    window.addChatMessage('System', 'Error: Socket not initialized. Chat may not work properly.');
+                }
             } else if (!this.multiplayer.socket.connected) {
                 console.warn('Socket not connected yet - waiting for connection');
+                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                    window.addChatMessage('System', 'Connecting to multiplayer server...');
+                }
                 
                 // Add a connection event listener to initialize chat when connected
                 this.multiplayer.socket.on('connect', () => {
                     console.log('Socket connected - initializing chat listeners');
+                    window.isMultiplayerInitialized = true;
+                    if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                        window.addChatMessage('System', 'Connected to multiplayer server!');
+                    }
                     this.initChatListeners();
                 });
             } else {
                 console.log('Socket already connected - initializing chat listeners');
+                window.isMultiplayerInitialized = true;
+                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                    window.addChatMessage('System', 'Connected to multiplayer server!');
+                }
                 this.initChatListeners();
             }
         } catch (error) {
             console.error('Failed to initialize multiplayer:', error);
             this.showMessage('Multiplayer initialization failed - playing in single player mode');
+            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                window.addChatMessage('System', 'Error: Multiplayer initialization failed. Chat will not work.');
+            }
         }
     }
     
