@@ -43,33 +43,9 @@ export default class Multiplayer {
                 reconnectionAttempts: 5
             });
 
-            // Set up event handlers
-            this.socket.on('connect', () => {
-                console.log('Connected to game server');
-                this.isConnected = true;
-                this.localPlayerId = this.socket.id;
-                this.sendPlayerInfo();
-            });
-
-            this.socket.on('connect_error', (error) => {
-                console.log('Connection error:', error);
-                console.log('Connection error details:', error);
-                if (this.game && this.game.showMessage) {
-                    this.game.showMessage('Multiplayer connection failed - playing in single player mode');
-                }
-            });
-
-            this.socket.on('player_joined', (data) => {
-                this.handlePlayerJoined(data);
-            });
-
-            this.socket.on('player_left', (data) => {
-                this.handlePlayerLeft(data);
-            });
-
-            this.socket.on('player_update', (data) => {
-                this.handlePlayerUpdate(data);
-            });
+            // Set up all event handlers
+            this.setupSocketEvents();
+            
         } catch (error) {
             console.log('Socket initialization error:', error);
             if (this.game && this.game.showMessage) {
@@ -88,7 +64,7 @@ export default class Multiplayer {
             this.localPlayerId = this.socket.id;
             
             // Send initial player data
-            this.sendPlayerJoin();
+            this.sendPlayerInfo();
             
             // Show connected message
             this.showNotification(`Connected to multiplayer server`);
