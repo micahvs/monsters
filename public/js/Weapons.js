@@ -388,6 +388,15 @@ export class Weapon {
     }
     
     createExplosion(position, type) {
+        // Use the game's enhanced explosion effect if available
+        if (window.game && typeof window.game.createExplosion === 'function') {
+            // Determine explosion type based on weapon
+            const explosionType = type.name === "Rockets" ? 'standard' : 'large';
+            window.game.createExplosion(position, explosionType);
+            return;
+        }
+        
+        // Fallback implementation if game's explosion effect is not available
         // Explosion size based on weapon type
         const size = type.name === "Rockets" ? 1.5 : 2.0; // Mines have bigger explosions
         
@@ -435,7 +444,6 @@ export class Weapon {
             if (explosionLife > 0) {
                 // Update light
                 explosionLight.intensity = explosionLife / 20;
-                explosionLight.distance = (1 - explosionLife / 60) * size * 15 + size * 5;
                 
                 // Update particles
                 for (const particle of particles) {
@@ -461,8 +469,6 @@ export class Weapon {
         };
         
         animateExplosion();
-        
-        return { position, radius: size * 5 }; // Return explosion data for damage calculation
     }
     
     setDamageMultiplier(multiplier) {
