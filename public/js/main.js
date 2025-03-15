@@ -3213,12 +3213,15 @@ class Game {
     destroyTurret(turret) {
         if (!turret || !turret.mesh) return;
         
+        // Mark as destroyed to prevent further processing
+        turret.destroyed = true;
+        
         // Add to score
         this.score += 100;
         this.updateScoreDisplay();
         
-        // Create explosion at turret position
-        this.createExplosion(turret.mesh.position, 'large');
+        // Create explosion at turret position with skipAreaDamage=true to prevent recursion
+        this.createExplosion(turret.mesh.position, 'large', true);
         
         // Remove turret from scene
         this.scene.remove(turret.mesh);
@@ -4735,7 +4738,7 @@ class Game {
         };
         
         // Pre-allocate explosion particles
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 200; i++) {
             // Fire particles
             const size = Math.random() * 0.8 + 0.3;
             const particleGeometry = new THREE.SphereGeometry(size, 8, 8);
@@ -4755,7 +4758,7 @@ class Game {
             });
             
             // Smoke particles
-            if (i < 50) {
+            if (i < 100) {
                 const smokeGeometry = new THREE.SphereGeometry(size, 8, 8);
                 const smokeMaterial = new THREE.MeshBasicMaterial({
                     color: 0x555555,
@@ -4773,7 +4776,7 @@ class Game {
             }
             
             // Debris pieces
-            if (i < 30) {
+            if (i < 60) {
                 const debrisGeometry = new THREE.TetrahedronGeometry(Math.random() * 0.5 + 0.2, 0);
                 const debrisMaterial = new THREE.MeshStandardMaterial({
                     color: 0x333333,
@@ -4803,7 +4806,7 @@ class Game {
         });
         
         this.shockwavePool = [];
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 10; i++) {
             const shockwave = new THREE.Mesh(this.shockwaveGeometry, this.shockwaveMaterial.clone());
             shockwave.rotation.x = -Math.PI / 2; // Flat on the ground
             shockwave.visible = false;
@@ -4816,7 +4819,7 @@ class Game {
         
         // Create explosion light pool
         this.explosionLightPool = [];
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 20; i++) {
             const light = new THREE.PointLight(0xff5500, 0, 30);
             light.visible = false;
             this.scene.add(light);
@@ -4844,10 +4847,52 @@ class Game {
             }
         }
         
-        // If no particles available, reuse the oldest one
-        console.warn(`No available particles in ${poolName} pool, reusing oldest`);
-        pool[0].mesh.visible = true;
-        return pool[0];
+        // If no particles available, find the one that's been in use the longest
+        // This is a better strategy than just taking the first one
+        let oldestParticleIndex = 0;
+        let oldestLifetime = Infinity;
+        
+        // Find particles in active explosions
+        for (let i = 0; i < pool.length; i++) {
+            // Check if this particle is in any active explosion
+            let found = false;
+            let lifetime = 0;
+            
+            for (const explosion of this.activeExplosions) {
+                // Check in particles array
+                for (const particle of explosion.particles) {
+                    if (particle.mesh === pool[i].mesh) {
+                        found = true;
+                        lifetime = explosion.life;
+                        break;
+                    }
+                }
+                
+                // Check in debris array if not found yet
+                if (!found && poolName === 'explosionDebris') {
+                    for (const debris of explosion.debris) {
+                        if (debris.mesh === pool[i].mesh) {
+                            found = true;
+                            lifetime = explosion.life;
+                            break;
+                        }
+                    }
+                }
+                
+                if (found) break;
+            }
+            
+            // If this particle is in an explosion with a lower lifetime, it's older
+            if (found && lifetime < oldestLifetime) {
+                oldestLifetime = lifetime;
+                oldestParticleIndex = i;
+            }
+        }
+        
+        // Use the oldest particle
+        pool[oldestParticleIndex].inUse = true;
+        pool[oldestParticleIndex].mesh.visible = true;
+        return pool[oldestParticleIndex];
     }
     
     // Get shockwave from pool
@@ -4860,12 +4905,30 @@ class Game {
             }
         }
         
-        // If no shockwaves available, reuse the first one
-        this.shockwavePool[0].mesh.visible = true;
-        return this.shockwavePool[0];
+        // If no shockwaves available, find the one that's been in use the longest
+        let oldestShockwaveIndex = 0;
+        let oldestLifetime = Infinity;
+        
+        // Find shockwaves in active explosions
+        for (let i = 0; i < this.shockwavePool.length; i++) {
+            for (const explosion of this.activeExplosions) {
+                if (explosion.shockwave && explosion.shockwave.mesh === this.shockwavePool[i].mesh) {
+                    if (explosion.life < oldestLifetime) {
+                        oldestLifetime = explosion.life;
+                        oldestShockwaveIndex = i;
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // Use the oldest shockwave
+        this.shockwavePool[oldestShockwaveIndex].inUse = true;
+        this.shockwavePool[oldestShockwaveIndex].mesh.visible = true;
+        return this.shockwavePool[oldestShockwaveIndex];
     }
     
-    // Get explosion light from pool
+    // Get light from pool
     getLightFromPool() {
         for (let i = 0; i < this.explosionLightPool.length; i++) {
             if (!this.explosionLightPool[i].inUse) {
@@ -4875,9 +4938,27 @@ class Game {
             }
         }
         
-        // If no lights available, reuse the first one
-        this.explosionLightPool[0].light.visible = true;
-        return this.explosionLightPool[0];
+        // If no lights available, find the one that's been in use the longest
+        let oldestLightIndex = 0;
+        let oldestLifetime = Infinity;
+        
+        // Find lights in active explosions
+        for (let i = 0; i < this.explosionLightPool.length; i++) {
+            for (const explosion of this.activeExplosions) {
+                if (explosion.light && explosion.light.light === this.explosionLightPool[i].light) {
+                    if (explosion.life < oldestLifetime) {
+                        oldestLifetime = explosion.life;
+                        oldestLightIndex = i;
+                    }
+                    break;
+                }
+            }
+        }
+        
+        // Use the oldest light
+        this.explosionLightPool[oldestLightIndex].inUse = true;
+        this.explosionLightPool[oldestLightIndex].light.visible = true;
+        return this.explosionLightPool[oldestLightIndex];
     }
     
     // Update all active explosions
@@ -5008,7 +5089,7 @@ class Game {
     }
 
     // Create explosion effect using object pooling
-    createExplosion(position, type = 'standard') {
+    createExplosion(position, type = 'standard', skipAreaDamage = false) {
         // Ensure particle pools are initialized
         if (!this.particlePools) {
             this.initializeParticlePools();
@@ -5181,11 +5262,13 @@ class Game {
             }
         }
         
-        // Apply area damage
-        if (isLarge) {
-            this.applyAreaDamage(position, 15, 50);
-        } else {
-            this.applyAreaDamage(position, 10, 30);
+        // Apply area damage only if not skipped (to prevent recursion)
+        if (!skipAreaDamage) {
+            if (isLarge) {
+                this.applyAreaDamage(position, 15, 50);
+            } else {
+                this.applyAreaDamage(position, 10, 30);
+            }
         }
     }
 }

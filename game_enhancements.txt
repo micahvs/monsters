@@ -44,9 +44,7 @@
 
 7. **Improved Multiplayer Features**
    - Add player rankings and leaderboard
-   - Implement team-based gameplay
-   - Add voice chat integration
-   - Create lobby system for match setup
+
 
 ## Technical Improvements
 

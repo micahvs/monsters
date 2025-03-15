@@ -17,7 +17,8 @@ class MusicPlayer {
         this.musicTracks = [];
         this.currentTrackIndex = 0;
         this.isPlaying = false;
-        this.supportedExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac'];
+        this.supportedExtensions = ['.mp3']; // Only scan for MP3 files to reduce errors
+        this.isScanning = false;
         
         // Initialize the player
         this.init();
@@ -77,86 +78,37 @@ class MusicPlayer {
     }
     
     scanForMusicFiles() {
+        if (this.isScanning) return;
+        
+        this.isScanning = true;
         const basePath = '/music/';
         const foundTracks = new Set(); // Use a Set to avoid duplicates
         const scanPromises = [];
         
-        // 1. Try common music file patterns
+        // Only scan for known pattern files that actually exist
         const filePatterns = [
-            // Pattern files with numbered sequence
-            { prefix: 'pattern_bar_live_part', maxIndex: 20, padLength: 2 },
-            { prefix: 'track', maxIndex: 20, padLength: 2 },
-            { prefix: 'music', maxIndex: 20, padLength: 2 },
-            { prefix: 'song', maxIndex: 20, padLength: 2 },
-            { prefix: 'bgm', maxIndex: 20, padLength: 2 }
+            // Pattern files with numbered sequence - only these are known to exist
+            { prefix: 'pattern_bar_live_part', maxIndex: 19, padLength: 2 },
+            { prefix: 'fallback', maxIndex: 1, padLength: 0 }
         ];
         
-        // Try each pattern with each supported extension
+        // Try each pattern with MP3 extension only
         filePatterns.forEach(pattern => {
             for (let i = 0; i < pattern.maxIndex; i++) {
-                const paddedIndex = i.toString().padStart(pattern.padLength, '0');
+                const paddedIndex = pattern.padLength > 0 ? 
+                    i.toString().padStart(pattern.padLength, '0') : '';
                 
-                this.supportedExtensions.forEach(ext => {
-                    const filename = `${pattern.prefix}${paddedIndex}${ext}`;
-                    scanPromises.push(
-                        this.tryLoadTrack(basePath + filename)
-                            .then(success => {
-                                if (success) {
-                                    foundTracks.add(basePath + filename);
-                                }
-                                return success;
-                            })
-                    );
-                });
+                const filename = `${pattern.prefix}${paddedIndex}.mp3`;
+                scanPromises.push(
+                    this.tryLoadTrack(basePath + filename, true) // Silent mode for known files
+                        .then(success => {
+                            if (success) {
+                                foundTracks.add(basePath + filename);
+                            }
+                            return success;
+                        })
+                );
             }
-        });
-        
-        // 2. Try common standalone music files
-        const commonFiles = [
-            'fallback.mp3',
-            'background.mp3',
-            'theme.mp3',
-            'main.mp3',
-            'menu.mp3',
-            'game.mp3',
-            'action.mp3',
-            'battle.mp3',
-            'intro.mp3',
-            'outro.mp3'
-        ];
-        
-        commonFiles.forEach(file => {
-            scanPromises.push(
-                this.tryLoadTrack(basePath + file)
-                    .then(success => {
-                        if (success) {
-                            foundTracks.add(basePath + file);
-                        }
-                        return success;
-                    })
-            );
-        });
-        
-        // 3. Try to scan for any music file with common extensions
-        // This is a more aggressive approach that tries to find any music file
-        const commonPrefixes = ['', 'music_', 'track_', 'song_', 'bgm_', 'audio_'];
-        const commonNames = ['01', '02', '03', '1', '2', '3', 'a', 'b', 'c', 'main', 'theme', 'background'];
-        
-        commonPrefixes.forEach(prefix => {
-            commonNames.forEach(name => {
-                this.supportedExtensions.forEach(ext => {
-                    const filename = `${prefix}${name}${ext}`;
-                    scanPromises.push(
-                        this.tryLoadTrack(basePath + filename)
-                            .then(success => {
-                                if (success) {
-                                    foundTracks.add(basePath + filename);
-                                }
-                                return success;
-                            })
-                    );
-                });
-            });
         });
         
         // When all scan attempts are done
@@ -172,10 +124,12 @@ class MusicPlayer {
             } else {
                 console.warn('No music tracks found. Please add MP3 files to the /music/ directory.');
             }
+            
+            this.isScanning = false;
         });
     }
     
-    tryLoadTrack(url) {
+    tryLoadTrack(url, silent = false) {
         return new Promise(resolve => {
             const tempAudio = new Audio();
             
@@ -190,7 +144,7 @@ class MusicPlayer {
                 clearTimeout(timeout);
                 tempAudio.removeEventListener('canplaythrough', handleCanPlay);
                 tempAudio.removeEventListener('error', handleError);
-                console.log(`Track found: ${url}`);
+                if (!silent) console.log(`Track found: ${url}`);
                 resolve(true);
             };
             
@@ -201,8 +155,19 @@ class MusicPlayer {
                 resolve(false);
             };
             
+            // Suppress console errors for 404s during scanning
+            if (silent) {
+                tempAudio.onerror = () => {
+                    handleError();
+                    return true; // Prevents the error from appearing in console
+                };
+            }
+            
             tempAudio.addEventListener('canplaythrough', handleCanPlay);
-            tempAudio.addEventListener('error', handleError);
+            if (!silent) {
+                tempAudio.addEventListener('error', handleError);
+            }
+            
             tempAudio.src = url;
             tempAudio.load();
         });
