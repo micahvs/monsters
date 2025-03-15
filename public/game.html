@@ -271,35 +271,47 @@
         }
 
         /* Powerup Indicators - Bottom Center */
-        #powerup-indicators-container {
+        #powerup-indicators {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            width: auto;
-            max-width: 60%;
+            display: flex;
+            gap: 8px;
             z-index: 100;
             background: none;
             border: none;
             pointer-events: none;
         }
 
-        #powerup-indicators {
+        .powerup-indicator {
             display: flex;
-            gap: 15px;
+            flex-direction: column;
+            align-items: center;
             justify-content: center;
-            background: none;
+            padding: 4px 6px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            background-color: rgba(0, 0, 0, 0.3);
         }
 
-        .powerup-indicator {
-            padding: 8px 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(0, 0, 0, 0.7);
-            font-size: 14px;
-            border-bottom: 2px solid;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+        .powerup-icon {
+            font-size: 16px;
+            color: white;
+        }
+
+        .powerup-timer {
+            font-size: 12px;
+            color: white;
+        }
+
+        .pulse {
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 1; }
+            to { opacity: 0.6; }
         }
 
         /* Debug Panel - Left Side */
@@ -598,7 +610,7 @@
 
     <!-- Audio Element -->
     <audio id="backgroundMusic" preload="auto">
-        <source src="pattern_bar_live_part00.mp3" type="audio/mpeg">
+        <source src="music/pattern_bar_live_part00.mp3" type="audio/mpeg">
     </audio>
 
     <!-- Scripts -->
@@ -620,7 +632,7 @@
             });
         });
         
-        // Audio controls - improved version
+        // Audio controls - improved version with alphabetical sorting
         document.addEventListener('DOMContentLoaded', function() {
             const audioElement = document.getElementById('backgroundMusic');
             const audioToggle = document.getElementById('audioToggle');
@@ -628,30 +640,56 @@
             const audioIcon = audioToggle.querySelector('i');
             const playPauseIcon = playPauseButton.querySelector('i');
             
-            let currentAudioPart = 0;
-            const totalAudioParts = 19; // We have parts 0-18
+            // Music tracks in alphabetical order
+            const musicTracks = [
+                'music/fallback.mp3',
+                'music/pattern_bar_live_part00.mp3',
+                'music/pattern_bar_live_part01.mp3',
+                'music/pattern_bar_live_part02.mp3',
+                'music/pattern_bar_live_part03.mp3',
+                'music/pattern_bar_live_part04.mp3',
+                'music/pattern_bar_live_part05.mp3',
+                'music/pattern_bar_live_part06.mp3',
+                'music/pattern_bar_live_part07.mp3',
+                'music/pattern_bar_live_part08.mp3',
+                'music/pattern_bar_live_part09.mp3',
+                'music/pattern_bar_live_part10.mp3',
+                'music/pattern_bar_live_part11.mp3',
+                'music/pattern_bar_live_part12.mp3',
+                'music/pattern_bar_live_part13.mp3',
+                'music/pattern_bar_live_part14.mp3',
+                'music/pattern_bar_live_part15.mp3',
+                'music/pattern_bar_live_part16.mp3',
+                'music/pattern_bar_live_part17.mp3',
+                'music/pattern_bar_live_part18.mp3'
+            ].sort(); // Sort alphabetically
+            
+            let currentTrackIndex = 0;
             let isPlaying = false;
             
-            // Function to play the next audio part
-            function playNextAudioPart() {
-                currentAudioPart = (currentAudioPart + 1) % totalAudioParts;
-                const nextFile = `pattern_bar_live_part${currentAudioPart.toString().padStart(2, '0')}.mp3`;
-                console.log(`Loading next part: ${nextFile}`);
+            // Function to play the next track
+            function playNextTrack() {
+                currentTrackIndex = (currentTrackIndex + 1) % musicTracks.length;
+                const nextFile = musicTracks[currentTrackIndex];
+                console.log(`Loading next track: ${nextFile}`);
                 
                 audioElement.src = nextFile;
                 audioElement.load();
                 
                 if (isPlaying) {
                     audioElement.play().catch(error => {
-                        console.error(`Error playing next part: ${error.message}`);
+                        console.error(`Error playing next track: ${error.message}`);
                     });
                 }
             }
             
-            // When one audio part ends, play the next one
+            // Set initial track
+            audioElement.src = musicTracks[0];
+            
+            // When one track ends, play the next one
             audioElement.addEventListener('ended', function() {
-                console.log('Audio ended, playing next part');
-                playNextAudioPart();
+                console.log('Audio ended, playing next track');
+                playNextTrack();
             });
             
             // Check if audio was previously muted
@@ -712,8 +750,8 @@
             // Handle audio errors
             audioElement.addEventListener('error', function(e) {
                 console.error('Audio error:', e);
-                // Try the next part if this one fails
-                playNextAudioPart();
+                // Try the next track if this one fails
+                playNextTrack();
             });
         });
 

@@ -4000,49 +4000,44 @@ class Game {
     
     // Create fade-out effect when powerup disappears
     createPowerupFadeEffect(powerup) {
-        // Create particles at powerup position
-        const particleCount = 10;
+        // Handle either powerup object or type string
+        let powerupConfig;
+        let position;
         
-        for (let i = 0; i < particleCount; i++) {
-            // Create particle
-            const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-            const particleMaterial = new THREE.MeshPhongMaterial({
-                color: powerup.children[0].material.color,
-                emissive: powerup.children[0].material.emissive,
-                emissiveIntensity: 0.5,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position at powerup position
-            particle.position.copy(powerup.position);
-            
-            // Set velocity - outward in all directions
-            const angle = Math.random() * Math.PI * 2;
-            const speed = Math.random() * 0.2 + 0.1;
-            particle.userData = {
-                velocity: {
-                    x: Math.cos(angle) * speed,
-                    y: Math.random() * 0.2 + 0.1,
-                    z: Math.sin(angle) * speed
-                },
-                life: 1.0
-            };
-            
-            this.scene.add(particle);
-            this.sparks.push(particle);
+        if (typeof powerup === 'string') {
+            // Type is a string - get config from powerupTypes
+            powerupConfig = this.powerupTypes[powerup];
+            if (!powerupConfig) {
+                console.log(`No config found for powerup type: ${powerup}`);
+                return;
+            }
+            // If type is a string, use truck position
+            position = this.truck.position.clone();
+        } else if (powerup && powerup.userData && powerup.userData.type) {
+            // Type is a powerup object - get config from its userData
+            powerupConfig = this.powerupTypes[powerup.userData.type];
+            if (!powerupConfig) {
+                console.log(`No config found for powerup object type: ${powerup.userData.type}`);
+                return;
+            }
+            // If type is a powerup object, use its position
+            position = powerup.position.clone();
+        } else {
+            console.log('Invalid argument passed to createPowerupFadeEffect');
+            return;
         }
-    }
-
-    // Helper function to convert hex color to rgba
-    hexToRgba(hex, alpha) {
-        const r = (hex >> 16) & 255;
-        const g = (hex >> 8) & 255;
-        const b = hex & 255;
         
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        // Use particle pool instead of creating new particles
+        this.createPooledParticles({
+            position: position,
+            color: powerupConfig.color,
+            emissive: powerupConfig.emissive,
+            count: 10,
+            size: 0.15,
+            speed: 0.1,
+            life: 0.7,
+            opacity: 0.5
+        });
     }
 
     // Create visual effect for powerup collection
@@ -4055,69 +4050,28 @@ class Game {
             return;
         }
         
-        // Create particles around the truck
-        const particleCount = 20;
+        // Use particle pool for the effect
+        this.createPooledParticles({
+            position: this.truck.position.clone(),
+            color: powerupConfig.color,
+            emissive: powerupConfig.emissive,
+            count: 15,
+            size: 0.2,
+            speed: 0.15,
+            life: 1.0,
+            opacity: 0.8,
+            radius: 3,
+            yOffset: 1.5
+        });
         
-        for (let i = 0; i < particleCount; i++) {
-            // Create particle
-            const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-            const particleMaterial = new THREE.MeshPhongMaterial({
-                color: powerupConfig.color,
-                emissive: powerupConfig.emissive,
-                emissiveIntensity: 0.5,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position around truck
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 3;
-            particle.position.set(
-                this.truck.position.x + Math.cos(angle) * radius,
-                this.truck.position.y + Math.random() * 3,
-                this.truck.position.z + Math.sin(angle) * radius
-            );
-            
-            // Set velocity - outward from truck
-            const speed = Math.random() * 0.2 + 0.1;
-            const velocity = {
-                x: Math.cos(angle) * speed,
-                y: Math.random() * 0.2 + 0.1,
-                z: Math.sin(angle) * speed
-            };
-            
-            // Create spark with the expected structure
-            const spark = {
-                mesh: particle,
-                velocity: velocity,
-                life: 1.0
-            };
-            
-            this.scene.add(particle);
-            this.sparks.push(spark);
-        }
-        
-        // Add a flash of light
-        const light = new THREE.PointLight(powerupConfig.color, 2, 10);
-        light.position.copy(this.truck.position);
-        light.position.y += 2;
-        this.scene.add(light);
-        
-        // Fade out and remove light
-        let lightLife = 10;
-        const fadeLight = () => {
-            lightLife--;
-            if (lightLife > 0) {
-                light.intensity = lightLife / 10 * 2;
-                requestAnimationFrame(fadeLight);
-            } else {
-                this.scene.remove(light);
-            }
-        };
-        
-        fadeLight();
+        // Add a flash of light from the light pool
+        this.createPooledLight({
+            position: this.truck.position.clone().add(new THREE.Vector3(0, 2, 0)),
+            color: powerupConfig.color,
+            intensity: 2,
+            distance: 10,
+            decay: 0.2
+        });
         
         // Create custom effect based on powerup type
         switch(type) {
@@ -4136,221 +4090,311 @@ class Game {
         }
     }
     
-    // Add speed boost visual effect
+    // Create pooled particles for effects
+    createPooledParticles(options) {
+        const {
+            position,
+            color,
+            emissive,
+            count = 10,
+            size = 0.2,
+            speed = 0.15,
+            life = 1.0,
+            opacity = 0.8,
+            radius = 2,
+            yOffset = 0
+        } = options;
+        
+        // Initialize particle pool if it doesn't exist
+        if (!this.particlePool) {
+            this.particlePool = [];
+            this.particlePoolSize = 100;
+            
+            for (let i = 0; i < this.particlePoolSize; i++) {
+                const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+                const particleMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xffffff,
+                    emissive: 0xffffff,
+                    emissiveIntensity: 0.5,
+                    transparent: true,
+                    opacity: 0
+                });
+                
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.visible = false;
+                particle.scale.set(1, 1, 1);
+                this.scene.add(particle);
+                
+                this.particlePool.push({
+                    mesh: particle,
+                    inUse: false
+                });
+            }
+        }
+        
+        // Use particles from the pool
+        for (let i = 0; i < count; i++) {
+            // Find an available particle
+            const particleObj = this.particlePool.find(p => !p.inUse);
+            if (!particleObj) {
+                console.log('Particle pool exhausted');
+                break;
+            }
+            
+            const particle = particleObj.mesh;
+            particleObj.inUse = true;
+            
+            // Reset and configure particle
+            particle.visible = true;
+            particle.scale.set(size * 5, size * 5, size * 5);
+            particle.material.color.set(color);
+            particle.material.emissive.set(emissive || color);
+            particle.material.emissiveIntensity = 0.5;
+            particle.material.opacity = opacity;
+            
+            // Position particle
+            const angle = Math.random() * Math.PI * 2;
+            const particleRadius = Math.random() * radius;
+            particle.position.set(
+                position.x + Math.cos(angle) * particleRadius,
+                position.y + yOffset + Math.random() * 2,
+                position.z + Math.sin(angle) * particleRadius
+            );
+            
+            // Set velocity
+            const particleSpeed = Math.random() * speed + (speed / 2);
+            const velocity = {
+                x: Math.cos(angle) * particleSpeed,
+                y: Math.random() * speed - (speed / 2),
+                z: Math.sin(angle) * particleSpeed
+            };
+            
+            // Add to sparks with auto-return to pool
+            this.sparks.push({
+                mesh: particle,
+                velocity: velocity,
+                life: life,
+                poolObj: particleObj,
+                update: function(delta) {
+                    // Update position
+                    this.mesh.position.x += this.velocity.x;
+                    this.mesh.position.y += this.velocity.y;
+                    this.mesh.position.z += this.velocity.z;
+                    
+                    // Update life and opacity
+                    this.life -= delta;
+                    this.mesh.material.opacity = this.life;
+                    
+                    // Return to pool if life depleted
+                    if (this.life <= 0) {
+                        this.mesh.visible = false;
+                        this.poolObj.inUse = false;
+                        return true; // Signal removal
+                    }
+                    return false;
+                }
+            });
+        }
+    }
+    
+    // Create pooled light for effects
+    createPooledLight(options) {
+        const {
+            position,
+            color,
+            intensity = 2,
+            distance = 10,
+            decay = 0.2
+        } = options;
+        
+        // Initialize light pool if it doesn't exist
+        if (!this.lightPool) {
+            this.lightPool = [];
+            this.lightPoolSize = 20;
+            
+            for (let i = 0; i < this.lightPoolSize; i++) {
+                const light = new THREE.PointLight(0xffffff, 0, distance, decay);
+                light.visible = false;
+                this.scene.add(light);
+                
+                this.lightPool.push({
+                    light: light,
+                    inUse: false
+                });
+            }
+        }
+        
+        // Find an available light
+        const lightObj = this.lightPool.find(l => !l.inUse);
+        if (!lightObj) {
+            console.log('Light pool exhausted');
+            return;
+        }
+        
+        const light = lightObj.light;
+        lightObj.inUse = true;
+        
+        // Configure light
+        light.visible = true;
+        light.position.copy(position);
+        light.color.set(color);
+        light.intensity = intensity;
+        
+        // Add to special effects for updating
+        if (!this.specialEffects) {
+            this.specialEffects = [];
+        }
+        
+        this.specialEffects.push({
+            light: light,
+            lightObj: lightObj,
+            life: 1.0,
+            update: function() {
+                this.life -= 0.05;
+                this.light.intensity = this.life * intensity;
+                
+                if (this.life <= 0) {
+                    this.light.visible = false;
+                    this.lightObj.inUse = false;
+                    return true; // Signal removal
+                }
+                return false;
+            }
+        });
+    }
+    
+    // Add speed boost visual effect - simplified
     createSpeedBoostEffect() {
         if (!this.truck) return;
         
-        // Create speed lines behind truck
-        const count = 10;
+        const truckDirection = new THREE.Vector3(
+            -Math.sin(this.truck.rotation.y), 
+            0, 
+            -Math.cos(this.truck.rotation.y)
+        );
         
-        for (let i = 0; i < count; i++) {
-            const lineGeometry = new THREE.BoxGeometry(0.1, 0.1, 1 + Math.random() * 2);
-            const lineMaterial = new THREE.MeshBasicMaterial({
-                color: 0x00ff00,
-                transparent: true,
-                opacity: 0.7
-            });
+        // Use particle pool for speed lines
+        for (let i = 0; i < 10; i++) {
+            // Find an available particle
+            if (!this.particlePool) {
+                this.createPooledParticles({count: 0}); // Initialize pool
+            }
             
-            const line = new THREE.Mesh(lineGeometry, lineMaterial);
+            const particleObj = this.particlePool.find(p => !p.inUse);
+            if (!particleObj) break;
+            
+            const particle = particleObj.mesh;
+            particleObj.inUse = true;
+            
+            // Configure as a speed line
+            particle.visible = true;
+            particle.scale.set(0.1, 0.1, 1 + Math.random() * 2);
+            particle.material.color.set(0x00ff00);
+            particle.material.emissive.set(0x00ff00);
+            particle.material.opacity = 0.7;
             
             // Position behind truck
             const angle = Math.random() * Math.PI;
             const radius = 1.5 + Math.random() * 1.5;
-            const truckDirection = new THREE.Vector3(
-                -Math.sin(this.truck.rotation.y), 
-                0, 
-                -Math.cos(this.truck.rotation.y)
-            );
             
-            line.position.set(
+            particle.position.set(
                 this.truck.position.x + truckDirection.x * (3 + Math.random() * 2) + Math.cos(angle) * radius,
                 this.truck.position.y + Math.random() * 2,
                 this.truck.position.z + truckDirection.z * (3 + Math.random() * 2) + Math.sin(angle) * radius
             );
             
-            line.lookAt(this.truck.position);
+            particle.lookAt(this.truck.position);
             
-            // Set velocity - away from truck
-            const velocity = {
-                x: truckDirection.x * (0.2 + Math.random() * 0.1),
-                y: 0,
-                z: truckDirection.z * (0.2 + Math.random() * 0.1)
-            };
-            
-            // Add to scene
-            this.scene.add(line);
-            
-            // Add to sparks for animation
+            // Add to sparks with auto-return to pool
             this.sparks.push({
-                mesh: line,
-                velocity: velocity,
-                life: 1.0
+                mesh: particle,
+                velocity: {
+                    x: truckDirection.x * (0.2 + Math.random() * 0.1),
+                    y: 0,
+                    z: truckDirection.z * (0.2 + Math.random() * 0.1)
+                },
+                life: 1.0,
+                poolObj: particleObj,
+                update: function(delta) {
+                    // Update position
+                    this.mesh.position.x += this.velocity.x;
+                    this.mesh.position.z += this.velocity.z;
+                    
+                    // Update life and opacity
+                    this.life -= delta;
+                    this.mesh.material.opacity = this.life;
+                    
+                    // Return to pool if life depleted
+                    if (this.life <= 0) {
+                        this.mesh.visible = false;
+                        this.poolObj.inUse = false;
+                        return true; // Signal removal
+                    }
+                    return false;
+                }
             });
         }
     }
     
-    // Add damage boost visual effect
+    // Add damage boost visual effect - simplified
     createDamageBoostEffect() {
         if (!this.truck) return;
         
-        // Create energy particles around the truck
-        const count = 15;
+        // Use particle pool for orbital particles
+        this.createPooledParticles({
+            position: this.truck.position.clone(),
+            color: 0xff00ff,
+            count: 15,
+            size: 0.15,
+            speed: 0.05,
+            life: 1.0,
+            opacity: 0.8,
+            radius: 2,
+            yOffset: 1
+        });
         
-        for (let i = 0; i < count; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.15, 6, 6);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff00ff,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position around truck
+        // Add orbital behavior to the last 15 particles
+        const startIndex = Math.max(0, this.sparks.length - 15);
+        for (let i = startIndex; i < this.sparks.length; i++) {
+            const spark = this.sparks[i];
             const angle = Math.random() * Math.PI * 2;
-            const height = Math.random() * 2;
             const radius = 2;
             
-            particle.position.set(
-                this.truck.position.x + Math.cos(angle) * radius,
-                this.truck.position.y + height,
-                this.truck.position.z + Math.sin(angle) * radius
-            );
-            
-            // Set orbital motion
-            particle.userData = {
-                centerX: this.truck.position.x,
-                centerZ: this.truck.position.z,
-                radius: radius,
-                speed: 0.05 + Math.random() * 0.05,
-                angle: angle,
-                verticalSpeed: 0.02 * (Math.random() > 0.5 ? 1 : -1),
-                life: 1.0
-            };
-            
-            // Add to scene and array with special handling for orbital particles
-            this.scene.add(particle);
-            
-            // Add a special effect with custom update logic
-            const specialEffect = {
-                mesh: particle,
-                update: () => {
-                    // Update angle
-                    particle.userData.angle += particle.userData.speed;
-                    
-                    // Update position based on truck position
-                    particle.position.x = this.truck.position.x + Math.cos(particle.userData.angle) * particle.userData.radius;
-                    particle.position.z = this.truck.position.z + Math.sin(particle.userData.angle) * particle.userData.radius;
-                    
-                    // Update height with vertical oscillation
-                    particle.position.y += particle.userData.verticalSpeed;
-                    if (particle.position.y > this.truck.position.y + 3 || particle.position.y < this.truck.position.y) {
-                        particle.userData.verticalSpeed *= -1;
-                    }
-                    
-                    // Decrease life gradually
-                    particle.userData.life -= 0.005;
-                    particle.material.opacity = particle.userData.life;
-                    
-                    // Remove if life is depleted
-                    if (particle.userData.life <= 0) {
-                        this.scene.remove(particle);
-                        return true; // Signal removal
-                    }
-                    return false; // Keep updating
+            // Override the update method with orbital behavior
+            spark.update = function(delta) {
+                // Update angle based on velocity
+                this.velocity.angle = (this.velocity.angle || angle) + (this.velocity.speed || 0.05);
+                
+                // Update position in orbit around truck
+                this.mesh.position.x = this.truckPos.x + Math.cos(this.velocity.angle) * radius;
+                this.mesh.position.z = this.truckPos.z + Math.sin(this.velocity.angle) * radius;
+                
+                // Oscillate height
+                this.velocity.verticalDir = this.velocity.verticalDir || (Math.random() > 0.5 ? 1 : -1);
+                this.mesh.position.y += 0.02 * this.velocity.verticalDir;
+                
+                if (this.mesh.position.y > this.truckPos.y + 3 || this.mesh.position.y < this.truckPos.y) {
+                    this.velocity.verticalDir *= -1;
                 }
+                
+                // Update life and opacity
+                this.life -= delta * 0.5; // Slower fade for orbital particles
+                this.mesh.material.opacity = this.life;
+                
+                // Return to pool if life depleted
+                if (this.life <= 0) {
+                    this.mesh.visible = false;
+                    this.poolObj.inUse = false;
+                    return true; // Signal removal
+                }
+                return false;
             };
             
-            // Create array for special effects if it doesn't exist
-            if (!this.specialEffects) {
-                this.specialEffects = [];
-            }
-            
-            this.specialEffects.push(specialEffect);
+            // Store reference to truck position
+            spark.truckPos = this.truck.position;
         }
     }
 
-    // Create fade effect for expiring powerups
-    createPowerupFadeEffect(type) {
-        if (!this.truck || !this.scene) return;
-        
-        // Handle either powerup object or type string
-        let powerupConfig;
-        
-        if (typeof type === 'string') {
-            // Type is a string - get config from powerupTypes
-            powerupConfig = this.powerupTypes[type];
-            if (!powerupConfig) {
-                console.log(`No config found for powerup type: ${type}`);
-                return;
-            }
-        } else if (type && type.userData && type.userData.type) {
-            // Type is a powerup object - get config from its userData
-            powerupConfig = this.powerupTypes[type.userData.type];
-            if (!powerupConfig) {
-                console.log(`No config found for powerup object type: ${type.userData.type}`);
-                return;
-            }
-        } else {
-            console.log('Invalid argument passed to createPowerupFadeEffect');
-            return;
-        }
-        
-        // Determine position based on parameter type
-        let position;
-        if (typeof type === 'string') {
-            // If type is a string, use truck position
-            position = this.truck.position.clone();
-        } else {
-            // If type is a powerup object, use its position
-            position = type.position.clone();
-        }
-        
-        // Create particles
-        const particleCount = 10;
-        
-        for (let i = 0; i < particleCount; i++) {
-            // Create particle
-            const particleGeometry = new THREE.SphereGeometry(0.15, 6, 6);
-            const particleMaterial = new THREE.MeshPhongMaterial({
-                color: powerupConfig.color,
-                emissive: powerupConfig.emissive,
-                emissiveIntensity: 0.3,
-                transparent: true,
-                opacity: 0.5
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position at the appropriate location
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 2;
-            particle.position.set(
-                position.x + Math.cos(angle) * radius,
-                position.y + Math.random() * 2,
-                position.z + Math.sin(angle) * radius
-            );
-            
-            // Set velocity - downward and outward
-            const speed = Math.random() * 0.1 + 0.05;
-            const velocity = {
-                x: Math.cos(angle) * speed,
-                y: -Math.random() * 0.1,
-                z: Math.sin(angle) * speed
-            };
-            
-            // Create spark with the expected structure
-            const spark = {
-                mesh: particle,
-                velocity: velocity,
-                life: 0.7
-            };
-            
-            this.scene.add(particle);
-            this.sparks.push(spark);
-        }
-    }
-    
     // Update HUD to show active powerups
     updatePowerupIndicators() {
         const container = document.getElementById('powerup-indicators');
@@ -4371,26 +4415,26 @@ class Game {
                 hasActivePowerups = true;
                 const powerupConfig = this.powerupTypes[type];
                 
+                // Create indicator element
                 const indicator = document.createElement('div');
                 indicator.className = 'powerup-indicator';
                 
-                // Set border color to match powerup
+                // Set color to match powerup
                 if (powerupConfig.color) {
                     const colorHex = powerupConfig.color.toString(16).padStart(6, '0');
-                    indicator.style.borderBottomColor = '#' + colorHex;
-                    indicator.style.boxShadow = `0 0 15px #${colorHex}`;
+                    indicator.style.backgroundColor = `rgba(${parseInt(colorHex.substr(0, 2), 16)}, ${parseInt(colorHex.substr(2, 2), 16)}, ${parseInt(colorHex.substr(4, 2), 16)}, 0.3)`;
+                    indicator.style.borderColor = `#${colorHex}`;
                 }
                 
                 // Create icon
                 const icon = document.createElement('span');
                 icon.textContent = powerupConfig.icon || '✦';
-                icon.style.fontSize = '16px';
-                icon.style.color = powerupConfig.color ? '#' + powerupConfig.color.toString(16).padStart(6, '0') : '#ffffff';
+                icon.className = 'powerup-icon';
                 
                 // Create timer
                 const timer = document.createElement('span');
                 timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
-                timer.style.fontSize = '14px';
+                timer.className = 'powerup-timer';
                 
                 indicator.appendChild(icon);
                 indicator.appendChild(timer);
@@ -4399,27 +4443,13 @@ class Game {
                 
                 // Pulse effect for indicators about to expire
                 if (data.timeRemaining < 180) { // Less than 3 seconds
-                    indicator.style.animation = 'pulse 0.5s infinite alternate';
-                    if (!document.getElementById('powerup-pulse-style')) {
-                        const style = document.createElement('style');
-                        style.id = 'powerup-pulse-style';
-                        style.textContent = `
-                            @keyframes pulse {
-                                from { opacity: 1; }
-                                to { opacity: 0.6; }
-                            }
-                        `;
-                        document.head.appendChild(style);
-                    }
+                    indicator.classList.add('pulse');
                 }
             }
         }
         
         // Show/hide the container based on active powerups
-        const containerParent = document.getElementById('powerup-indicators-container');
-        if (containerParent) {
-            containerParent.style.display = hasActivePowerups ? 'block' : 'none';
-        }
+        container.style.display = hasActivePowerups ? 'flex' : 'none';
     }
     
     // Initialize weapons for the player
