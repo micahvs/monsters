@@ -192,11 +192,19 @@ io.on('connection', (socket) => {
         message: data.message,
         timestamp: Date.now()
       };
-      console.log('Broadcasting chat message to all clients:', chatMessage);
-      // Use broadcast.emit to send to all clients EXCEPT the sender
-      socket.broadcast.emit('chat', chatMessage);
-      // Also send back to the sender so they get the same formatted message
-      socket.emit('chat', chatMessage);
+      console.log('Broadcasting chat message to ALL clients:', chatMessage);
+      // Use io.emit to send to ALL clients including the sender in one operation
+      io.emit('chat', chatMessage);
+    } else {
+      console.error('Player not found in gameState for chat message:', socket.id);
+      // Still try to broadcast the message even if player not found
+      const chatMessage = {
+        playerId: socket.id,
+        nickname: data.nickname || 'Unknown Player',
+        message: data.message,
+        timestamp: Date.now()
+      };
+      io.emit('chat', chatMessage);
     }
   });
 });

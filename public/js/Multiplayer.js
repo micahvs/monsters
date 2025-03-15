@@ -219,9 +219,22 @@ export default class Multiplayer {
         
         // When receiving a chat message
         this.socket.on('chat', (chatData) => {
-            console.log('Received chat message in Multiplayer.js:', chatData);
+            console.log('Received chat message in Multiplayer.js socket event:', chatData);
+            
+            // Validate the chat data
+            if (!chatData || !chatData.message) {
+                console.error('Invalid chat data received in socket event:', chatData);
+                return;
+            }
+            
             // Always process the message, regardless of who sent it
             this.receiveChatMessage(chatData);
+            
+            // Also try the global chat function as a fallback
+            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                const sender = chatData.playerId === this.localPlayerId ? 'You' : chatData.nickname;
+                window.addChatMessage(sender, chatData.message);
+            }
         });
     }
     
@@ -339,13 +352,35 @@ export default class Multiplayer {
     }
     
     sendChatMessage(message) {
-        if (!message || !this.socket) return;
+        if (!message || !this.socket) {
+            console.error('Cannot send chat message: message is empty or socket is not available');
+            return;
+        }
         
-        // Send message to server
-        this.socket.emit('chat', {
-            message: message,
-            nickname: this.game.playerName || 'Player'
-        });
+        console.log('Sending chat message to server:', message);
+        
+        // Get the player name from the game or localStorage
+        const nickname = this.game.playerName || 
+                         localStorage.getItem('monsterTruckNickname') || 
+                         'Player';
+        
+        // Send message to server with additional debugging
+        try {
+            const chatData = {
+                message: message,
+                nickname: nickname
+            };
+            
+            console.log('Emitting chat event with data:', chatData);
+            this.socket.emit('chat', chatData);
+            
+            // Verify socket connection
+            if (!this.socket.connected) {
+                console.error('Socket is not connected when trying to send chat message');
+            }
+        } catch (error) {
+            console.error('Error sending chat message:', error);
+        }
     }
     
     // REMOTE PLAYER MANAGEMENT
@@ -743,7 +778,7 @@ export default class Multiplayer {
     }
     
     receiveChatMessage(chatData) {
-        console.log('Processing chat message:', chatData);
+        console.log('Processing chat message in Multiplayer.js:', chatData);
         
         if (!chatData || !chatData.message) {
             console.error('Invalid chat data received:', chatData);
@@ -752,7 +787,7 @@ export default class Multiplayer {
         
         // If we have the global chat function from game.html, use it
         if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-            console.log('Using window.addChatMessage to display chat');
+            console.log('Using window.addChatMessage to display chat message');
             const sender = chatData.playerId === this.localPlayerId ? 'You' : chatData.nickname;
             window.addChatMessage(sender, chatData.message);
             return;
@@ -764,9 +799,12 @@ export default class Multiplayer {
             return;
         }
         
+        console.log('Using internal chat UI to display message');
+        
         // Add message to chat history if it's an array
         if (Array.isArray(this.chatMessages)) {
             this.chatMessages.push(chatData);
+            return; // If it's an array, we can't append DOM elements to it
         }
         
         // Create message element

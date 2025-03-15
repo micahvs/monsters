@@ -764,8 +764,17 @@
                             nickname: window.gameInstance.playerName || 'Player'
                         };
                         
-                        console.log('Sending chat message:', chatData);
+                        console.log('Sending chat message from game.html:', chatData);
                         window.gameInstance.multiplayer.socket.emit('chat', chatData);
+                        
+                        // Verify socket connection
+                        if (!window.gameInstance.multiplayer.socket.connected) {
+                            console.error('Socket is not connected when trying to send chat message from game.html');
+                            addChatMessage('System', 'Error: Not connected to server. Message may not be delivered.');
+                        }
+                    } else {
+                        console.error('Cannot send chat message: multiplayer not initialized');
+                        addChatMessage('System', 'Error: Multiplayer not initialized. Message not sent.');
                     }
                     
                     // Clear input
@@ -781,24 +790,27 @@
             
             // Set up a function to initialize chat socket listeners after game is loaded
             window.initChatSocketListeners = function() {
-                console.log('Initializing chat socket listeners');
+                console.log('Initializing chat socket listeners in game.html');
                 
                 if (!window.gameInstance) {
                     console.error('Game instance not available for chat initialization');
+                    addChatMessage('System', 'Error: Game not initialized. Chat may not work properly.');
                     return;
                 }
                 
                 if (!window.gameInstance.multiplayer) {
                     console.error('Multiplayer not available for chat initialization');
+                    addChatMessage('System', 'Error: Multiplayer not initialized. Chat may not work properly.');
                     return;
                 }
                 
                 if (!window.gameInstance.multiplayer.socket) {
                     console.error('Socket not available for chat initialization');
+                    addChatMessage('System', 'Error: Socket not available. Chat may not work properly.');
                     return;
                 }
                 
-                console.log('Setting up chat socket listeners');
+                console.log('Setting up chat socket listeners in game.html');
                 
                 // Remove any existing listeners to prevent duplicates
                 window.gameInstance.multiplayer.socket.off('chat');
@@ -807,6 +819,11 @@
                 window.gameInstance.multiplayer.socket.on('chat', function(chatData) {
                     console.log('Received chat message in game.html:', chatData);
                     
+                    if (!chatData || !chatData.message) {
+                        console.error('Invalid chat data received in game.html:', chatData);
+                        return;
+                    }
+                    
                     // Handle all messages, including our own
                     addChatMessage(
                         chatData.playerId === window.gameInstance.multiplayer.localPlayerId ? 'You' : chatData.nickname, 
@@ -814,7 +831,22 @@
                     );
                 });
                 
-                console.log('Chat socket listeners initialized');
+                // Verify socket connection
+                if (!window.gameInstance.multiplayer.socket.connected) {
+                    console.warn('Socket not connected yet in game.html - waiting for connection');
+                    addChatMessage('System', 'Connecting to chat server...');
+                    
+                    // Add a connection event listener
+                    window.gameInstance.multiplayer.socket.on('connect', function() {
+                        console.log('Socket connected in game.html');
+                        addChatMessage('System', 'Connected to chat server!');
+                    });
+                } else {
+                    console.log('Socket already connected in game.html');
+                    addChatMessage('System', 'Connected to chat server!');
+                }
+                
+                console.log('Chat socket listeners initialized in game.html');
             };
             
             // Call initChatSocketListeners when the page loads

@@ -3536,36 +3536,78 @@ class Game {
         }
 
         try {
+            console.log('Initializing multiplayer...');
+            
             // Direct initialization
             this.multiplayer = new Multiplayer(this);
-            console.log('Multiplayer initialized');
+            console.log('Multiplayer instance created successfully');
             
             // Set player name and color for chat
             this.playerName = localStorage.getItem('monsterTruckNickname') || 'Player';
             this.playerColor = localStorage.getItem('monsterTruckColor') || '#ff00ff';
+            console.log('Player info set for chat:', this.playerName, this.playerColor);
             
-            // Initialize chat socket listeners if the function exists
-            if (typeof window.initChatSocketListeners === 'function') {
-                console.log('Calling initChatSocketListeners from main.js');
-                window.initChatSocketListeners();
-            } else {
-                console.error('initChatSocketListeners function not found');
-            }
-            
-            // Force a direct connection to ensure chat works
-            if (this.multiplayer.socket) {
-                console.log('Setting up direct chat listener in main.js');
-                this.multiplayer.socket.on('chat', (chatData) => {
-                    console.log('Direct chat message received in main.js:', chatData);
-                    if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                        const sender = chatData.playerId === this.multiplayer.localPlayerId ? 'You' : chatData.nickname;
-                        window.addChatMessage(sender, chatData.message);
-                    }
+            // Verify socket connection
+            if (!this.multiplayer.socket) {
+                console.error('Socket not initialized in multiplayer instance');
+            } else if (!this.multiplayer.socket.connected) {
+                console.warn('Socket not connected yet - waiting for connection');
+                
+                // Add a connection event listener to initialize chat when connected
+                this.multiplayer.socket.on('connect', () => {
+                    console.log('Socket connected - initializing chat listeners');
+                    this.initChatListeners();
                 });
+            } else {
+                console.log('Socket already connected - initializing chat listeners');
+                this.initChatListeners();
             }
         } catch (error) {
             console.error('Failed to initialize multiplayer:', error);
             this.showMessage('Multiplayer initialization failed - playing in single player mode');
+        }
+    }
+    
+    // Separate method to initialize chat listeners
+    initChatListeners() {
+        // Initialize chat socket listeners if the function exists
+        if (typeof window.initChatSocketListeners === 'function') {
+            console.log('Calling initChatSocketListeners from main.js');
+            window.initChatSocketListeners();
+        } else {
+            console.error('initChatSocketListeners function not found');
+        }
+        
+        // Force a direct connection to ensure chat works
+        if (this.multiplayer && this.multiplayer.socket) {
+            console.log('Setting up direct chat listener in main.js');
+            
+            // Remove any existing listeners to prevent duplicates
+            this.multiplayer.socket.off('chat');
+            
+            this.multiplayer.socket.on('chat', (chatData) => {
+                console.log('Direct chat message received in main.js:', chatData);
+                
+                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                    const sender = chatData.playerId === this.multiplayer.localPlayerId ? 'You' : chatData.nickname;
+                    window.addChatMessage(sender, chatData.message);
+                } else {
+                    console.error('addChatMessage function not available in window');
+                }
+            });
+            
+            // Test the chat system
+            console.log('Sending test message to server');
+            setTimeout(() => {
+                if (this.multiplayer.socket.connected) {
+                    this.multiplayer.socket.emit('chat', {
+                        message: 'System test message',
+                        nickname: 'System'
+                    });
+                }
+            }, 3000);
+        } else {
+            console.error('Cannot set up chat listener: multiplayer or socket not available');
         }
     }
 
