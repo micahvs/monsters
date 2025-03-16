@@ -3725,7 +3725,7 @@ class Game {
             
             container.position.x = spawnX;
             container.position.z = spawnZ;
-            container.position.y = 3; // Higher above ground for better visibility
+            container.position.y = 3;
             
             // Store powerup type and other data
             container.userData = {
@@ -3753,8 +3753,8 @@ class Game {
                 this.lastPowerupSpawn = Date.now();
             }
             
-            // Show message to indicate a powerup has spawned
-            this.showMessage(`${powerupConfig.name} powerup spawned!`);
+            // Remove spawn notification
+            // this.showMessage(`${powerupConfig.name} powerup spawned!`);
             
             return container;
         } catch (error) {
@@ -3935,64 +3935,43 @@ class Game {
             return;
         }
         
-        // Make sure powerups array exists
-        if (!this.powerups) {
-            this.powerups = [];
-        }
-        
         const now = Date.now();
         
-        // Log powerup count for debugging
-        if (this.frameCount % 60 === 0) { // Once per second (assuming 60fps)
-            console.log(`Current powerups in game: ${this.powerups.length}`);
-        }
-        
-        // Initialize lastPowerupSpawn if needed
-        if (!this.lastPowerupSpawn) {
-            this.lastPowerupSpawn = now - this.powerupSpawnInterval; // Force immediate spawn
-            console.log("Initializing powerup spawn timer");
-        }
-        
-        // Check if we should spawn a new powerup - ensure we always have at least one
-        if (now - this.lastPowerupSpawn > this.powerupSpawnInterval || this.powerups.length === 0) {
-            console.log("Spawning new powerup - time elapsed:", (now - this.lastPowerupSpawn));
-            this.createPowerup();
-            this.lastPowerupSpawn = now;
+        // Check if we need to spawn a new powerup
+        if (!this.lastPowerupSpawn || now - this.lastPowerupSpawn > this.powerupSpawnInterval) {
+            // Only spawn if we have fewer than max powerups
+            if (!this.powerups || this.powerups.length < this.maxPowerups) {
+                this.createPowerup();
+                this.lastPowerupSpawn = now;
+            }
         }
         
         // Update existing powerups
+        if (!this.powerups || this.powerups.length === 0) {
+            return;
+        }
+        
         for (let i = this.powerups.length - 1; i >= 0; i--) {
             const powerup = this.powerups[i];
-            
-            // Skip invalid powerups
-            if (!powerup || !powerup.userData) {
-                console.warn("Invalid powerup found, removing:", powerup);
-                if (powerup && this.scene) {
-                    this.scene.remove(powerup);
-                }
-                this.powerups.splice(i, 1);
-                continue;
-            }
             
             try {
                 // Rotate powerup
                 powerup.rotation.y += powerup.userData.rotationSpeed;
                 
-                // Make powerup float up and down
-                const floatOffset = Math.sin(now * 0.001 + powerup.userData.floatOffset) * powerup.userData.floatHeight;
-                powerup.position.y = 2 + floatOffset;
+                // Float up and down
+                const floatOffset = Math.sin(now * powerup.userData.floatSpeed + powerup.userData.floatOffset) * powerup.userData.floatHeight;
+                powerup.position.y = 3 + floatOffset;
                 
-                // Make powerups stand out more - pulse the light
-                if (powerup.children && powerup.children.length > 1) {
-                    const light = powerup.children[1];
-                    if (light && light.isLight) {
-                        light.intensity = 1 + Math.sin(now * 0.003) * 0.5;
-                    }
-                }
+                // Check if player collects powerup
+                if (!this.truck) continue;
                 
-                // Check for collision with truck - use a larger collision radius for better gameplay
-                const distance = powerup.position.distanceTo(this.truck.position);
-                const collisionRadius = 8; // Larger collision radius for easier pickup
+                const dx = this.truck.position.x - powerup.position.x;
+                const dy = this.truck.position.y - powerup.position.y;
+                const dz = this.truck.position.z - powerup.position.z;
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                // Larger collision radius for easier pickup
+                const collisionRadius = 5;
                 
                 if (distance < collisionRadius) {
                     console.log(`Powerup collected! Type: ${powerup.userData.type}, distance: ${distance.toFixed(2)}`);
@@ -4007,8 +3986,8 @@ class Game {
                     this.scene.remove(powerup);
                     this.powerups.splice(i, 1);
                     
-                    // Show message
-                    this.showMessage(`Collected ${this.powerupTypes[powerup.userData.type].name}`);
+                    // Remove collection notification
+                    // this.showMessage(`Collected ${this.powerupTypes[powerup.userData.type].name}`);
                     continue;
                 }
                 

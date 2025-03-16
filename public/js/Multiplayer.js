@@ -75,16 +75,15 @@ export default class Multiplayer {
             // Set global multiplayer initialization status
             window.isMultiplayerInitialized = true;
             
+            // Update chat status indicator
+            const chatStatus = document.getElementById('chat-status');
+            if (chatStatus) chatStatus.classList.add('online');
+            
             // Send initial player data
             this.sendPlayerInfo();
             
             // Show connected message
             this.showNotification(`Connected to multiplayer server`);
-            
-            // Notify chat system
-            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                window.addChatMessage('System', 'Connected to multiplayer server!');
-            }
         });
         
         // When disconnected from the server
@@ -95,12 +94,11 @@ export default class Multiplayer {
             // Update global multiplayer initialization status
             window.isMultiplayerInitialized = false;
             
-            this.showNotification('Disconnected from server', 'error');
+            // Update chat status indicator
+            const chatStatus = document.getElementById('chat-status');
+            if (chatStatus) chatStatus.classList.remove('online');
             
-            // Notify chat system
-            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                window.addChatMessage('System', 'Disconnected from multiplayer server. Chat will not work until reconnected.');
-            }
+            this.showNotification('Disconnected from server', 'error');
         });
         
         // When a connection error occurs

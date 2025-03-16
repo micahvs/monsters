@@ -507,7 +507,7 @@
         /* Radar System - Top Right Corner */
         #radar-container {
             position: fixed;
-            top: 20px;
+            top: 150px;
             right: 20px;
             width: 220px;
             height: 220px;
@@ -568,6 +568,34 @@
         
         .compass-mark {
             margin-bottom: 5px;
+        }
+
+        /* Chat Status Indicator */
+        #chat-status {
+            position: fixed;
+            bottom: 290px;
+            right: 20px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #666;
+            box-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+            z-index: 101;
+        }
+        
+        #chat-status.online {
+            background-color: #00ff00;
+            box-shadow: 0 0 8px rgba(0, 255, 0, 0.8);
+        }
+        
+        #chat-status-container {
+            position: fixed;
+            bottom: 285px;
+            right: 40px;
+            font-size: 12px;
+            color: #aaa;
+            font-family: 'Orbitron', sans-serif;
+            z-index: 101;
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -675,6 +703,10 @@
             <button id="chatSend">Send</button>
         </div>
     </div>
+    
+    <!-- Chat Status Indicator -->
+    <div id="chat-status"></div>
+    <div id="chat-status-container">CHAT</div>
     
     <!-- Audio Controls - Bottom Right -->
     <div id="audio-controls">
@@ -798,7 +830,7 @@
             }
             
             // Add a welcome message
-            addChatMessage('System', 'Welcome to Monster Truck Stadium Chat!');
+            addChatMessage('System', 'Welcome to Monster Truck Stadium!');
             
             // Expose the addChatMessage function globally so it can be called from the game
             window.addChatMessage = addChatMessage;
@@ -807,24 +839,27 @@
             window.initChatSocketListeners = function() {
                 console.log('Initializing chat socket listeners in game.html');
                 
+                // Get chat status indicator
+                const chatStatus = document.getElementById('chat-status');
+                
                 // Check if game instance is available
                 if (!window.gameInstance) {
                     console.error('Game instance not available for chat initialization');
-                    addChatMessage('System', 'Error: Game not initialized. Chat may not work properly.');
+                    if (chatStatus) chatStatus.classList.remove('online');
                     return;
                 }
                 
                 // Check if multiplayer is available
                 if (!window.gameInstance.multiplayer) {
                     console.error('Multiplayer not available for chat initialization');
-                    addChatMessage('System', 'Error: Multiplayer not initialized. Chat may not work properly.');
+                    if (chatStatus) chatStatus.classList.remove('online');
                     return;
                 }
                 
                 // Check if socket is available
                 if (!window.gameInstance.multiplayer.socket) {
                     console.error('Socket not available for chat initialization');
-                    addChatMessage('System', 'Error: Socket not available. Chat may not work properly.');
+                    if (chatStatus) chatStatus.classList.remove('online');
                     return;
                 }
                 
@@ -850,19 +885,26 @@
                 // Verify socket connection
                 if (!window.gameInstance.multiplayer.socket.connected) {
                     console.warn('Socket not connected yet in game.html - waiting for connection');
-                    addChatMessage('System', 'Connecting to chat server...');
+                    if (chatStatus) chatStatus.classList.remove('online');
                     
                     // Add a connection event listener
                     window.gameInstance.multiplayer.socket.on('connect', function() {
                         console.log('Socket connected in game.html');
                         window.isMultiplayerInitialized = true;
-                        addChatMessage('System', 'Connected to chat server!');
+                        if (chatStatus) chatStatus.classList.add('online');
                     });
                 } else {
                     console.log('Socket already connected in game.html');
                     window.isMultiplayerInitialized = true;
-                    addChatMessage('System', 'Connected to chat server!');
+                    if (chatStatus) chatStatus.classList.add('online');
                 }
+                
+                // Add disconnect listener to update chat status
+                window.gameInstance.multiplayer.socket.on('disconnect', function() {
+                    console.log('Socket disconnected in game.html');
+                    window.isMultiplayerInitialized = false;
+                    if (chatStatus) chatStatus.classList.remove('online');
+                });
                 
                 console.log('Chat socket listeners initialized in game.html');
             };
