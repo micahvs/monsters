@@ -419,6 +419,37 @@ class Game {
             // Initialize game systems
             this.initializeWeapons();
             this.initializeParticlePools();
+            
+            // Initialize general particle pool
+            console.log("Initializing general particle pool...");
+            this.particlePool = [];
+            this.particlePoolSize = 100;
+            
+            for (let i = 0; i < this.particlePoolSize; i++) {
+                const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+                const particleMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xffffff,
+                    emissive: 0xffffff,
+                    emissiveIntensity: 0.5,
+                    transparent: true,
+                    opacity: 0
+                });
+                
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.visible = false;
+                particle.scale.set(1, 1, 1);
+                this.scene.add(particle);
+                
+                this.particlePool.push({
+                    mesh: particle,
+                    inUse: false
+                });
+            }
+            
+            // Initialize multiplayer
+            this.initMultiplayer();
+            
+            // Create turrets
             this.createTurrets();
             
             // Set initial camera position
@@ -3909,44 +3940,63 @@ class Game {
     
     // Create fade-out effect when powerup disappears
     createPowerupFadeEffect(powerup) {
-        // Handle either powerup object or type string
-        let powerupConfig;
-        let position;
-        
-        if (typeof powerup === 'string') {
-            // Type is a string - get config from powerupTypes
-            powerupConfig = this.powerupTypes[powerup];
-            if (!powerupConfig) {
-                console.log(`No config found for powerup type: ${powerup}`);
-                return;
-            }
-            // If type is a string, use truck position
-            position = this.truck.position.clone();
-        } else if (powerup && powerup.userData && powerup.userData.type) {
-            // Type is a powerup object - get config from its userData
-            powerupConfig = this.powerupTypes[powerup.userData.type];
-            if (!powerupConfig) {
-                console.log(`No config found for powerup object type: ${powerup.userData.type}`);
-                return;
-            }
-            // If type is a powerup object, use its position
-            position = powerup.position.clone();
-        } else {
-            console.log('Invalid argument passed to createPowerupFadeEffect');
+        if (!powerup || !powerup.position) {
+            console.warn('Invalid powerup object for fade effect');
             return;
         }
-        
-        // Use particle pool instead of creating new particles
-        this.createPooledParticles({
-            position: position,
-            color: powerupConfig.color,
-            emissive: powerupConfig.emissive,
-            count: 10,
-            size: 0.15,
-            speed: 0.1,
-            life: 0.7,
-            opacity: 0.5
+
+        // Create particles for the fade effect
+        const particles = this.createPooledParticles({
+            position: powerup.position.clone(),
+            color: powerup.material.color.getHex(),
+            emissive: powerup.material.emissive.getHex(),
+            count: 15,
+            size: 0.3,
+            speed: 0.2,
+            life: 1.0,
+            opacity: 0.8,
+            radius: 1.5
         });
+
+        // Add particles to the active effects
+        if (particles && particles.length > 0) {
+            particles.forEach(particleObj => {
+                const particle = particleObj.mesh;
+                if (particle && particle.userData) {
+                    this.sparks.push({
+                        mesh: particle,
+                        velocity: particle.userData.velocity,
+                        life: particle.userData.life,
+                        maxLife: particle.userData.maxLife,
+                        poolObj: particleObj,
+                        update: function(delta) {
+                            if (!this.mesh || !this.mesh.material) return true;
+
+                            // Update position
+                            this.mesh.position.add(this.velocity);
+                            
+                            // Update life and opacity
+                            this.life -= delta;
+                            const lifeRatio = this.life / this.maxLife;
+                            this.mesh.material.opacity = lifeRatio * 0.8;
+                            
+                            // Return to pool if life depleted
+                            if (this.life <= 0) {
+                                this.mesh.visible = false;
+                                this.poolObj.inUse = false;
+                                return true; // Signal removal
+                            }
+                            return false;
+                        }
+                    });
+                }
+            });
+        }
+
+        // Remove the powerup
+        if (powerup.parent) {
+            powerup.parent.remove(powerup);
+        }
     }
 
     // Create visual effect for powerup collection
@@ -4006,6 +4056,11 @@ class Game {
     
     // Create pooled particles for effects
     createPooledParticles(options) {
+        if (!this.particlePool || !Array.isArray(this.particlePool)) {
+            console.warn('Particle pool not initialized properly');
+            return [];
+        }
+
         const {
             position,
             color,
@@ -4019,32 +4074,7 @@ class Game {
             yOffset = 0
         } = options;
         
-        // Initialize particle pool if it doesn't exist
-        if (!this.particlePool) {
-            this.particlePool = [];
-            this.particlePoolSize = 100;
-            
-            for (let i = 0; i < this.particlePoolSize; i++) {
-                const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-                const particleMaterial = new THREE.MeshPhongMaterial({
-                    color: 0xffffff,
-                    emissive: 0xffffff,
-                    emissiveIntensity: 0.5,
-                    transparent: true,
-                    opacity: 0
-                });
-                
-                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                particle.visible = false;
-                particle.scale.set(1, 1, 1);
-                this.scene.add(particle);
-                
-                this.particlePool.push({
-                    mesh: particle,
-                    inUse: false
-                });
-            }
-        }
+        const usedParticles = [];
         
         // Use particles from the pool
         for (let i = 0; i < count; i++) {
@@ -4055,60 +4085,47 @@ class Game {
                 break;
             }
             
-            const particle = particleObj.mesh;
-            particleObj.inUse = true;
-            
-            // Reset and configure particle
-            particle.visible = true;
-            particle.scale.set(size * 5, size * 5, size * 5);
-            particle.material.color.set(color);
-            particle.material.emissive.set(emissive || color);
-            particle.material.emissiveIntensity = 0.5;
-            particle.material.opacity = opacity;
-            
-            // Position particle
-            const angle = Math.random() * Math.PI * 2;
-            const particleRadius = Math.random() * radius;
-            particle.position.set(
-                position.x + Math.cos(angle) * particleRadius,
-                position.y + yOffset + Math.random() * 2,
-                position.z + Math.sin(angle) * particleRadius
-            );
-            
-            // Set velocity
-            const particleSpeed = Math.random() * speed + (speed / 2);
-            const velocity = {
-                x: Math.cos(angle) * particleSpeed,
-                y: Math.random() * speed - (speed / 2),
-                z: Math.sin(angle) * particleSpeed
-            };
-            
-            // Add to sparks with auto-return to pool
-            this.sparks.push({
-                mesh: particle,
-                velocity: velocity,
-                life: life,
-                poolObj: particleObj,
-                update: function(delta) {
-                    // Update position
-                    this.mesh.position.x += this.velocity.x;
-                    this.mesh.position.y += this.velocity.y;
-                    this.mesh.position.z += this.velocity.z;
-                    
-                    // Update life and opacity
-                    this.life -= delta;
-                    this.mesh.material.opacity = this.life;
-                    
-                    // Return to pool if life depleted
-                    if (this.life <= 0) {
-                        this.mesh.visible = false;
-                        this.poolObj.inUse = false;
-                        return true; // Signal removal
-                    }
-                    return false;
+            try {
+                const particle = particleObj.mesh;
+                if (!particle) {
+                    console.warn('Invalid particle in pool');
+                    continue;
                 }
-            });
+                
+                particleObj.inUse = true;
+                particle.visible = true;
+                
+                // Reset particle properties
+                particle.position.copy(position);
+                if (particle.material) {
+                    particle.material.color.setHex(color || 0xffffff);
+                    if (emissive) particle.material.emissive.setHex(emissive);
+                    particle.material.opacity = opacity;
+                }
+                
+                // Random direction within radius
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.random() * radius;
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+                
+                particle.userData.velocity = new THREE.Vector3(
+                    x * speed,
+                    Math.random() * speed * 2,
+                    z * speed
+                );
+                
+                particle.userData.life = life;
+                particle.userData.maxLife = life;
+                
+                usedParticles.push(particleObj);
+            } catch (error) {
+                console.warn('Error setting up particle:', error);
+                continue;
+            }
         }
+        
+        return usedParticles;
     }
     
     // Create pooled light for effects
