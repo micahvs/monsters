@@ -865,26 +865,30 @@
                 
                 // Check if game instance is available
                 if (!window.gameInstance) {
-                    console.error('Game instance not available for chat initialization');
+                    console.log('Game instance not available yet, retrying in 1 second...');
                     if (chatStatus) chatStatus.classList.remove('online');
+                    setTimeout(window.initChatSocketListeners, 1000);
                     return;
                 }
                 
                 // Check if multiplayer is available
                 if (!window.gameInstance.multiplayer) {
-                    console.error('Multiplayer not available for chat initialization');
+                    console.log('Multiplayer not available yet, retrying in 1 second...');
                     if (chatStatus) chatStatus.classList.remove('online');
+                    setTimeout(window.initChatSocketListeners, 1000);
                     return;
                 }
                 
                 // Check if socket is available
                 if (!window.gameInstance.multiplayer.socket) {
-                    console.error('Socket not available for chat initialization');
+                    console.log('Socket not available yet, retrying in 1 second...');
                     if (chatStatus) chatStatus.classList.remove('online');
+                    setTimeout(window.initChatSocketListeners, 1000);
                     return;
                 }
                 
-                console.log('Setting up chat socket listeners in game.html');
+                console.log('All components available, setting up chat listeners');
+                if (chatStatus) chatStatus.classList.add('online');
                 
                 // Remove any existing listeners to prevent duplicates
                 window.gameInstance.multiplayer.socket.off('chat');

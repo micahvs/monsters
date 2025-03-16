@@ -28,36 +28,36 @@ export class SoundManager {
     
     initializeSoundPools() {
         // Vehicle sounds
-        this.createSoundPool('engine_idle', '/sounds/engine_idle.mp3', 1);
-        this.createSoundPool('engine_rev', '/sounds/engine_rev.mp3', 1);
-        this.createSoundPool('tire_screech', '/sounds/tire_screech.mp3', 3);
-        this.createSoundPool('suspension_bounce', '/sounds/suspension_bounce.mp3', 3);
+        this.createSoundPool('engine_idle', 'sounds/engine_idle.mp3', 1);
+        this.createSoundPool('engine_rev', 'sounds/engine_rev.mp3', 1);
+        this.createSoundPool('tire_screech', 'sounds/tire_screech.mp3', 3);
+        this.createSoundPool('suspension_bounce', 'sounds/suspension_bounce.mp3', 3);
         
         // Weapon sounds
-        this.createSoundPool('weapon_fire', '/sounds/weapon_fire.mp3', 5);
-        this.createSoundPool('projectile_hit', '/sounds/projectile_hit.mp3', 5);
-        this.createSoundPool('turret_fire', '/sounds/weapon_fire.mp3', 5, { pitch: 0.5 }); // Pitched down version
+        this.createSoundPool('weapon_fire', 'sounds/weapon_fire.mp3', 5);
+        this.createSoundPool('projectile_hit', 'sounds/projectile_hit.mp3', 5);
+        this.createSoundPool('turret_fire', 'sounds/weapon_fire.mp3', 5, { pitch: 0.5 }); // Pitched down version
         
         // Damage sounds
-        this.createSoundPool('vehicle_hit', '/sounds/vehicle_hit.mp3', 3);
-        this.createSoundPool('vehicle_explosion', '/sounds/vehicle_explosion.mp3', 3);
-        this.createSoundPool('metal_impact', '/sounds/metal_impact.mp3', 3);
-        this.createSoundPool('damage_warning', '/sounds/damage_warning.mp3', 1);
-        this.createSoundPool('shield_hit', '/sounds/shield_hit.mp3', 3);
+        this.createSoundPool('vehicle_hit', 'sounds/vehicle_hit.mp3', 3);
+        this.createSoundPool('vehicle_explosion', 'sounds/vehicle_explosion.mp3', 3);
+        this.createSoundPool('metal_impact', 'sounds/metal_impact.mp3', 3);
+        this.createSoundPool('damage_warning', 'sounds/damage_warning.mp3', 1);
+        this.createSoundPool('shield_hit', 'sounds/shield_hit.mp3', 3);
         
         // Powerup sounds
-        this.createSoundPool('powerup_pickup', '/sounds/powerup_pickup.mp3', 3);
-        this.createSoundPool('powerup_speed', '/sounds/powerup_speed.mp3', 2);
-        this.createSoundPool('powerup_shield', '/sounds/powerup_shield.mp3', 2);
-        this.createSoundPool('powerup_health', '/sounds/powerup_health.mp3', 2);
-        this.createSoundPool('powerup_damage', '/sounds/powerup_damage.mp3', 2);
-        this.createSoundPool('powerup_ammo', '/sounds/powerup_ammo.mp3', 2);
+        this.createSoundPool('powerup_pickup', 'sounds/powerup_pickup.mp3', 3);
+        this.createSoundPool('powerup_speed', 'sounds/powerup_speed.mp3', 2);
+        this.createSoundPool('powerup_shield', 'sounds/powerup_shield.mp3', 2);
+        this.createSoundPool('powerup_health', 'sounds/powerup_health.mp3', 2);
+        this.createSoundPool('powerup_damage', 'sounds/powerup_damage.mp3', 2);
+        this.createSoundPool('powerup_ammo', 'sounds/powerup_ammo.mp3', 2);
         
         // UI sounds
-        this.createSoundPool('menu_select', '/sounds/menu_select.mp3', 1);
-        this.createSoundPool('menu_confirm', '/sounds/menu_confirm.mp3', 1);
-        this.createSoundPool('menu_back', '/sounds/menu_back.mp3', 1);
-        this.createSoundPool('chat_message', '/sounds/chat_message.mp3', 1);
+        this.createSoundPool('menu_select', 'sounds/menu_select.mp3', 1);
+        this.createSoundPool('menu_confirm', 'sounds/menu_confirm.mp3', 1);
+        this.createSoundPool('menu_back', 'sounds/menu_back.mp3', 1);
+        this.createSoundPool('chat_message', 'sounds/chat_message.mp3', 1);
     }
     
     initializeMusicTracks() {
@@ -65,11 +65,11 @@ export class SoundManager {
         for (let i = 0; i <= 18; i++) {
             const trackNum = i.toString().padStart(2, '0');
             const trackName = `pattern_bar_live_part${trackNum}`;
-            this.loadMusicTrack(trackName, `/music/${trackName}.mp3`);
+            this.loadMusicTrack(trackName, `music/${trackName}.mp3`);
         }
         
         // Load fallback track
-        this.loadMusicTrack('fallback', '/music/zfallback.mp3');
+        this.loadMusicTrack('fallback', 'music/fallback.mp3');
     }
     
     createSoundPool(name, path, poolSize, options = {}) {
