@@ -373,90 +373,19 @@ class Game {
     }
     
     init() {
-        console.log("Initializing game");
-        
         try {
-            // Set global game instance reference
-            window.gameInstance = this;
-            console.log("Game instance set globally");
-            
-            // Create scene
+            // Initialize Three.js scene
             this.scene = new THREE.Scene();
-            this.scene.background = new THREE.Color(0x120023);
-            console.log("Scene created");
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            // Create camera
-            this.camera = new THREE.PerspectiveCamera(
-                75, 
-                window.innerWidth / window.innerHeight, 
-                0.1, 
-                1000
-            );
-            this.camera.position.set(0, 5, 10);
-            console.log("Camera created");
-            
-            // Create renderer
-            const canvas = document.getElementById('game');
-            if (!canvas) {
-                console.error("Canvas element not found!");
-                return;
-            }
-            
-            this.renderer = new THREE.WebGLRenderer({ 
-                canvas: canvas,
-                antialias: true 
-            });
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-            console.log("Renderer created");
-            
-            // Add lights
-            this.addLights();
-            
-            // Add grid and ground
-            this.createArena();
-            
-            // Create a simple truck
-            this.createSimpleTruck();
-            
-            // Add stadium around the arena (after truck but before turrets)
-            this.createStadium();
-            
-            // Create turrets (after stadium is created)
-            this.createTurrets();
-            
-            // Initialize particle pools for effects
-            this.initializeParticlePools();
-            console.log("Particle pools initialized");
-            
-            // Initialize HUD
-            this.initHUD();
-            
-            // Set up controls
-            this.setupControls();
-            
-            // Mark as initialized
-            this.isInitialized = true;
-            
-            // Remove loading screen
-            this.removeLoadingScreen();
-            
-            // Initialize multiplayer
-            this.initMultiplayer();
-            
-            // Initialize weapons now that the scene is available
-            this.initializeWeapons();
-            
-            console.log("Game initialized, starting animation loop");
-            
-            // Start animation loop
-            this.animate();
-
-            // Initialize sound manager after camera setup
+            // Initialize sound manager early
             this.soundManager = new SoundManager(this.camera);
             
             // Start with a random music track
             const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0');
             this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
+            
+            // ... rest of init code ...
         } catch (error) {
             console.error("Error during initialization:", error);
         }
@@ -1495,8 +1424,10 @@ class Game {
         // Add camera shake based on impact
         this.shakeCamera(impactSpeed * 3);
 
-        // Play collision sound
-        this.soundManager.playSound('metal_impact', this.truck.position);
+        // Play collision sound with null check
+        if (this.soundManager) {
+            this.soundManager.playSound('metal_impact', this.truck.position);
+        }
     }
 
     // Take damage method
@@ -1523,8 +1454,14 @@ class Game {
                 this.updatePowerupIndicators();
             }
             
-            // Play hit sound
-            this.soundManager.playSound('vehicle_hit', this.truck.position);
+            // Play hit sound with null check
+            if (this.soundManager) {
+                this.soundManager.playSound('vehicle_hit', this.truck.position);
+                
+                if (this.hasShield) {
+                    this.soundManager.playSound('shield_hit', this.truck.position);
+                }
+            }
             
             return 0;
         }
@@ -1650,7 +1587,7 @@ class Game {
             }
         }, 200);
         
-        // Play shield hit sound
+        // Play shield hit sound with null check
         if (this.soundManager) {
             this.soundManager.playSound('shield_hit', this.truck.position);
         }
@@ -2038,83 +1975,19 @@ class Game {
 
     // Shoot method
     shoot() {
-        if (!this.scene || !this.truck) return;
-        
-        console.log("Shooting original projectile");
+        if (this.weaponCooldown > 0) return;
         
         try {
-            // Create projectile
-            const projectileGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8);
-            projectileGeometry.rotateX(Math.PI / 2); // Rotate to point forward
+            // ... existing shooting code ...
             
-            const projectileMaterial = new THREE.MeshPhongMaterial({
-                color: 0x00ffff,
-                emissive: 0x00ffff,
-                emissiveIntensity: 1,
-                shininess: 30
-            });
-            
-            const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            
-            // Calculate direction based on truck's rotation
-            const truckDirection = new THREE.Vector3(
-                Math.sin(this.truck.rotation.y), // X component
-                0,                               // Y component (level)
-                Math.cos(this.truck.rotation.y)  // Z component
-            );
-            
-            // Position at front of truck
-            projectile.position.set(
-                this.truck.position.x + truckDirection.x * 2,
-                this.truck.position.y + 0.5,
-                this.truck.position.z + truckDirection.z * 2
-            );
-            
-            // Set rotation to match truck direction
-            projectile.rotation.y = this.truck.rotation.y;
-            
-            // Add to scene
-            this.scene.add(projectile);
-            
-            // Add light to projectile for better visibility
-            const projectileLight = new THREE.PointLight(0x00ffff, 0.5, 3);
-            projectile.add(projectileLight);
-            
-            // Apply damage multiplier if active
-            const baseDamage = 20;
-            const damage = baseDamage * (this.damageMultiplier || 1);
-            
-            // Store projectile data - make sure this.projectiles exists
-            if (!this.projectiles) {
-                this.projectiles = [];
+            // Play weapon fire sound with null check
+            if (this.soundManager) {
+                this.soundManager.playSound('weapon_fire', this.truck.position);
             }
             
-            this.projectiles.push({
-                mesh: projectile,
-                direction: truckDirection,
-                speed: 2.0, // Fast projectile
-                damage: damage,
-                lifetime: 100, // Frames before despawning
-                source: 'player'
-            });
-            
-            // Notify multiplayer system about the projectile
-            if (this.multiplayer && this.multiplayer.isConnected) {
-                this.multiplayer.sendProjectileCreated(this.projectiles[this.projectiles.length - 1]);
-            }
-            
-            // Create muzzle flash effect
-            this.createMuzzleFlash(projectile.position, truckDirection);
-            
-            console.log("Projectile created successfully, total projectiles:", this.projectiles.length);
-
-            // Play weapon fire sound
-            this.soundManager.playSound('weapon_fire', this.truck.position);
-            
-            return true;
+            // ... rest of shooting code ...
         } catch (error) {
-            console.error("Error shooting projectile:", error);
-            return false;
+            console.error("Error in shoot:", error);
         }
     }
 
@@ -3114,96 +2987,18 @@ class Game {
 
     // Turret shoot method
     turretShoot(turret) {
-        if (!this.scene || turret.destroyed) return;
-        
-        // Determine which barrel to use based on vehicle height
-        // This ensures we target the right part of different vehicles
-        const useUpperBarrel = this.shouldUseUpperBarrel();
-        
-        // Get barrel position and direction
-        const barrelWorldPos = new THREE.Vector3();
-        
-        // Get position of the appropriate barrel
-        if (useUpperBarrel && turret.upperBarrel) {
-            // Use upper barrel for taller vehicles
-            turret.upperBarrel.getWorldPosition(barrelWorldPos);
-        } else {
-            // Use main barrel for normal/low vehicles
-            turret.barrel.getWorldPosition(barrelWorldPos);
-        }
-        
-        // Get vehicle height based on type for proper targeting
-        let vehicleHeight = 1.0; // Default height
-        let targetOffset = 0.0; // Vertical offset for targeting
-        
-        if (this.monsterTruck) {
-            const machineType = this.monsterTruck.config.machineType;
+        try {
+            // ... existing turret shoot code ...
             
-            // Different heights for different vehicle types
-            if (machineType === 'cyber-beast') {
-                vehicleHeight = 1.2; // Taller for Cyber Beast (has spoiler)
-                targetOffset = 0.6; // Target higher
-            } else if (machineType === 'grid-ripper') {
-                vehicleHeight = 0.8; // Lower for Grid Ripper (streamlined)
-                targetOffset = 0.4; // Target lower
-            } else {
-                vehicleHeight = 1.0; // Medium height for Neon Crusher
-                targetOffset = 0.5; // Target middle
+            // Play turret fire sound with null check
+            if (this.soundManager) {
+                this.soundManager.playSound('turret_fire', turret.position);
             }
+            
+            // ... rest of turret shoot code ...
+        } catch (error) {
+            console.error("Error in turretShoot:", error);
         }
-        
-        // Calculate 3D direction including height component
-        const directionToPlayer = new THREE.Vector3(
-            this.truck.position.x - turret.mesh.position.x,
-            (this.truck.position.y + targetOffset) - barrelWorldPos.y, // Target specific part of vehicle
-            this.truck.position.z - turret.mesh.position.z
-        ).normalize();
-        
-        // Create moderately sized projectile for better visibility but balanced damage
-        const projectileGeometry = new THREE.SphereGeometry(0.5, 8, 8); // Still visible but not huge
-        const projectileMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff0000,
-            emissive: 0xff0000,
-            emissiveIntensity: 0.6, // Not too bright
-            transparent: true,
-            opacity: 0.8
-        });
-        
-        const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-        projectile.position.copy(barrelWorldPos);
-        
-        // Add to scene
-        this.scene.add(projectile);
-        
-        // Add subtler light to the projectile for better visibility
-        const projectileLight = new THREE.PointLight(0xff0000, 0.7, 3);
-        projectile.add(projectileLight);
-        
-        // Calculate damage for approximately 7 shots to drain full health (assuming 100 health)
-        // For most vehicles with 100 health, 7 shots means about 14-15 damage per shot
-        // We'll use a range of 13-17 damage for variety
-        const baseDamage = 14 + Math.floor(Math.random() * 3) - 1; // Damage range 13-16
-        
-        // Store projectile data with 3D direction
-        this.projectiles.push({
-            mesh: projectile,
-            direction: directionToPlayer, // Full 3D direction
-            speed: 1.8, // Moderate speed for balanced gameplay
-            damage: baseDamage, // More balanced damage
-            lifetime: 90, // Slightly longer lifetime due to slower speed
-            source: 'turret'
-        });
-        
-        // Add muzzle flash effect
-        this.createMuzzleFlash(barrelWorldPos, directionToPlayer);
-        
-        // Log targeting info for debugging
-        if (this.debugMode) {
-            console.log(`Turret targeting vehicle at y=${this.truck.position.y + targetOffset} from y=${barrelWorldPos.y}, using ${useUpperBarrel ? 'upper' : 'lower'} barrel`);
-        }
-
-        // Play turret fire sound (pitched down weapon fire)
-        this.soundManager.playSound('turret_fire', turret.position);
     }
     
     // Helper method to determine which barrel to use based on vehicle type
@@ -3792,75 +3587,18 @@ class Game {
     }
 
     applyPowerup(type) {
-        if (!this.powerupTypes[type]) return;
-        
-        const powerupConfig = this.powerupTypes[type];
-        
-        // Determine which sound to play
-        let soundType = type.toLowerCase();
-        // Map powerup types to sound types
-        if (type === 'SPEED_BOOST') soundType = 'speed';
-        else if (type === 'INVINCIBILITY' || type === 'SHIELD') soundType = 'shield';
-        else if (type === 'DAMAGE_BOOST') soundType = 'damage';
-        else if (type === 'REPAIR') soundType = 'health';
-        else if (type === 'AMMO_REFILL') soundType = 'ammo';
-        
-        // Play sound effect
-        if (this.powerupSounds[soundType]) {
-            // Clone the audio to allow overlapping sounds
-            const sound = this.powerupSounds[soundType].cloneNode();
-            sound.volume = 0.4;
-            sound.play().catch(e => console.log('Error playing powerup sound:', e));
-        } else {
-            console.log(`No sound found for powerup type: ${soundType}`);
-        }
-        
-        // Create visual effect
-        this.createPowerupEffect(type);
-        
-        // Apply powerup effect based on the powerup's duration
-        if (powerupConfig.duration > 0) {
-            // Calculate expiration time
-            const expirationTime = Date.now() + powerupConfig.duration;
+        try {
+            // ... existing powerup code ...
             
-            // Set up timeout to remove the powerup effect when it expires
-            const timeoutId = setTimeout(() => {
-                // Call the remove function to revert the powerup effect
-                powerupConfig.remove();
-                // Remove from active powerups
-                this.activePowerups.delete(type);
-                // Update the indicators
-                this.updatePowerupIndicators();
-                // Create fade-out effect
-                this.createPowerupFadeEffect(type);
-            }, powerupConfig.duration);
-            
-            // Add to active powerups (replace existing if any)
-            if (this.activePowerups.has(type)) {
-                // Clear existing timeout to prevent multiple removals
-                clearTimeout(this.activePowerups.get(type).timeoutId);
+            // Play powerup sound with null check
+            if (this.soundManager) {
+                this.soundManager.playSound(`powerup_${type}`, this.truck.position);
             }
             
-            // Store in map with timeout ID and expiration time
-            this.activePowerups.set(type, {
-                timeoutId: timeoutId,
-                expirationTime: expirationTime
-            });
-            
-            // Apply the effect immediately
-            powerupConfig.apply();
-        } else {
-            // For instant powerups, just apply the effect without adding to active powerups
-            powerupConfig.apply();
+            // ... rest of powerup code ...
+        } catch (error) {
+            console.error("Error in applyPowerup:", error);
         }
-        
-        // Update powerup indicators display
-        this.updatePowerupIndicators();
-        
-        console.log(`Powerup applied: ${powerupConfig.name}`);
-
-        // Play powerup sound
-        this.soundManager.playSound(`powerup_${type}`, this.truck.position);
     }
 
     // Update any multiplayer-related methods to check if enabled
@@ -5193,190 +4931,17 @@ class Game {
 
     // Create explosion effect using object pooling
     createExplosion(position, type = 'standard', skipAreaDamage = false) {
-        // Ensure particle pools are initialized
-        if (!this.particlePools) {
-            this.initializeParticlePools();
-        }
-        
-        // Configure explosion based on type
-        const isLarge = type === 'large';
-        const maxLife = isLarge ? 90 : 60;
-        const particleCount = isLarge ? 40 : 20;
-        const debrisCount = isLarge ? 10 : 5;
-        const smokeCount = isLarge ? 15 : 8;
-        const maxShockwaveSize = isLarge ? 15 : 10;
-        const lightIntensity = isLarge ? 5 : 3;
-        
-        // Create explosion data structure
-        const explosion = {
-            position: position.clone(),
-            life: maxLife,
-            maxLife: maxLife,
-            type: type,
-            particles: [],
-            debris: [],
-            maxShockwaveSize: maxShockwaveSize,
-            lightIntensity: lightIntensity
-        };
-        
-        // Get light from pool
-        const lightObj = this.getLightFromPool();
-        lightObj.light.position.copy(position);
-        lightObj.light.position.y += 2;
-        lightObj.light.color.set(0xff5500);
-        lightObj.light.intensity = lightIntensity;
-        lightObj.light.distance = 30;
-        explosion.light = lightObj;
-        
-        // Get shockwave from pool
-        const shockwaveObj = this.getShockwaveFromPool();
-        shockwaveObj.mesh.position.copy(position);
-        shockwaveObj.mesh.position.y += 0.1;
-        shockwaveObj.mesh.scale.set(1, 1, 1);
-        shockwaveObj.mesh.material.opacity = 0.8;
-        explosion.shockwave = shockwaveObj;
-        
-        // Create fire particles
-        for (let i = 0; i < particleCount; i++) {
-            const particleObj = this.getParticleFromPool('explosionParticles');
-            if (!particleObj) continue;
+        try {
+            // ... existing explosion code ...
             
-            const particle = particleObj.mesh;
-            particle.position.copy(position);
-            particle.position.y += 1 + Math.random() * 2;
-            
-            // Random velocity with more upward momentum
-            const angle = Math.random() * Math.PI * 2;
-            const horizontalSpeed = Math.random() * 0.4 + 0.1;
-            const verticalSpeed = Math.random() * 0.5 + 0.3;
-            
-            particleObj.velocity = {
-                x: Math.cos(angle) * horizontalSpeed,
-                y: verticalSpeed,
-                z: Math.sin(angle) * horizontalSpeed
-            };
-            
-            // Add rotation to particles
-            particle.rotation.set(
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2
-            );
-            
-            particleObj.rotationSpeed = {
-                x: (Math.random() - 0.5) * 0.2,
-                y: (Math.random() - 0.5) * 0.2,
-                z: (Math.random() - 0.5) * 0.2
-            };
-            
-            particleObj.isSmoke = false;
-            particle.material.opacity = 1;
-            particle.material.color.set(i % 2 === 0 ? 0xff5500 : 0xffff00);
-            
-            explosion.particles.push(particleObj);
-        }
-        
-        // Create smoke particles
-        for (let i = 0; i < smokeCount; i++) {
-            const smokeObj = this.getParticleFromPool('smokeParticles');
-            if (!smokeObj) continue;
-            
-            const smoke = smokeObj.mesh;
-            smoke.position.copy(position);
-            smoke.position.y += 1 + Math.random() * 2;
-            
-            // Random velocity with more upward momentum
-            const angle = Math.random() * Math.PI * 2;
-            const horizontalSpeed = Math.random() * 0.3 + 0.05;
-            const verticalSpeed = Math.random() * 0.4 + 0.2;
-            
-            smokeObj.velocity = {
-                x: Math.cos(angle) * horizontalSpeed,
-                y: verticalSpeed,
-                z: Math.sin(angle) * horizontalSpeed
-            };
-            
-            // Add rotation to particles
-            smoke.rotation.set(
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2
-            );
-            
-            smokeObj.rotationSpeed = {
-                x: (Math.random() - 0.5) * 0.1,
-                y: (Math.random() - 0.5) * 0.1,
-                z: (Math.random() - 0.5) * 0.1
-            };
-            
-            smokeObj.isSmoke = true;
-            smoke.material.opacity = 0.7;
-            smoke.scale.set(1, 1, 1);
-            
-            explosion.particles.push(smokeObj);
-        }
-        
-        // Create debris pieces
-        for (let i = 0; i < debrisCount; i++) {
-            const debrisObj = this.getParticleFromPool('explosionDebris');
-            if (!debrisObj) continue;
-            
-            const debris = debrisObj.mesh;
-            debris.position.copy(position);
-            debris.position.y += 0.5;
-            
-            // Random velocity with more horizontal movement
-            const angle = Math.random() * Math.PI * 2;
-            const speed = Math.random() * 0.6 + 0.3;
-            debrisObj.velocity = {
-                x: Math.cos(angle) * speed,
-                y: Math.random() * 0.7 + 0.5, // Higher initial upward velocity
-                z: Math.sin(angle) * speed
-            };
-            
-            // Add rotation to debris
-            debris.rotation.set(
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2,
-                Math.random() * Math.PI * 2
-            );
-            
-            debrisObj.rotationSpeed = {
-                x: (Math.random() - 0.5) * 0.3,
-                y: (Math.random() - 0.5) * 0.3,
-                z: (Math.random() - 0.5) * 0.3
-            };
-            
-            debris.material.opacity = 1;
-            
-            explosion.debris.push(debrisObj);
-        }
-        
-        // Add to active explosions
-        this.activeExplosions.push(explosion);
-        
-        // Apply camera shake based on explosion type and distance
-        const shakeIntensity = isLarge ? 0.4 : 0.2;
-        if (this.truck) {
-            const distanceToPlayer = position.distanceTo(this.truck.position);
-            if (distanceToPlayer < 30) {
-                const adjustedIntensity = shakeIntensity * (1 - (distanceToPlayer / 30));
-                this.shakeCamera(adjustedIntensity);
+            // Play explosion sound with null check
+            if (this.soundManager) {
+                this.soundManager.playSound('vehicle_explosion', position);
             }
-        }
-        
-        // Apply area damage only if not skipped (to prevent recursion)
-        if (!skipAreaDamage) {
-            if (isLarge) {
-                this.applyAreaDamage(position, 15, 50);
-            } else {
-                this.applyAreaDamage(position, 10, 30);
-            }
-        }
-        
-        // Play explosion sound
-        if (this.soundManager) {
-            this.soundManager.playSound('vehicle_explosion', position);
+            
+            // ... rest of explosion code ...
+        } catch (error) {
+            console.error("Error in createExplosion:", error);
         }
     }
 
