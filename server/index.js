@@ -80,8 +80,9 @@ io.on('connection', (socket) => {
         lastUpdate: Date.now()
       };
       
-      // Broadcast updated position to all other players
-      socket.broadcast.emit('playerMoved', {
+      // Broadcast updated position to all other players immediately
+      // Use volatile emit for position updates to reduce latency
+      socket.volatile.broadcast.emit('playerMoved', {
         id: socket.id,
         ...update
       });

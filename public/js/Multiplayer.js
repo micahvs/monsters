@@ -79,6 +79,13 @@ export default class Multiplayer {
             const chatStatus = document.getElementById('chat-status');
             if (chatStatus) chatStatus.classList.add('online');
             
+            // Clear existing players when reconnecting to prevent duplicates
+            this.players.forEach((player, id) => {
+                if (id !== this.localPlayerId) {
+                    this.removeRemotePlayer(id);
+                }
+            });
+            
             // Send initial player data
             this.sendPlayerInfo();
             
@@ -116,6 +123,13 @@ export default class Multiplayer {
         this.socket.on('gameState', (gameState) => {
             console.log('Received game state:', gameState);
             
+            // Clear existing players before adding new ones to prevent duplicates
+            this.players.forEach((player, id) => {
+                if (id !== this.localPlayerId) {
+                    this.removeRemotePlayer(id);
+                }
+            });
+            
             // Create other players
             Object.values(gameState.players).forEach(playerData => {
                 if (playerData.id !== this.localPlayerId) {
@@ -128,6 +142,13 @@ export default class Multiplayer {
         this.socket.on('playerJoined', (playerData) => {
             if (playerData.id !== this.localPlayerId) {
                 console.log('New player joined:', playerData);
+                
+                // Remove any existing player with this ID first to prevent duplicates
+                if (this.players.has(playerData.id)) {
+                    console.log('Removing existing player before adding new one:', playerData.id);
+                    this.removeRemotePlayer(playerData.id);
+                }
+                
                 this.addRemotePlayer(playerData);
                 this.showNotification(`${playerData.nickname} joined the arena`);
             }
@@ -140,11 +161,16 @@ export default class Multiplayer {
         
         // When a player leaves
         this.socket.on('playerLeft', (playerData) => {
+            console.log('Player left:', playerData.id);
+            
+            // Store nickname before removing
+            const nickname = this.players.get(playerData.id)?.nickname || 'Player';
+            
+            // Remove the player
             this.removeRemotePlayer(playerData.id);
             
-            if (this.players.get(playerData.id)) {
-                this.showNotification(`${this.players.get(playerData.id).nickname} left the arena`);
-            }
+            // Show notification after removal
+            this.showNotification(`${nickname} left the arena`);
         });
         
         // When a player shoots
@@ -260,6 +286,9 @@ export default class Multiplayer {
     }
     
     startUpdates() {
+        // Increase update rate for more responsive gameplay
+        this.updateRate = 30; // ms between updates (reduced from 50ms)
+        
         // Start sending regular position updates
         this.updateInterval = setInterval(() => {
             if (this.isConnected && this.game.truck) {
@@ -304,6 +333,27 @@ export default class Multiplayer {
         
         const now = Date.now();
         
+        // Calculate velocity for better prediction
+        const velocity = {
+            x: 0,
+            y: 0,
+            z: 0
+        };
+        
+        if (this.game.truck.userData && this.game.truck.userData.lastPosition) {
+            const timeDelta = (now - (this.game.truck.userData.lastUpdateTime || now - 100)) / 1000;
+            if (timeDelta > 0) {
+                velocity.x = (this.game.truck.position.x - this.game.truck.userData.lastPosition.x) / timeDelta;
+                velocity.y = (this.game.truck.position.y - this.game.truck.userData.lastPosition.y) / timeDelta;
+                velocity.z = (this.game.truck.position.z - this.game.truck.userData.lastPosition.z) / timeDelta;
+            }
+        }
+        
+        // Store current position for next velocity calculation
+        if (!this.game.truck.userData) this.game.truck.userData = {};
+        this.game.truck.userData.lastPosition = this.game.truck.position.clone();
+        this.game.truck.userData.lastUpdateTime = now;
+        
         // Only send updates if enough time has passed or there's significant change
         if (now - this.lastUpdateTime > this.updateRate) {
             this.lastUpdateTime = now;
@@ -317,7 +367,7 @@ export default class Multiplayer {
                 rotation: {
                     y: this.game.truck.rotation.y
                 },
-                velocity: this.game.truck.velocity,
+                velocity: velocity,
                 health: this.game.monsterTruck ? this.game.monsterTruck.health : this.game.health
             });
         }
@@ -411,6 +461,10 @@ export default class Multiplayer {
         
         // Skip if it's the local player or player already exists
         if (playerData.id === this.localPlayerId || this.players.has(playerData.id)) {
+            // If player exists, just update their data
+            if (this.players.has(playerData.id)) {
+                this.updateRemotePlayer(playerData);
+            }
             return;
         }
         
@@ -500,22 +554,41 @@ export default class Multiplayer {
     }
     
     removeRemotePlayer(playerId) {
-        if (!this.players.has(playerId) || !this.game.scene) return;
+        if (!this.players.has(playerId)) {
+            console.log(`Player ${playerId} not found for removal`);
+            return;
+        }
         
+        console.log(`Removing remote player: ${playerId}`);
         const player = this.players.get(playerId);
         
-        // Remove truck from scene
-        if (player.monsterTruck) {
-            player.monsterTruck.dispose();
+        try {
+            // Remove truck from scene
+            if (player.monsterTruck) {
+                player.monsterTruck.dispose();
+            } else if (player.truckMesh && this.game.scene) {
+                this.game.scene.remove(player.truckMesh);
+            }
+            
+            // Remove nickname display
+            if (player.nicknameDisplay && this.game.scene) {
+                this.game.scene.remove(player.nicknameDisplay);
+            }
+            
+            // Remove radar blip
+            const blip = this.radarBlips.get(playerId);
+            if (blip) {
+                blip.remove();
+                this.radarBlips.delete(playerId);
+            }
+            
+            // Remove from players list
+            this.players.delete(playerId);
+            
+            console.log(`Successfully removed player ${playerId}`);
+        } catch (error) {
+            console.error(`Error removing player ${playerId}:`, error);
         }
-        
-        // Remove nickname display
-        if (player.nicknameDisplay) {
-            this.game.scene.remove(player.nicknameDisplay);
-        }
-        
-        // Remove from players list
-        this.players.delete(playerId);
     }
     
     updatePlayerPositions() {
@@ -523,24 +596,37 @@ export default class Multiplayer {
         
         const now = Date.now();
         
-        // Update each remote player's position with interpolation
+        // Update each remote player's position with improved interpolation
         this.players.forEach((player, playerId) => {
             if (!player.truckMesh || playerId === this.localPlayerId) return;
             
             // Calculate how far we are between updates (0-1)
             const timeSinceUpdate = now - player.lastUpdateTime;
-            const interpolationFactor = Math.min(1.0, timeSinceUpdate / this.updateRate);
             
-            // Interpolate position
+            // Use a more responsive interpolation factor
+            // This will make movement smoother and more responsive
+            const interpolationFactor = Math.min(1.0, timeSinceUpdate / (this.updateRate * 0.8));
+            
+            // Apply some prediction for smoother movement
+            let predictedPosition = player.targetPosition.clone();
+            if (player.velocity) {
+                // If we have velocity data, use it for prediction
+                predictedPosition.x += player.velocity.x * (timeSinceUpdate / 1000);
+                predictedPosition.z += player.velocity.z * (timeSinceUpdate / 1000);
+            }
+            
+            // Interpolate position with prediction
             player.truckMesh.position.lerpVectors(
                 player.lastPosition,
-                player.targetPosition,
+                predictedPosition,
                 interpolationFactor
             );
             
-            // Interpolate rotation
+            // Interpolate rotation with improved smoothing
+            // Use a slightly faster rotation interpolation for more responsive turning
+            const rotationFactor = Math.min(1.0, timeSinceUpdate / (this.updateRate * 0.6));
             player.truckMesh.rotation.y = player.lastRotation.y + 
-                (player.targetRotation.y - player.lastRotation.y) * interpolationFactor;
+                (player.targetRotation.y - player.lastRotation.y) * rotationFactor;
             
             // Update nickname position
             if (player.nicknameDisplay) {
