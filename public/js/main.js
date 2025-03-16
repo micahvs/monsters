@@ -4956,7 +4956,12 @@ class Game {
 // Initialize game when window is fully loaded
 window.addEventListener('load', () => {
     console.log("Window loaded, creating game");
-    window.game = new Game();
+    try {
+        window.game = new Game();
+        console.log("Game instance created and set on window.game");
+    } catch (error) {
+        console.error("Error creating game instance:", error);
+    }
 });
 
 export default Game;

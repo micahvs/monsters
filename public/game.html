@@ -783,7 +783,7 @@
                 if (sender === 'System') {
                     senderColor = '#00ffff';
                 } else if (sender === 'You') {
-                    senderColor = window.gameInstance?.playerColor || '#ff00ff';
+                    senderColor = window.game?.playerColor || '#ff00ff';
                 }
                 
                 messageElement.innerHTML = `<span style="color: ${senderColor}; font-weight: bold;">${sender}:</span> ${message}`;
@@ -812,17 +812,17 @@
                     console.log('Sending chat message, waiting for server echo:', message);
                     
                     // Check if multiplayer is initialized using the global flag
-                    if (window.isMultiplayerInitialized && window.gameInstance && window.gameInstance.multiplayer && window.gameInstance.multiplayer.socket) {
+                    if (window.isMultiplayerInitialized && window.game && window.game.multiplayer && window.game.multiplayer.socket) {
                         const chatData = {
                             message: message,
-                            nickname: window.gameInstance.playerName || 'Player'
+                            nickname: window.game.playerName || 'Player'
                         };
                         
                         console.log('Sending chat message from game.html:', chatData);
-                        window.gameInstance.multiplayer.socket.emit('chat', chatData);
+                        window.game.multiplayer.socket.emit('chat', chatData);
                         
                         // Verify socket connection
-                        if (!window.gameInstance.multiplayer.socket.connected) {
+                        if (!window.game.multiplayer.socket.connected) {
                             console.error('Socket is not connected when trying to send chat message from game.html');
                             addChatMessage('System', 'Error: Not connected to server. Message may not be delivered.');
                         }
@@ -834,11 +834,11 @@
                         addChatMessage('You', message);
                         
                         // Check specific conditions to provide better error messages
-                        if (!window.gameInstance) {
+                        if (!window.game) {
                             addChatMessage('System', 'Error: Game not initialized. Chat may not work properly.');
-                        } else if (!window.gameInstance.multiplayer) {
+                        } else if (!window.game.multiplayer) {
                             addChatMessage('System', 'Error: Multiplayer component not initialized. Chat may not work properly.');
-                        } else if (!window.gameInstance.multiplayer.socket) {
+                        } else if (!window.game.multiplayer.socket) {
                             addChatMessage('System', 'Error: Socket not available. Chat may not work properly.');
                         } else if (!window.isMultiplayerInitialized) {
                             addChatMessage('System', 'Error: Waiting for multiplayer to initialize. Try again in a moment.');
@@ -864,7 +864,7 @@
                 const chatStatus = document.getElementById('chat-status');
                 
                 // Check if game instance is available
-                if (!window.gameInstance) {
+                if (!window.game) {
                     console.log('Game instance not available yet, retrying in 1 second...');
                     if (chatStatus) chatStatus.classList.remove('online');
                     setTimeout(window.initChatSocketListeners, 1000);
@@ -872,7 +872,7 @@
                 }
                 
                 // Check if multiplayer is available
-                if (!window.gameInstance.multiplayer) {
+                if (!window.game.multiplayer) {
                     console.log('Multiplayer not available yet, retrying in 1 second...');
                     if (chatStatus) chatStatus.classList.remove('online');
                     setTimeout(window.initChatSocketListeners, 1000);
@@ -880,7 +880,7 @@
                 }
                 
                 // Check if socket is available
-                if (!window.gameInstance.multiplayer.socket) {
+                if (!window.game.multiplayer.socket) {
                     console.log('Socket not available yet, retrying in 1 second...');
                     if (chatStatus) chatStatus.classList.remove('online');
                     setTimeout(window.initChatSocketListeners, 1000);
@@ -891,10 +891,10 @@
                 if (chatStatus) chatStatus.classList.add('online');
                 
                 // Remove any existing listeners to prevent duplicates
-                window.gameInstance.multiplayer.socket.off('chat');
+                window.game.multiplayer.socket.off('chat');
                 
                 // Listen for chat messages from server
-                window.gameInstance.multiplayer.socket.on('chat', function(chatData) {
+                window.game.multiplayer.socket.on('chat', function(chatData) {
                     console.log('Received chat message in game.html:', chatData);
                     
                     if (!chatData || !chatData.message) {
@@ -903,17 +903,17 @@
                     }
                     
                     // Display the message - the server will echo back our own messages
-                    const sender = chatData.playerId === window.gameInstance.multiplayer.localPlayerId ? 'You' : chatData.nickname;
+                    const sender = chatData.playerId === window.game.multiplayer.localPlayerId ? 'You' : chatData.nickname;
                     addChatMessage(sender, chatData.message);
                 });
                 
                 // Verify socket connection
-                if (!window.gameInstance.multiplayer.socket.connected) {
+                if (!window.game.multiplayer.socket.connected) {
                     console.warn('Socket not connected yet in game.html - waiting for connection');
                     if (chatStatus) chatStatus.classList.remove('online');
                     
                     // Add a connection event listener
-                    window.gameInstance.multiplayer.socket.on('connect', function() {
+                    window.game.multiplayer.socket.on('connect', function() {
                         console.log('Socket connected in game.html');
                         window.isMultiplayerInitialized = true;
                         if (chatStatus) chatStatus.classList.add('online');
@@ -925,7 +925,7 @@
                 }
                 
                 // Add disconnect listener to update chat status
-                window.gameInstance.multiplayer.socket.on('disconnect', function() {
+                window.game.multiplayer.socket.on('disconnect', function() {
                     console.log('Socket disconnected in game.html');
                     window.isMultiplayerInitialized = false;
                     if (chatStatus) chatStatus.classList.remove('online');
@@ -937,7 +937,7 @@
             // Call initChatSocketListeners when the page loads
             // This will be called again when the game instance is created
             setTimeout(function() {
-                if (window.gameInstance && window.gameInstance.multiplayer) {
+                if (window.game && window.game.multiplayer) {
                     window.initChatSocketListeners();
                 }
             }, 2000);
