@@ -565,7 +565,34 @@ export default class Multiplayer {
         try {
             // Remove truck from scene
             if (player.monsterTruck) {
-                player.monsterTruck.dispose();
+                // MonsterTruck doesn't have a dispose method, so we need to remove its components
+                if (player.monsterTruck.body && this.game.scene) {
+                    this.game.scene.remove(player.monsterTruck.body);
+                }
+                
+                // Remove wheels if they exist
+                if (player.monsterTruck.wheels) {
+                    player.monsterTruck.wheels.forEach(wheel => {
+                        if (wheel && this.game.scene) {
+                            this.game.scene.remove(wheel);
+                        }
+                    });
+                }
+                
+                // Dispose of any geometries and materials
+                if (player.monsterTruck.body) {
+                    if (player.monsterTruck.body.geometry) {
+                        player.monsterTruck.body.geometry.dispose();
+                    }
+                    
+                    if (player.monsterTruck.body.material) {
+                        if (Array.isArray(player.monsterTruck.body.material)) {
+                            player.monsterTruck.body.material.forEach(mat => mat.dispose());
+                        } else {
+                            player.monsterTruck.body.material.dispose();
+                        }
+                    }
+                }
             } else if (player.truckMesh && this.game.scene) {
                 this.game.scene.remove(player.truckMesh);
             }
@@ -573,6 +600,14 @@ export default class Multiplayer {
             // Remove nickname display
             if (player.nicknameDisplay && this.game.scene) {
                 this.game.scene.remove(player.nicknameDisplay);
+                
+                // Dispose of nickname texture and material
+                if (player.nicknameDisplay.material) {
+                    if (player.nicknameDisplay.material.map) {
+                        player.nicknameDisplay.material.map.dispose();
+                    }
+                    player.nicknameDisplay.material.dispose();
+                }
             }
             
             // Remove radar blip
