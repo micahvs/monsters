@@ -3,6 +3,7 @@ import { MonsterTruck } from './MonsterTruck.js';
 import { World } from './World.js';
 import Multiplayer from './Multiplayer.js';
 import { Weapon, WeaponTypes, WeaponPickup } from './Weapons.js';
+import { SoundManager } from './SoundManager.js';
 
 const TRUCK_SPECS = {
     'NEON CRUSHER': {
@@ -367,6 +368,8 @@ class Game {
                 this.powerupSounds[key].src = 'sounds/powerup_generic.mp3';
             });
         });
+
+        this.soundManager = null;  // Will be initialized after camera setup
     }
     
     init() {
@@ -447,6 +450,13 @@ class Game {
             
             // Start animation loop
             this.animate();
+
+            // Initialize sound manager after camera setup
+            this.soundManager = new SoundManager(this.camera);
+            
+            // Start with a random music track
+            const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0');
+            this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
         } catch (error) {
             console.error("Error during initialization:", error);
         }
@@ -1484,6 +1494,9 @@ class Game {
         
         // Add camera shake based on impact
         this.shakeCamera(impactSpeed * 3);
+
+        // Play collision sound
+        this.soundManager.playSound('metal_impact', this.truck.position);
     }
 
     // Take damage method
@@ -1509,6 +1522,9 @@ class Game {
                 this.activePowerups.delete('SHIELD');
                 this.updatePowerupIndicators();
             }
+            
+            // Play hit sound
+            this.soundManager.playSound('vehicle_hit', this.truck.position);
             
             return 0;
         }
@@ -1633,6 +1649,11 @@ class Game {
                 this.shieldMesh.material.opacity = originalOpacity;
             }
         }, 200);
+        
+        // Play shield hit sound
+        if (this.soundManager) {
+            this.soundManager.playSound('shield_hit', this.truck.position);
+        }
     }
     
     // Add screen flash effect for damage
@@ -2086,6 +2107,10 @@ class Game {
             this.createMuzzleFlash(projectile.position, truckDirection);
             
             console.log("Projectile created successfully, total projectiles:", this.projectiles.length);
+
+            // Play weapon fire sound
+            this.soundManager.playSound('weapon_fire', this.truck.position);
+            
             return true;
         } catch (error) {
             console.error("Error shooting projectile:", error);
@@ -3176,6 +3201,9 @@ class Game {
         if (this.debugMode) {
             console.log(`Turret targeting vehicle at y=${this.truck.position.y + targetOffset} from y=${barrelWorldPos.y}, using ${useUpperBarrel ? 'upper' : 'lower'} barrel`);
         }
+
+        // Play turret fire sound (pitched down weapon fire)
+        this.soundManager.playSound('turret_fire', turret.position);
     }
     
     // Helper method to determine which barrel to use based on vehicle type
@@ -3830,6 +3858,9 @@ class Game {
         this.updatePowerupIndicators();
         
         console.log(`Powerup applied: ${powerupConfig.name}`);
+
+        // Play powerup sound
+        this.soundManager.playSound(`powerup_${type}`, this.truck.position);
     }
 
     // Update any multiplayer-related methods to check if enabled
@@ -3906,26 +3937,15 @@ class Game {
 
     // Add this method to toggle audio
     toggleAudio() {
-        if (!this.backgroundMusic || !this.audioToggle) return;
-        
-        const audioIcon = this.audioToggle.querySelector('i');
-        
-        if (this.backgroundMusic.muted) {
-            // Unmute
-            this.backgroundMusic.muted = false;
-            this.audioToggle.classList.remove('muted');
-            if (audioIcon) audioIcon.className = 'fas fa-volume-up';
-            localStorage.setItem('monsterTruckAudioMuted', 'false');
-            this.isMuted = false;
-            this.showMessage('Audio On');
-        } else {
-            // Mute
-            this.backgroundMusic.muted = true;
-            this.audioToggle.classList.add('muted');
-            if (audioIcon) audioIcon.className = 'fas fa-volume-mute';
-            localStorage.setItem('monsterTruckAudioMuted', 'true');
-            this.isMuted = true;
-            this.showMessage('Audio Off');
+        if (this.soundManager) {
+            const newVolume = this.soundManager.masterVolume > 0 ? 0 : 0.7;
+            this.soundManager.setMasterVolume(newVolume);
+            
+            // Update UI to show muted/unmuted state
+            const audioButton = document.getElementById('audioButton');
+            if (audioButton) {
+                audioButton.textContent = newVolume > 0 ? '🔊' : '🔇';
+            }
         }
     }
 
@@ -4168,6 +4188,11 @@ class Game {
                 // Add damage boost effect
                 this.createDamageBoostEffect();
                 break;
+        }
+        
+        // Play powerup pickup sound
+        if (this.soundManager) {
+            this.soundManager.playSound('powerup_pickup', this.truck.position);
         }
     }
     
@@ -5348,6 +5373,18 @@ class Game {
                 this.applyAreaDamage(position, 10, 30);
             }
         }
+        
+        // Play explosion sound
+        if (this.soundManager) {
+            this.soundManager.playSound('vehicle_explosion', position);
+        }
+    }
+
+    dispose() {
+        if (this.soundManager) {
+            this.soundManager.dispose();
+        }
+        // ... any other disposal code ...
     }
 }
 
