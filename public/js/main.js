@@ -388,11 +388,21 @@ class Game {
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             
             // Initialize sound manager early
+            console.log("Initializing sound manager...");
             this.soundManager = new SoundManager(this.camera);
             
             // Start with a random music track
             const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0');
+            console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
             this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
+            
+            // Add audio context resume handler for browsers that require user interaction
+            document.addEventListener('click', () => {
+                if (this.soundManager && this.soundManager.listener.context.state === 'suspended') {
+                    console.log("Resuming audio context after user interaction");
+                    this.soundManager.listener.context.resume();
+                }
+            }, { once: true });
             
             // Add lights
             this.addLights();

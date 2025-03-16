@@ -24,6 +24,32 @@ export class SoundManager {
         // Initialize sound pools
         this.initializeSoundPools();
         this.initializeMusicTracks();
+        
+        // Check audio context state
+        this.checkAudioContext();
+    }
+    
+    checkAudioContext() {
+        if (this.listener.context.state === 'suspended') {
+            console.log('Audio context is suspended. Waiting for user interaction...');
+            const resumeAudio = () => {
+                console.log('Attempting to resume audio context...');
+                this.listener.context.resume().then(() => {
+                    console.log('Audio context resumed successfully');
+                }).catch(error => {
+                    console.error('Error resuming audio context:', error);
+                });
+                document.removeEventListener('click', resumeAudio);
+                document.removeEventListener('keydown', resumeAudio);
+                document.removeEventListener('touchstart', resumeAudio);
+            };
+            
+            document.addEventListener('click', resumeAudio);
+            document.addEventListener('keydown', resumeAudio);
+            document.addEventListener('touchstart', resumeAudio);
+        } else {
+            console.log('Audio context is ready:', this.listener.context.state);
+        }
     }
     
     initializeSoundPools() {
@@ -73,18 +99,28 @@ export class SoundManager {
     }
     
     createSoundPool(name, path, poolSize, options = {}) {
+        console.log(`Creating sound pool for ${name} with path ${path}`);
         const pool = [];
         for (let i = 0; i < poolSize; i++) {
             const sound = new THREE.Audio(this.listener);
             const loader = new THREE.AudioLoader();
             
-            loader.load(path, (buffer) => {
-                sound.setBuffer(buffer);
-                sound.setVolume(this.sfxVolume * this.masterVolume);
-                if (options.pitch) {
-                    sound.setPlaybackRate(options.pitch);
+            loader.load(path, 
+                (buffer) => {
+                    console.log(`Successfully loaded sound: ${name}`);
+                    sound.setBuffer(buffer);
+                    sound.setVolume(this.sfxVolume * this.masterVolume);
+                    if (options.pitch) {
+                        sound.setPlaybackRate(options.pitch);
+                    }
+                },
+                (progress) => {
+                    console.log(`Loading sound ${name}: ${(progress.loaded / progress.total * 100).toFixed(2)}%`);
+                },
+                (error) => {
+                    console.error(`Error loading sound ${name} from ${path}:`, error);
                 }
-            });
+            );
             
             pool.push(sound);
         }
@@ -105,9 +141,10 @@ export class SoundManager {
     }
     
     playSound(name, position = null) {
+        console.log(`Attempting to play sound: ${name}`);
         const pool = this.soundPools.get(name);
         if (!pool) {
-            console.warn(`Sound not found: ${name}`);
+            console.warn(`Sound not found in pool: ${name}`);
             return null;
         }
         
@@ -118,20 +155,33 @@ export class SoundManager {
             return null;
         }
         
-        // If position is provided, make it positional
-        if (position) {
-            const posSound = new THREE.PositionalAudio(this.listener);
-            posSound.setBuffer(sound.buffer);
-            posSound.setVolume(sound.volume);
-            posSound.setRefDistance(20);
-            posSound.setRolloffFactor(1);
-            posSound.position.copy(position);
-            posSound.play();
-            return posSound;
+        // Check if sound is ready to play
+        if (!sound.buffer) {
+            console.warn(`Sound ${name} not loaded yet`);
+            return null;
         }
         
-        sound.play();
-        return sound;
+        try {
+            // If position is provided, make it positional
+            if (position) {
+                const posSound = new THREE.PositionalAudio(this.listener);
+                posSound.setBuffer(sound.buffer);
+                posSound.setVolume(sound.volume);
+                posSound.setRefDistance(20);
+                posSound.setRolloffFactor(1);
+                posSound.position.copy(position);
+                posSound.play();
+                console.log(`Playing positional sound: ${name}`);
+                return posSound;
+            }
+            
+            sound.play();
+            console.log(`Playing non-positional sound: ${name}`);
+            return sound;
+        } catch (error) {
+            console.error(`Error playing sound ${name}:`, error);
+            return null;
+        }
     }
     
     playMusic(name) {
