@@ -374,9 +374,18 @@ class Game {
     
     init() {
         try {
+            console.log("Starting game initialization...");
+            
             // Initialize Three.js scene
             this.scene = new THREE.Scene();
             this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            // Initialize renderer
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: document.getElementById('game'),
+                antialias: true
+            });
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
             
             // Initialize sound manager early
             this.soundManager = new SoundManager(this.camera);
@@ -385,9 +394,45 @@ class Game {
             const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0');
             this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
             
-            // ... rest of init code ...
+            // Add lights
+            this.addLights();
+            
+            // Create arena and stadium
+            this.createArena();
+            this.createStadium();
+            
+            // Initialize game components
+            this.createSimpleTruck();
+            this.setupControls();
+            this.initHUD();
+            
+            // Initialize game systems
+            this.initializeWeapons();
+            this.initializeParticlePools();
+            this.createTurrets();
+            
+            // Set initial camera position
+            this.camera.position.set(0, 5, -10);
+            
+            // Start animation loop
+            this.isInitialized = true;
+            this.animate();
+            
+            // Remove loading screen after everything is initialized
+            console.log("Game initialization complete, removing loading screen");
+            this.removeLoadingScreen();
+            
         } catch (error) {
             console.error("Error during initialization:", error);
+            // Show error on loading screen instead of removing it
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                const loadingText = loadingScreen.querySelector('.loading-text');
+                if (loadingText) {
+                    loadingText.textContent = 'Error loading game. Please refresh.';
+                    loadingText.style.color = '#ff0000';
+                }
+            }
         }
     }
     
@@ -741,15 +786,30 @@ class Game {
         try {
             const loadingScreen = document.getElementById('loadingScreen');
             if (loadingScreen) {
+                // Add transition CSS if not already present
+                if (!loadingScreen.style.transition) {
+                    loadingScreen.style.transition = 'opacity 0.5s ease';
+                }
+                
+                // Fade out
                 loadingScreen.style.opacity = '0';
-                loadingScreen.style.transition = 'opacity 0.5s ease';
+                
+                // Remove after fade
                 setTimeout(() => {
-                    loadingScreen.remove();
+                    try {
+                        if (loadingScreen.parentNode) {
+                            loadingScreen.parentNode.removeChild(loadingScreen);
+                        }
+                        console.log("Loading screen removed successfully");
+                    } catch (removeError) {
+                        console.error("Error removing loading screen element:", removeError);
+                    }
                 }, 500);
+            } else {
+                console.warn("Loading screen element not found");
             }
-            console.log("Loading screen removed");
         } catch (error) {
-            console.error("Error removing loading screen:", error);
+            console.error("Error in removeLoadingScreen:", error);
         }
     }
     
@@ -840,11 +900,11 @@ class Game {
             } 
             else if (updateGroup === 1) {
                 // Group 2: Update turrets and visual effects
-                if (typeof this.updateTurrets === 'function') {
+            if (typeof this.updateTurrets === 'function') {
                     this.updateTurrets(deltaTime);
-                }
-                
-                if (typeof this.updateSparks === 'function' && this.sparks && this.sparks.length > 0) {
+            }
+            
+            if (typeof this.updateSparks === 'function' && this.sparks && this.sparks.length > 0) {
                     this.updateSparks(deltaTime);
                 }
                 
@@ -864,8 +924,8 @@ class Game {
                 }
                 
                 // Debug info - update position display (not critical)
-                if (this.truck && window.updateDebugInfo) {
-                    window.updateDebugInfo(this.truck.position);
+            if (this.truck && window.updateDebugInfo) {
+                window.updateDebugInfo(this.truck.position);
                 }
             }
             
@@ -1010,7 +1070,7 @@ class Game {
             // Use old shooting system as fallback
             if (typeof this.shoot === 'function') {
                 console.log("Using original shoot method");
-                this.shoot();
+            this.shoot();
             }
             
             // Also try new weapon system if available
@@ -1127,7 +1187,7 @@ class Game {
         
         // Update speed display - less frequently to reduce DOM updates
         if (this.frameCount % 5 === 0) {
-            this.updateSpeedDisplay();
+        this.updateSpeedDisplay();
         }
     }
     
@@ -1135,10 +1195,10 @@ class Game {
         if (!this.camera || !this.truck) return;
         
         try {
-            // Zoomed out follow camera for better visibility
-            const cameraDistance = 8; // Increased from 5 for wider view
-            const cameraHeight = 5;   // Increased from 3 for higher perspective
-            
+        // Zoomed out follow camera for better visibility
+        const cameraDistance = 8; // Increased from 5 for wider view
+        const cameraHeight = 5;   // Increased from 3 for higher perspective
+        
             // Store original position to handle errors
             const originalX = this.camera.position.x;
             const originalZ = this.camera.position.z;
@@ -1157,15 +1217,15 @@ class Game {
             // Apply new position
             this.camera.position.x = newX;
             this.camera.position.z = newZ;
-            this.camera.position.y = cameraHeight;
-            
+        this.camera.position.y = cameraHeight;
+        
             // Calculate look at point
-            const lookAtPoint = new THREE.Vector3(
-                this.truck.position.x + Math.sin(this.truck.rotation.y) * 2,
-                this.truck.position.y,
-                this.truck.position.z + Math.cos(this.truck.rotation.y) * 2
-            );
-            
+        const lookAtPoint = new THREE.Vector3(
+            this.truck.position.x + Math.sin(this.truck.rotation.y) * 2,
+            this.truck.position.y,
+            this.truck.position.z + Math.cos(this.truck.rotation.y) * 2
+        );
+        
             // Check if values are valid
             if (lookAtPoint.x === undefined || isNaN(lookAtPoint.x) || 
                 lookAtPoint.y === undefined || isNaN(lookAtPoint.y) || 
@@ -1180,7 +1240,7 @@ class Game {
             }
             
             // Apply look at
-            this.camera.lookAt(lookAtPoint);
+        this.camera.lookAt(lookAtPoint);
             
         } catch (error) {
             console.error("Error updating camera:", error);
@@ -1224,7 +1284,7 @@ class Game {
                 const shouldRender = !this.lastRenderTime || now - this.lastRenderTime >= 33.33; // ~30fps
                 
                 if (shouldRender) {
-                    this.renderer.render(this.scene, this.camera);
+                this.renderer.render(this.scene, this.camera);
                     this.lastRenderTime = now;
                 }
             }
@@ -1765,46 +1825,46 @@ class Game {
                 this.truck.acceleration = 0;
                 this.truck.turning = 0;
             }
-            
-            // Create game over overlay
-            const overlay = document.createElement('div');
+        
+        // Create game over overlay
+        const overlay = document.createElement('div');
             overlay.id = "game-over-overlay"; // Add ID for easier targeting
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.8);
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
                 z-index: 9999;
-                font-family: 'Orbitron', sans-serif;
-                color: #ff00ff;
-            `;
-    
-            overlay.innerHTML = `
+            font-family: 'Orbitron', sans-serif;
+            color: #ff00ff;
+        `;
+
+        overlay.innerHTML = `
                 <h1 style="text-shadow: 0 0 10px #ff00ff; font-size: 48px; margin-bottom: 20px;">GAME OVER!</h1>
                 <h2 style="text-shadow: 0 0 10px #ff00ff; font-size: 32px; margin-bottom: 30px;">SCORE: ${this.score}</h2>
                 <button id="try-again-button" style="
-                    background: linear-gradient(45deg, #ff00ff, #aa00ff);
-                    color: white;
-                    border: none;
-                    padding: 15px 30px;
-                    margin-top: 20px;
+                background: linear-gradient(45deg, #ff00ff, #aa00ff);
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                margin-top: 20px;
                     font-size: 24px;
-                    border-radius: 5px;
-                    cursor: pointer;
-                    font-family: 'Orbitron', sans-serif;
-                    text-transform: uppercase;
-                    letter-spacing: 2px;
-                    box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
-                ">TRY AGAIN</button>
-            `;
-    
-            document.body.appendChild(overlay);
+                border-radius: 5px;
+                cursor: pointer;
+                font-family: 'Orbitron', sans-serif;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
+            ">TRY AGAIN</button>
+        `;
+
+        document.body.appendChild(overlay);
             
             // Add event listener to the try again button
             const tryAgainButton = document.getElementById("try-again-button");
@@ -2123,9 +2183,9 @@ class Game {
         let trailsCreatedThisFrame = 0;
         
         try {
-            for (let i = this.projectiles.length - 1; i >= 0; i--) {
-                const projectile = this.projectiles[i];
-                
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
+            const projectile = this.projectiles[i];
+            
                 // Skip invalid projectiles
                 if (!projectile || !projectile.mesh || !projectile.direction) {
                     if (projectile && projectile.mesh) {
@@ -2145,10 +2205,10 @@ class Game {
                 // But do this less frequently to save performance
                 if (i % 3 === 0 && projectile.direction.length() > 0) {
                     projectile.mesh.lookAt(
-                        projectile.mesh.position.x + projectile.direction.x,
-                        projectile.mesh.position.y + projectile.direction.y,
-                        projectile.mesh.position.z + projectile.direction.z
-                    );
+                    projectile.mesh.position.x + projectile.direction.x,
+                    projectile.mesh.position.y + projectile.direction.y,
+                    projectile.mesh.position.z + projectile.direction.z
+                );
                 }
                 
                 // Add tracer effect - limit number of trails created per frame
@@ -2173,14 +2233,14 @@ class Game {
                     // Check for turret collisions
                     const hitResult = (typeof this.checkProjectileCollisions === 'function') ? 
                         this.checkProjectileCollisions(projectile) : null;
-                    
-                    // Remove if lifetime ended or collision occurred
+            
+            // Remove if lifetime ended or collision occurred
                     if (projectile.lifetime <= 0 || wallHit || hitResult) {
-                        this.scene.remove(projectile.mesh);
-                        this.projectiles.splice(i, 1);
-                        
-                        // Create impact effect if collision occurred
-                        if (hitResult) {
+                this.scene.remove(projectile.mesh);
+                this.projectiles.splice(i, 1);
+                
+                // Create impact effect if collision occurred
+                if (hitResult) {
                             this.createOptimizedImpactEffect(projectile.mesh.position, hitResult);
                         } else if (wallHit) {
                             // Create simple wall impact effect
@@ -3190,25 +3250,25 @@ class Game {
             // Handle different spark object structures
             if (spark.mesh) {
                 // Original spark structure with mesh property
-                // Update position
-                spark.mesh.position.x += spark.velocity.x;
-                spark.mesh.position.y += spark.velocity.y;
-                spark.mesh.position.z += spark.velocity.z;
-                
-                // Apply gravity
-                spark.velocity.y -= 0.01;
-                
-                // Reduce life
-                spark.life -= 0.02;
-                
-                // Scale down as life decreases
-                spark.mesh.scale.set(spark.life, spark.life, spark.life);
-                
-                // Remove if dead
-                if (spark.life <= 0) {
-                    this.scene.remove(spark.mesh);
-                    this.sparks.splice(i, 1);
-                }
+            // Update position
+            spark.mesh.position.x += spark.velocity.x;
+            spark.mesh.position.y += spark.velocity.y;
+            spark.mesh.position.z += spark.velocity.z;
+            
+            // Apply gravity
+            spark.velocity.y -= 0.01;
+            
+            // Reduce life
+            spark.life -= 0.02;
+            
+            // Scale down as life decreases
+            spark.mesh.scale.set(spark.life, spark.life, spark.life);
+            
+            // Remove if dead
+            if (spark.life <= 0) {
+                this.scene.remove(spark.mesh);
+                this.sparks.splice(i, 1);
+            }
             } else if (spark.userData) {
                 // New spark structure (direct mesh with userData)
                 // Update position
