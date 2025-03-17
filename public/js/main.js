@@ -396,6 +396,11 @@ class Game {
             console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
             this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
             
+            // Always show the sound enable button to make it easy to unlock sounds
+            setTimeout(() => {
+                this.showSoundEnableButton();
+            }, 1000);
+            
             // Add audio context resume handler for browsers that require user interaction
             document.addEventListener('click', () => {
                 if (this.soundManager && this.soundManager.listener.context.state === 'suspended') {
@@ -1186,21 +1191,29 @@ class Game {
                         
                         // Play weapon sound if shot was successful
                         if (result && this.soundManager) {
-                            // Use our simple sound player with appropriate weapon sound
-                            let soundName = "weapon_fire"; // Default sound
-                            
-                            if (currentWeapon.type.name === "Shotgun") {
-                                soundName = "weapon_fire";
-                            } else if (currentWeapon.type.name === "Rockets") {
-                                soundName = "explosion";
-                            } else if (currentWeapon.type.name === "Mines") {
-                                soundName = "powerup_pickup";
-                            } else if (currentWeapon.type.name === "Machine Gun") {
-                                soundName = "weapon_fire";
+                            // Directly play the weapon fire sound with no abstraction
+                            try {
+                                // Just directly create and play the Audio - simplest approach
+                                const audio = new Audio('/sounds/weapon_fire.mp3');
+                                audio.volume = 0.5;
+                                const promise = audio.play();
+                                
+                                console.log('Direct weapon sound attempted');
+                                
+                                // If it fails, show the button
+                                if (promise) {
+                                    promise.catch(error => {
+                                        console.error('Weapon sound failed:', error);
+                                        
+                                        // Show button if we get a NotAllowedError
+                                        if (error.name === 'NotAllowedError') {
+                                            this.showSoundEnableButton();
+                                        }
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('Weapon sound error:', e);
                             }
-                            
-                            // Play using our simple direct player
-                            this.playSimpleSound(soundName);
                         }
                         
                         // Update weapon display
@@ -5081,32 +5094,83 @@ class Game {
     // Simple direct sound player that works independently of SoundManager
     playSimpleSound(soundName) {
         try {
-            const soundPath = `/sounds/${soundName}.mp3`;
-            console.log(`Attempting to play simple sound: ${soundPath}`);
+            // Map sound names directly to known file paths
+            let actualPath;
+            
+            // Check for specific sounds that might be causing issues
+            switch(soundName) {
+                case 'weapon_fire':
+                    actualPath = '/sounds/weapon_fire.mp3';
+                    break;
+                case 'explosion':
+                    actualPath = '/sounds/vehicle_explosion.mp3';
+                    break;
+                case 'powerup_speed':
+                    actualPath = '/sounds/powerup_speed.mp3';
+                    break;
+                case 'powerup_health':
+                    actualPath = '/sounds/powerup_health.mp3';
+                    break;
+                case 'powerup_shield':
+                    actualPath = '/sounds/powerup_shield.mp3';
+                    break;
+                case 'powerup_damage':
+                    actualPath = '/sounds/powerup_damage.mp3';
+                    break;
+                case 'powerup_ammo':
+                    actualPath = '/sounds/powerup_ammo.mp3';
+                    break;
+                case 'menu_select':
+                    actualPath = '/sounds/menu_select.mp3';
+                    break;
+                default:
+                    actualPath = `/sounds/${soundName}.mp3`;
+            }
+            
+            console.log(`Attempting to play simple sound: ${actualPath}`);
             
             // Create a direct HTML5 Audio element
-            const audio = new Audio(soundPath);
+            const audio = new Audio(actualPath);
             audio.volume = 0.5;
             
-            // Force play with user interaction check
-            const playPromise = audio.play();
-            if (playPromise) {
-                playPromise.catch(error => {
-                    console.error(`Error playing ${soundName}:`, error);
-                    
-                    // If autoplay was prevented, try again after a small delay
-                    if (error.name === 'NotAllowedError') {
-                        // Add a button for user to click to enable audio
-                        this.showSoundEnableButton(() => {
-                            // Try playing again after user interaction
-                            setTimeout(() => {
-                                try {
-                                    new Audio(soundPath).play();
-                                } catch (e) {}
-                            }, 100);
+            // IMPORTANT: Call play() AND add an event handler to play again if loading
+            audio.addEventListener('canplaythrough', () => {
+                try {
+                    const actualPlay = audio.play();
+                    if (actualPlay) {
+                        actualPlay.catch(innerError => {
+                            console.error(`Canplaythrough error: ${innerError}`);
                         });
                     }
-                });
+                } catch (playError) {
+                    console.error('Play error:', playError);
+                }
+            });
+            
+            // Try playing right away too
+            try {
+                // Force play with user interaction check
+                const playPromise = audio.play();
+                if (playPromise) {
+                    playPromise.catch(error => {
+                        console.error(`Error playing ${soundName}:`, error);
+                        
+                        // If autoplay was prevented, try again after a small delay
+                        if (error.name === 'NotAllowedError') {
+                            // Add a button for user to click to enable audio
+                            this.showSoundEnableButton(() => {
+                                // Try playing again after user interaction
+                                setTimeout(() => {
+                                    try {
+                                        new Audio(actualPath).play();
+                                    } catch (e) {}
+                                }, 100);
+                            });
+                        }
+                    });
+                }
+            } catch (initialPlayError) {
+                console.warn('Initial play attempt failed:', initialPlayError);
             }
             
             return true;
@@ -5133,8 +5197,36 @@ class Game {
         button.style.border = 'none';
         button.style.padding = '10px 20px';
         button.style.cursor = 'pointer';
+        button.style.fontFamily = 'Arial, sans-serif';
+        button.style.boxShadow = '0 0 10px rgba(255, 0, 255, 0.7)';
         
         button.onclick = () => {
+            // Play multiple sounds at once to unlock audio
+            try {
+                // Try all common sounds to ensure they're all unlocked
+                const sounds = [
+                    new Audio('/sounds/weapon_fire.mp3'),
+                    new Audio('/sounds/vehicle_explosion.mp3'),
+                    new Audio('/sounds/menu_select.mp3'),
+                    new Audio('/sounds/powerup_pickup.mp3'),
+                    new Audio('/sounds/shield_hit.mp3')
+                ];
+                
+                // Set volume to 0 and play them all
+                sounds.forEach(sound => {
+                    sound.volume = 0;
+                    const promise = sound.play();
+                    if (promise) promise.catch(() => {});
+                });
+                
+                // Then try an audible sound
+                const testSound = new Audio('/sounds/menu_confirm.mp3');
+                testSound.volume = 0.5;
+                testSound.play().catch(() => {});
+            } catch (e) {
+                console.error('Error unlocking audio:', e);
+            }
+            
             // Run callback
             if (callback) callback();
             
@@ -5143,8 +5235,27 @@ class Game {
                 this.soundManager.listener.context.resume();
             }
             
-            // Remove the button after clicking
+            // Show a success message
+            const message = document.createElement('div');
+            message.textContent = 'Sound Enabled!';
+            message.style.position = 'fixed';
+            message.style.top = '10px';
+            message.style.left = '10px';
+            message.style.zIndex = '9999';
+            message.style.background = '#00ff00';
+            message.style.color = 'black';
+            message.style.padding = '10px 20px';
+            message.style.fontFamily = 'Arial, sans-serif';
+            message.style.borderRadius = '5px';
+            
+            // Remove the button
             button.remove();
+            
+            // Add the message
+            document.body.appendChild(message);
+            
+            // Remove the message after 2 seconds
+            setTimeout(() => message.remove(), 2000);
         };
         
         document.body.appendChild(button);
@@ -5154,8 +5265,15 @@ class Game {
         try {
             // ... existing explosion code ...
             
-            // Play explosion sound directly
-            this.playSimpleSound('vehicle_explosion');
+            // Play explosion sound directly with no abstraction
+            try {
+                const audio = new Audio('/sounds/vehicle_explosion.mp3');
+                audio.volume = 0.5;
+                audio.play().catch(e => console.error('Explosion sound error:', e));
+                console.log('Direct explosion sound attempted');
+            } catch (e) {
+                console.error('Explosion sound creation error:', e);
+            }
             
             // ... rest of explosion code ...
         } catch (error) {
