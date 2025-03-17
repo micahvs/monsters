@@ -1123,21 +1123,42 @@ class Game {
             this.truck.acceleration = 0.02;
             
             // Play engine rev sound when accelerating
-            if (window.soundManager && this.frameCount % 30 === 0) { // Play every half second
-                window.soundManager.playSound('engine_rev', this.truck.position);
+            if (this.frameCount % 30 === 0) { // Play every half second
+                console.log("Playing engine rev sound");
+                if (this.soundManager) {
+                    console.log("Using sound manager to play 'engine_rev'");
+                    this.soundManager.playSound('engine_rev', this.truck.position);
+                } else if (window.SoundFX) {
+                    console.log("Using SoundFX to play 'engine_rev'");
+                    window.SoundFX.play('engine_rev');
+                }
             }
         } else if (this.keys.ArrowDown) {
             // Down arrow = backward
             this.truck.acceleration = -0.02;
             
             // Play engine deceleration sound when braking/reversing
-            if (window.soundManager && this.frameCount % 30 === 0) {
-                window.soundManager.playSound('engine_deceleration', this.truck.position);
+            if (this.frameCount % 30 === 0) {
+                console.log("Playing engine deceleration sound");
+                if (this.soundManager) {
+                    console.log("Using sound manager to play 'engine_deceleration'");
+                    this.soundManager.playSound('engine_deceleration', this.truck.position);
+                } else if (window.SoundFX) {
+                    console.log("Using SoundFX to play 'engine_deceleration'");
+                    window.SoundFX.play('engine_deceleration');
+                }
             }
         } else {
             // Play idle sound when not accelerating or decelerating
-            if (window.soundManager && this.frameCount % 60 === 0) { // Play less frequently
-                window.soundManager.playSound('engine_idle', this.truck.position);
+            if (this.frameCount % 60 === 0) { // Play less frequently
+                console.log("Playing engine idle sound");
+                if (this.soundManager) {
+                    console.log("Using sound manager to play 'engine_idle'");
+                    this.soundManager.playSound('engine_idle', this.truck.position);
+                } else if (window.SoundFX) {
+                    console.log("Using SoundFX to play 'engine_idle'");
+                    window.SoundFX.play('engine_idle');
+                }
             }
         }
         
@@ -1147,16 +1168,26 @@ class Game {
             this.truck.turning = 0.02;
             
             // Play tire screech on sharp turns
-            if (Math.abs(this.truck.velocity) > 0.5 && window.soundManager && this.frameCount % 20 === 0) {
-                window.soundManager.playSound('tire_screech', this.truck.position);
+            if (Math.abs(this.truck.velocity) > 0.5 && this.frameCount % 20 === 0) {
+                console.log("Playing tire screech sound (left turn)");
+                if (this.soundManager) {
+                    this.soundManager.playSound('tire_screech', this.truck.position);
+                } else if (window.SoundFX) {
+                    window.SoundFX.play('tire_screech');
+                }
             }
         } else if (this.keys.ArrowRight) {
             // Right arrow = turn right (clockwise)
             this.truck.turning = -0.02;
             
             // Play tire screech on sharp turns
-            if (Math.abs(this.truck.velocity) > 0.5 && window.soundManager && this.frameCount % 20 === 0) {
-                window.soundManager.playSound('tire_screech', this.truck.position);
+            if (Math.abs(this.truck.velocity) > 0.5 && this.frameCount % 20 === 0) {
+                console.log("Playing tire screech sound (right turn)");
+                if (this.soundManager) {
+                    this.soundManager.playSound('tire_screech', this.truck.position);
+                } else if (window.SoundFX) {
+                    window.SoundFX.play('tire_screech');
+                }
             }
         }
         
@@ -1798,13 +1829,24 @@ class Game {
         this.shakeCamera(intensity * 0.3);
         
         // Sound effect
-        if (window.soundManager) {
+        console.log("Adding engine rev sound for collision feedback");
+        if (this.soundManager) {
             // Play engine rev sound for more immersive collision feedback
-            window.soundManager.playSound('engine_rev', this.truck.position);
+            this.soundManager.playSound('engine_rev', this.truck.position);
             
             // Play suspension bounce for heavier collisions
             if (intensity > 0.5) {
-                window.soundManager.playSound('suspension_bounce', this.truck.position);
+                this.soundManager.playSound('suspension_bounce', this.truck.position);
+            }
+        } 
+        // Fallback to SoundFX
+        else if (window.SoundFX) {
+            // Play engine rev sound for more immersive collision feedback
+            window.SoundFX.play('engine_rev');
+            
+            // Play suspension bounce for heavier collisions
+            if (intensity > 0.5) {
+                window.SoundFX.play('suspension_bounce');
             }
         }
     }
@@ -1866,12 +1908,28 @@ class Game {
         }
         
         // Play collision sound effect
-        if (window.soundManager) {
-            window.soundManager.playSound('metal_impact', this.truck.position);
+        console.log("Playing collision sound effects");
+        
+        // Try primary sound system
+        if (this.soundManager) {
+            console.log("Using SoundManager for collision sounds");
+            this.soundManager.playSound('metal_impact', this.truck.position);
             
             // Add suspension bounce sound for extra effect
             if (Math.random() > 0.5) {
-                window.soundManager.playSound('suspension_bounce', this.truck.position);
+                this.soundManager.playSound('suspension_bounce', this.truck.position);
+            }
+        } 
+        // Fall back to SoundFX
+        else if (window.SoundFX) {
+            console.log("Using SoundFX for collision sounds");
+            window.SoundFX.play('metal_impact');
+            
+            // Add suspension bounce sound for extra effect
+            if (Math.random() > 0.5) {
+                setTimeout(() => {
+                    window.SoundFX.play('suspension_bounce');
+                }, 150);
             }
         }
     }
@@ -5677,11 +5735,19 @@ window.SoundFX = {
             'metal_impact',
             'powerup_pickup',
             'menu_select',
-            'menu_confirm'
+            'menu_confirm',
+            // Add vehicle sounds
+            'engine_idle',
+            'engine_rev',
+            'engine_deceleration',
+            'tire_screech',
+            'tire_dirt',
+            'suspension_bounce'
         ];
         
         // Pre-load each sound
         soundFiles.forEach(sound => {
+            console.log(`Preloading sound: ${sound}`);
             this.sounds[sound] = new Audio(`/sounds/${sound}.mp3`);
             
             // Clone several instances for overlapping sounds
@@ -5697,7 +5763,7 @@ window.SoundFX = {
         // Create the sound button
         this.createSoundButton();
         
-        console.log('Simple sound system initialized');
+        console.log('Simple sound system initialized with', Object.keys(this.sounds).length, 'sounds');
     },
     
     // Create button for enabling sounds

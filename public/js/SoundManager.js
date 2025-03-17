@@ -210,7 +210,9 @@ export class SoundManager {
         // Vehicle sounds
         this.createSoundPool('engine_idle', 'sounds/engine_idle.mp3', 1);
         this.createSoundPool('engine_rev', 'sounds/engine_rev.mp3', 1);
+        this.createSoundPool('engine_deceleration', 'sounds/engine_deceleration.mp3', 1);
         this.createSoundPool('tire_screech', 'sounds/tire_screech.mp3', 3);
+        this.createSoundPool('tire_dirt', 'sounds/tire_dirt.mp3', 2);
         this.createSoundPool('suspension_bounce', 'sounds/suspension_bounce.mp3', 3);
         
         // Weapon sounds
@@ -465,7 +467,9 @@ export class SoundManager {
         const soundMap = {
             'engine_idle': '/sounds/engine_idle.mp3',
             'engine_rev': '/sounds/engine_rev.mp3',
+            'engine_deceleration': '/sounds/engine_deceleration.mp3',
             'tire_screech': '/sounds/tire_screech.mp3',
+            'tire_dirt': '/sounds/tire_dirt.mp3',
             'suspension_bounce': '/sounds/suspension_bounce.mp3',
             'shoot': '/sounds/weapon_fire.mp3',
             'explosion': '/sounds/vehicle_explosion.mp3',
