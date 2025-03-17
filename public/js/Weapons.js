@@ -750,7 +750,7 @@ export class Weapon {
             }
             
             const distance = position.distanceTo(projectile.mesh.position);
-            const hitRadius = projectile.type.name === "Mines" ? 5 : radius;
+            const hitRadius = projectile.type.name === "Mines" ? 3 : radius;
             
             if (distance < hitRadius) {
                 // Calculate damage based on distance for explosives
