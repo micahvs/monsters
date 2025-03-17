@@ -397,8 +397,9 @@ export class SoundManager {
         }
         
         try {
-            // Set the volume before playing
-            sound.setVolume(this.sfxVolume * this.masterVolume);
+            // Apply volume with sound-specific multiplier
+            const volumeMultiplier = this.getSoundVolumeMultiplier(name);
+            sound.setVolume(this.sfxVolume * this.masterVolume * volumeMultiplier);
             
             // Only try to play if we have a valid buffer
             if (sound.buffer) {
@@ -407,7 +408,7 @@ export class SoundManager {
                     try {
                         const pos = new THREE.PositionalAudio(this.listener);
                         pos.setBuffer(sound.buffer);
-                        pos.setVolume(this.sfxVolume * this.masterVolume);
+                        pos.setVolume(this.sfxVolume * this.masterVolume * volumeMultiplier);
                         pos.setRefDistance(20);
                         pos.setRolloffFactor(1);
                         pos.position.copy(position);
@@ -442,7 +443,10 @@ export class SoundManager {
             
             // Create a new Audio element
             const audio = new Audio(path);
-            audio.volume = this.sfxVolume * this.masterVolume;
+            
+            // Apply volume with sound-specific multiplier
+            const volumeMultiplier = this.getSoundVolumeMultiplier(name);
+            audio.volume = this.sfxVolume * this.masterVolume * volumeMultiplier;
             
             // Play the sound
             const playPromise = audio.play();
@@ -493,6 +497,28 @@ export class SoundManager {
         };
         
         return soundMap[name] || null;
+    }
+    
+    // Get the appropriate volume multiplier for a given sound
+    getSoundVolumeMultiplier(name) {
+        // Reduce vehicle sounds by 10%
+        const vehicleSounds = [
+            'engine_rev', 
+            'engine_deceleration', 
+            'tire_screech', 
+            'tire_dirt', 
+            'suspension_bounce'
+        ];
+        
+        // Reduce idle sound by an additional 10% (total 20% reduction)
+        if (name === 'engine_idle') {
+            return 0.8; // 20% reduction
+        } else if (vehicleSounds.includes(name)) {
+            return 0.9; // 10% reduction
+        }
+        
+        // Default multiplier for other sounds
+        return 1.0;
     }
     
     playMusic(name) {

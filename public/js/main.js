@@ -197,6 +197,12 @@ class Game {
             'M': false  // Audio mute toggle
         };
         
+        // Turning duration tracking
+        this.turnDuration = {
+            left: 0,
+            right: 0
+        };
+        
         // Game state
         this.health = 100;
         this.score = 0;
@@ -1162,14 +1168,25 @@ class Game {
             }
         }
         
+        // Update turn duration tracking - reset durations if not turning
+        if (!this.keys.ArrowLeft) this.turnDuration.left = 0;
+        if (!this.keys.ArrowRight) this.turnDuration.right = 0;
+        
         // Turning - FIXED
         if (this.keys.ArrowLeft) {
             // Left arrow = turn left (counter-clockwise)
             this.truck.turning = 0.02;
             
-            // Play tire screech on sharp turns
-            if (Math.abs(this.truck.velocity) > 0.5 && this.frameCount % 20 === 0) {
-                console.log("Playing tire screech sound (left turn)");
+            // Increment turn duration
+            this.turnDuration.left++;
+            
+            // Play tire screech only after turning for more than 1 second (60 frames)
+            // and only if moving at sufficient speed
+            if (Math.abs(this.truck.velocity) > 0.5 && 
+                this.turnDuration.left > 60 && 
+                this.frameCount % 20 === 0) {
+                
+                console.log("Playing tire screech sound (left turn) after", this.turnDuration.left, "frames");
                 if (this.soundManager) {
                     this.soundManager.playSound('tire_screech', this.truck.position);
                 } else if (window.SoundFX) {
@@ -1180,9 +1197,16 @@ class Game {
             // Right arrow = turn right (clockwise)
             this.truck.turning = -0.02;
             
-            // Play tire screech on sharp turns
-            if (Math.abs(this.truck.velocity) > 0.5 && this.frameCount % 20 === 0) {
-                console.log("Playing tire screech sound (right turn)");
+            // Increment turn duration
+            this.turnDuration.right++;
+            
+            // Play tire screech only after turning for more than 1 second (60 frames)
+            // and only if moving at sufficient speed
+            if (Math.abs(this.truck.velocity) > 0.5 && 
+                this.turnDuration.right > 60 && 
+                this.frameCount % 20 === 0) {
+                
+                console.log("Playing tire screech sound (right turn) after", this.turnDuration.right, "frames");
                 if (this.soundManager) {
                     this.soundManager.playSound('tire_screech', this.truck.position);
                 } else if (window.SoundFX) {
@@ -5754,16 +5778,92 @@ window.SoundFX = {
             this.sounds[sound + '_1'] = new Audio(`/sounds/${sound}.mp3`);
             this.sounds[sound + '_2'] = new Audio(`/sounds/${sound}.mp3`);
             
-            // Set volume
-            this.sounds[sound].volume = 0.5;
-            this.sounds[sound + '_1'].volume = 0.5;
-            this.sounds[sound + '_2'].volume = 0.5;
+            // Set volume based on sound type
+            const baseVolume = 0.5;
+            const volumeMultiplier = this.getVolumeMultiplier(sound);
+            
+            this.sounds[sound].volume = baseVolume * volumeMultiplier;
+            this.sounds[sound + '_1'].volume = baseVolume * volumeMultiplier;
+            this.sounds[sound + '_2'].volume = baseVolume * volumeMultiplier;
         });
         
         // Create the sound button
         this.createSoundButton();
         
         console.log('Simple sound system initialized with', Object.keys(this.sounds).length, 'sounds');
+    },
+    
+    // Get volume multiplier for sound types
+    getVolumeMultiplier(sound) {
+        // Vehicle sounds have reduced volume
+        const vehicleSounds = [
+            'engine_rev', 
+            'engine_deceleration', 
+            'tire_screech', 
+            'tire_dirt', 
+            'suspension_bounce'
+        ];
+        
+        // Reduce idle sound by an additional 10% (total 20% reduction)
+        if (sound === 'engine_idle') {
+            return 0.8; // 20% reduction
+        } else if (vehicleSounds.includes(sound)) {
+            return 0.9; // 10% reduction
+        }
+        
+        return 1.0; // Default volume
+    },
+    
+    // Play a sound effect
+    play(name) {
+        console.log(`SoundFX playing: ${name}`);
+        
+        // Find which instance to use
+        let sound;
+        if (this.sounds[name] && !this.sounds[name].playing) {
+            sound = this.sounds[name];
+        } else if (this.sounds[name + '_1'] && !this.sounds[name + '_1'].playing) {
+            sound = this.sounds[name + '_1'];
+        } else if (this.sounds[name + '_2'] && !this.sounds[name + '_2'].playing) {
+            sound = this.sounds[name + '_2'];
+        } else {
+            // If all are busy, use the main one anyway
+            sound = this.sounds[name] || new Audio(`/sounds/${name}.mp3`);
+        }
+        
+        // Make sure we have a sound
+        if (!sound) {
+            console.error(`Sound not found: ${name}`);
+            return;
+        }
+        
+        // Reset sound to beginning and ensure volume is set
+        sound.currentTime = 0;
+        sound.volume = 0.5 * this.getVolumeMultiplier(name);
+        
+        // Play the sound with error handling
+        try {
+            const promise = sound.play();
+            
+            // Track if it's playing
+            sound.playing = true;
+            
+            // Mark as available when done
+            sound.onended = () => { 
+                sound.playing = false;
+            };
+            
+            // Handle promise error
+            if (promise) {
+                promise.catch(error => {
+                    console.error(`Error playing ${name}:`, error);
+                    sound.playing = false;
+                });
+            }
+        } catch(error) {
+            console.error(`Error playing ${name}:`, error);
+            sound.playing = false;
+        }
     },
     
     // Create button for enabling sounds
@@ -5805,7 +5905,7 @@ window.SoundFX = {
             // Now try to play one audibly to confirm it worked
             try {
                 const testSound = this.sounds['menu_confirm'];
-                testSound.volume = 0.5;
+                testSound.volume = 0.5 * this.getVolumeMultiplier('menu_confirm');
                 testSound.currentTime = 0;
                 testSound.play().catch(() => {});
             } catch(e) {}
@@ -5827,58 +5927,6 @@ window.SoundFX = {
         
         document.body.appendChild(button);
     },
-    
-    // Play a sound effect
-    play(name) {
-        console.log(`SoundFX playing: ${name}`);
-        
-        // Find which instance to use
-        let sound;
-        if (this.sounds[name] && !this.sounds[name].playing) {
-            sound = this.sounds[name];
-        } else if (this.sounds[name + '_1'] && !this.sounds[name + '_1'].playing) {
-            sound = this.sounds[name + '_1'];
-        } else if (this.sounds[name + '_2'] && !this.sounds[name + '_2'].playing) {
-            sound = this.sounds[name + '_2'];
-        } else {
-            // If all are busy, use the main one anyway
-            sound = this.sounds[name] || new Audio(`/sounds/${name}.mp3`);
-        }
-        
-        // Make sure we have a sound
-        if (!sound) {
-            console.error(`Sound not found: ${name}`);
-            return;
-        }
-        
-        // Reset sound to beginning and ensure volume is set
-        sound.currentTime = 0;
-        sound.volume = 0.5;
-        
-        // Play the sound with error handling
-        try {
-            const promise = sound.play();
-            
-            // Track if it's playing
-            sound.playing = true;
-            
-            // Mark as available when done
-            sound.onended = () => { 
-                sound.playing = false;
-            };
-            
-            // Handle promise error
-            if (promise) {
-                promise.catch(error => {
-                    console.error(`Error playing ${name}:`, error);
-                    sound.playing = false;
-                });
-            }
-        } catch(error) {
-            console.error(`Error playing ${name}:`, error);
-            sound.playing = false;
-        }
-    }
 };
 
 window.addEventListener('load', () => {
