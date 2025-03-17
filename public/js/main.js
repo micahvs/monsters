@@ -381,9 +381,9 @@ class Game {
             this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
             // Initialize renderer
-            this.renderer = new THREE.WebGLRenderer({
+            this.renderer = new THREE.WebGLRenderer({ 
                 canvas: document.getElementById('game'),
-                antialias: true
+                antialias: true 
             });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             
@@ -829,7 +829,7 @@ class Game {
             if (loadingScreen) {
                 // Add transition CSS if not already present
                 if (!loadingScreen.style.transition) {
-                    loadingScreen.style.transition = 'opacity 0.5s ease';
+                loadingScreen.style.transition = 'opacity 0.5s ease';
                 }
                 
                 // Fade out
@@ -1142,6 +1142,7 @@ class Game {
                         );
                         
                         // Handle mines differently - they're dropped behind the truck
+                        let result = false;
                         if (currentWeapon.type.name === "Mines") {
                             // Drop behind the truck
                             const shootPosBehind = new THREE.Vector3(
@@ -1154,12 +1155,31 @@ class Game {
                             const downDirection = new THREE.Vector3(0, -1, 0);
                             
                             // Shoot the mine
-                            const result = currentWeapon.shoot(shootPosBehind, downDirection);
+                            result = currentWeapon.shoot(shootPosBehind, downDirection);
                             console.log("Mine shot result:", result);
                         } else {
                             // Shoot regular weapon
-                            const result = currentWeapon.shoot(shootPos, direction);
+                            result = currentWeapon.shoot(shootPos, direction);
                             console.log("Weapon shot result:", result);
+                        }
+                        
+                        // Play weapon sound if shot was successful
+                        if (result && this.soundManager) {
+                            // Choose the appropriate sound based on weapon type
+                            let soundName = "weapon_fire"; // Default sound
+                            
+                            if (currentWeapon.type.name === "Shotgun") {
+                                soundName = "weapon_fire";
+                            } else if (currentWeapon.type.name === "Rockets") {
+                                soundName = "explosion";
+                            } else if (currentWeapon.type.name === "Mines") {
+                                soundName = "powerup_pickup";
+                            } else if (currentWeapon.type.name === "Machine Gun") {
+                                soundName = "weapon_fire";
+                            }
+                            
+                            // Play the sound
+                            this.soundManager.playSound(soundName, shootPos);
                         }
                         
                         // Update weapon display
@@ -3950,11 +3970,28 @@ class Game {
             return;
         }
 
+        // Get the color from the mesh's material if available
+        let color = 0xffffff; // Default color
+        let emissive = 0xffffff; // Default emissive color
+        
+        // Check if powerup has children with material
+        if (powerup.children && powerup.children.length > 0 && powerup.children[0].material) {
+            // Get color from first child (usually the actual mesh)
+            const meshMaterial = powerup.children[0].material;
+            if (meshMaterial.color) color = meshMaterial.color.getHex();
+            if (meshMaterial.emissive) emissive = meshMaterial.emissive.getHex();
+        } 
+        // Fallback to direct material access if no children
+        else if (powerup.material && powerup.material.color) {
+            color = powerup.material.color.getHex();
+            if (powerup.material.emissive) emissive = powerup.material.emissive.getHex();
+        }
+        
         // Create particles for the fade effect
         const particles = this.createPooledParticles({
             position: powerup.position.clone(),
-            color: powerup.material.color.getHex(),
-            emissive: powerup.material.emissive.getHex(),
+            color: color,
+            emissive: emissive,
             count: 15,
             size: 0.3,
             speed: 0.2,
