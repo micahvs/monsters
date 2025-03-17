@@ -1121,18 +1121,43 @@ class Game {
         if (this.keys.ArrowUp) {
             // Up arrow = forward
             this.truck.acceleration = 0.02;
+            
+            // Play engine rev sound when accelerating
+            if (window.soundManager && this.frameCount % 30 === 0) { // Play every half second
+                window.soundManager.playSound('engine_rev', this.truck.position);
+            }
         } else if (this.keys.ArrowDown) {
             // Down arrow = backward
             this.truck.acceleration = -0.02;
+            
+            // Play engine deceleration sound when braking/reversing
+            if (window.soundManager && this.frameCount % 30 === 0) {
+                window.soundManager.playSound('engine_deceleration', this.truck.position);
+            }
+        } else {
+            // Play idle sound when not accelerating or decelerating
+            if (window.soundManager && this.frameCount % 60 === 0) { // Play less frequently
+                window.soundManager.playSound('engine_idle', this.truck.position);
+            }
         }
         
         // Turning - FIXED
         if (this.keys.ArrowLeft) {
             // Left arrow = turn left (counter-clockwise)
             this.truck.turning = 0.02;
+            
+            // Play tire screech on sharp turns
+            if (Math.abs(this.truck.velocity) > 0.5 && window.soundManager && this.frameCount % 20 === 0) {
+                window.soundManager.playSound('tire_screech', this.truck.position);
+            }
         } else if (this.keys.ArrowRight) {
             // Right arrow = turn right (clockwise)
             this.truck.turning = -0.02;
+            
+            // Play tire screech on sharp turns
+            if (Math.abs(this.truck.velocity) > 0.5 && window.soundManager && this.frameCount % 20 === 0) {
+                window.soundManager.playSound('tire_screech', this.truck.position);
+            }
         }
         
         // Shooting
@@ -1764,69 +1789,90 @@ class Game {
 
     // Show collision effect
     showCollisionEffect(intensity) {
-        // Flash the screen red
-        const flashOverlay = document.createElement('div');
-        flashOverlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 0, 0, ${Math.min(0.7, intensity)});
-            pointer-events: none;
-            z-index: 1000;
-            opacity: 0.7;
-        `;
+        if (!this.truck) return;
         
-        document.body.appendChild(flashOverlay);
-        
-        // Fade out and remove
-        setTimeout(() => {
-            flashOverlay.style.transition = 'opacity 0.5s';
-            flashOverlay.style.opacity = '0';
-            setTimeout(() => {
-                flashOverlay.remove();
-            }, 500);
-        }, 100);
-        
-        // Add spark particles at collision point
+        // Visual effects
         this.createCollisionSparks();
+        
+        // Physical effects - camera shake
+        this.shakeCamera(intensity * 0.3);
+        
+        // Sound effect
+        if (window.soundManager) {
+            // Play engine rev sound for more immersive collision feedback
+            window.soundManager.playSound('engine_rev', this.truck.position);
+            
+            // Play suspension bounce for heavier collisions
+            if (intensity > 0.5) {
+                window.soundManager.playSound('suspension_bounce', this.truck.position);
+            }
+        }
     }
 
     // Create spark particles at collision point
     createCollisionSparks() {
-        if (!this.scene || !this.truck) return;
+        // Create the spark particle system
+        const sparkCount = 15;
         
-        // Create 10-20 spark particles
-        const sparkCount = 10 + Math.floor(Math.random() * 10);
-        const sparkGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-        const sparkMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        // Create a position slightly in front of the truck based on velocity
+        const sparkPos = new THREE.Vector3(
+            this.truck.position.x + (Math.sin(this.truck.rotation.y) * 2),
+            this.truck.position.y + 0.5,
+            this.truck.position.z + (Math.cos(this.truck.rotation.y) * 2)
+        );
         
-        // Ensure sparks array exists
-        if (!this.sparks) this.sparks = [];
-        
+        // Create spark particles
         for (let i = 0; i < sparkCount; i++) {
-            const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
+            // Reuse sprite from pool if available
+            const spark = this.getParticle(0xffaa33);
             
-            // Position at truck
-            spark.position.copy(this.truck.position);
+            if (!spark) continue;
             
-            // Random velocity
-            const velocity = {
-                x: (Math.random() - 0.5) * 0.3,
-                y: Math.random() * 0.2 + 0.1,
-                z: (Math.random() - 0.5) * 0.3
-            };
+            // Set initial position
+            spark.position.copy(sparkPos);
             
-            // Add to scene
-            this.scene.add(spark);
+            // Set random velocity in half-spherical directions with proper physics
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI * 0.5; // Half-spherical (forward)
             
-            // Add to sparks array for animation
-            this.sparks.push({
-                mesh: spark,
-                velocity: velocity,
-                life: 1.0 // Life counter (1.0 to 0.0)
-            });
+            // Calculate direction vector with 3D spherical coordinates
+            const dirX = Math.sin(phi) * Math.cos(theta);
+            const dirY = Math.cos(phi);
+            const dirZ = Math.sin(phi) * Math.sin(theta);
+            
+            // Add truck's forward direction to make sparks fly forward
+            const forward = new THREE.Vector3(
+                Math.sin(this.truck.rotation.y),
+                0,
+                Math.cos(this.truck.rotation.y)
+            );
+            
+            // Store velocity and lifetime in userData
+            spark.userData = spark.userData || {};
+            spark.userData.velocity = new THREE.Vector3(
+                dirX + forward.x * 0.5,
+                dirY + 0.2,
+                dirZ + forward.z * 0.5
+            );
+            spark.userData.velocity.multiplyScalar(0.2 + Math.random() * 0.3);
+            spark.userData.lifetime = 20 + Math.random() * 30;
+            spark.userData.type = 'spark';
+            
+            // Add to active trails
+            if (!this.activeTrails) {
+                this.activeTrails = [];
+            }
+            this.activeTrails.push(spark);
+        }
+        
+        // Play collision sound effect
+        if (window.soundManager) {
+            window.soundManager.playSound('metal_impact', this.truck.position);
+            
+            // Add suspension bounce sound for extra effect
+            if (Math.random() > 0.5) {
+                window.soundManager.playSound('suspension_bounce', this.truck.position);
+            }
         }
     }
 
