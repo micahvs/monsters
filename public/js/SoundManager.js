@@ -313,32 +313,12 @@ export class SoundManager {
     updateListenerPosition() {
         if (!this.camera || !this.listener) return;
         
-        // Update listener position to match camera
-        this.listener.position.copy(this.camera.position);
+        // In Three.js, the AudioListener automatically updates its position
+        // based on the parent object (camera), so we don't need to manually
+        // update it. The camera.add(this.listener) call in the constructor
+        // sets up this relationship.
         
-        // Calculate forward and up vectors from camera's matrix
-        const matrix = this.camera.matrix;
-        const forward = new THREE.Vector3();
-        const up = new THREE.Vector3();
-        
-        // Extract forward (negative z) and up (y) vectors from camera matrix
-        forward.set(
-            -matrix.elements[8],
-            -matrix.elements[9],
-            -matrix.elements[10]
-        ).normalize();
-        
-        up.set(
-            matrix.elements[4],
-            matrix.elements[5],
-            matrix.elements[6]
-        ).normalize();
-        
-        // Set listener orientation
-        // Parameters are: forward x, forward y, forward z, up x, up y, up z
-        this.listener.setOrientation(
-            forward.x, forward.y, forward.z,
-            up.x, up.y, up.z
-        );
+        // We'll keep this method for compatibility with existing code,
+        // but we don't need to do anything here.
     }
 } 
