@@ -2171,29 +2171,71 @@ class Game {
     // Update projectiles
     // Pool of particles for reuse
     initializeParticlePool() {
-        if (!this.particlePool) {
+        try {
+            if (this.particlePool && this.particlePool.length > 0) {
+                console.log('Particle pool already initialized with ' + this.particlePool.length + ' particles');
+                return;
+            }
+            
+            console.log('Initializing particle pool...');
             this.particlePool = [];
             this.particlePoolSize = 100; // Create a fixed pool
             
             // Create particle objects once
             for (let i = 0; i < this.particlePoolSize; i++) {
-                const particleGeometry = new THREE.SphereGeometry(0.1, 4, 4); // Simplified geometry
-                const particleMaterial = new THREE.MeshBasicMaterial({
-                    color: 0xffffff,
-                    transparent: true,
-                    opacity: 0.7
-                });
-                
-                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                particle.visible = false; // Hide initially
-                particle.inUse = false;
-                
-                // Add to scene but hidden
-                this.scene.add(particle);
-                this.particlePool.push(particle);
+                try {
+                    const particleGeometry = new THREE.SphereGeometry(0.1, 4, 4); // Simplified geometry
+                    const particleMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xffffff,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    
+                    const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                    particle.visible = false; // Hide initially
+                    particle.inUse = false;
+                    
+                    // Add to scene but hidden
+                    this.scene.add(particle);
+                    this.particlePool.push(particle);
+                } catch (particleError) {
+                    console.error('Error creating particle ' + i + ':', particleError);
+                }
             }
             
-            console.log(`Created particle pool with ${this.particlePoolSize} particles`);
+            // Verify pool creation
+            if (this.particlePool.length === 0) {
+                console.error('Failed to create any particles for the pool');
+            } else {
+                console.log(`Created particle pool with ${this.particlePool.length}/${this.particlePoolSize} particles`);
+            }
+            
+            // Initialize next particle index
+            this.nextParticleIndex = 0;
+        } catch (error) {
+            console.error('Error initializing particle pool:', error);
+            // Create a minimal emergency pool to prevent further errors
+            this.particlePool = [];
+            this.particlePoolSize = 10;
+            
+            for (let i = 0; i < this.particlePoolSize; i++) {
+                try {
+                    const geometry = new THREE.SphereGeometry(0.1, 4, 4);
+                    const material = new THREE.MeshBasicMaterial({
+                        color: 0xffffff,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    const particle = new THREE.Mesh(geometry, material);
+                    particle.visible = false;
+                    particle.inUse = false;
+                    if (this.scene) this.scene.add(particle);
+                    this.particlePool.push(particle);
+                } catch (e) {
+                    console.error('Failed to create emergency particle', e);
+                }
+            }
+            console.log('Created emergency particle pool with ' + this.particlePool.length + ' particles');
         }
     }
     
@@ -2206,8 +2248,23 @@ class Game {
         // Find an available particle
         for (let i = 0; i < this.particlePool.length; i++) {
             const particle = this.particlePool[i];
-            if (!particle.inUse) {
-                particle.material.color.set(color);
+            if (particle && !particle.inUse) {
+                // Check if material exists
+                if (!particle.material) {
+                    console.warn('Particle without material found in pool - reinitializing particle');
+                    // Create a new material if missing
+                    particle.material = new THREE.MeshBasicMaterial({
+                        color: color,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                } else {
+                    // Set color on existing material
+                    if (particle.material.color) {
+                        particle.material.color.set(color);
+                    }
+                }
+                
                 particle.material.opacity = 0.7;
                 particle.visible = true;
                 particle.inUse = true;
@@ -2218,10 +2275,39 @@ class Game {
         
         // If all particles are in use, reuse the oldest one
         // This is more performant than creating new ones
-        const particle = this.particlePool[this.nextParticleIndex || 0];
-        this.nextParticleIndex = (this.nextParticleIndex + 1) % this.particlePoolSize;
+        const particleIndex = this.nextParticleIndex || 0;
+        this.nextParticleIndex = (particleIndex + 1) % this.particlePoolSize;
         
-        particle.material.color.set(color);
+        const particle = this.particlePool[particleIndex];
+        if (!particle) {
+            console.error('Cannot reuse particle at index', particleIndex, 'particlePool length:', this.particlePool.length);
+            // Create a new emergency particle - not ideal for performance but prevents crash
+            const emergencyParticle = new THREE.Mesh(
+                new THREE.SphereGeometry(0.1, 4, 4),
+                new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.7
+                })
+            );
+            emergencyParticle.inUse = true;
+            emergencyParticle.visible = true;
+            this.scene.add(emergencyParticle);
+            return emergencyParticle;
+        }
+        
+        // Set up the particle for reuse
+        if (!particle.material) {
+            // Create a new material if missing
+            particle.material = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.7
+            });
+        } else if (particle.material.color) {
+            particle.material.color.set(color);
+        }
+        
         particle.material.opacity = 0.7;
         particle.visible = true;
         particle.inUse = true;
@@ -2240,128 +2326,32 @@ class Game {
     
     // Optimized projectile update
     updateProjectiles(deltaTime = 1) {
-        if (!this.scene) return;
-        
-        // Initialize projectiles array if needed
-        if (!this.projectiles) {
-            this.projectiles = [];
-        }
-        
-        // Initialize particle pool if needed
-        if (!this.particlePool) {
-            this.initializeParticlePool();
-        }
-        
-        // Initialize turret projectiles array if needed
-        if (!this.turretProjectiles) {
-            this.turretProjectiles = [];
-        }
-        
-        // Reduce debug logging frequency
-        if (this.frameCount % 300 === 0) { // Log once every 5 seconds
-            console.log(`Updating ${this.projectiles.length} player projectiles and ${this.turretProjectiles.length} turret projectiles`);
-        }
-        
-        // Calculate maximum number of trail particles to create
-        // Limit based on projectile count to prevent overload
-        const maxTrailsPerFrame = Math.min(5, Math.ceil(10 / Math.max(1, this.projectiles.length)));
-        let trailsCreatedThisFrame = 0;
-        
         try {
-        // First update player projectiles
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const projectile = this.projectiles[i];
+            if (!this.projectiles || this.projectiles.length === 0) return;
             
-            // Skip invalid projectiles
-            if (!projectile || !projectile.mesh || !projectile.direction) {
-                    if (projectile && projectile.mesh) {
-                        this.scene.remove(projectile.mesh);
-                    }
-                    this.projectiles.splice(i, 1);
-                    continue;
-                }
-                
-                // Update position using all direction components with delta time scaling
-                const moveFactor = projectile.speed * deltaTime;
-                projectile.mesh.position.x += projectile.direction.x * moveFactor;
-                projectile.mesh.position.y += projectile.direction.y * moveFactor;
-                projectile.mesh.position.z += projectile.direction.z * moveFactor;
-                
-                // Rotate projectile to face direction of movement
-                // But do this less frequently to save performance
-                if (i % 3 === 0 && projectile.direction.length() > 0) {
-                    projectile.mesh.lookAt(
-                    projectile.mesh.position.x + projectile.direction.x,
-                    projectile.mesh.position.y + projectile.direction.y,
-                    projectile.mesh.position.z + projectile.direction.z
-                );
-                }
-                
-                // Add tracer effect - limit number of trails created per frame
-                if (trailsCreatedThisFrame < maxTrailsPerFrame && i % 2 === 0) {
-                    this.createOptimizedProjectileTrail(projectile);
-                    trailsCreatedThisFrame++;
-                }
-                
-                // Decrease lifetime with delta time scaling
-                projectile.lifetime -= deltaTime;
-                
-                // Only check collisions every other frame for distant projectiles
-                const shouldCheckCollisions = 
-                    (projectile.lifetime < 30) || // Always check when close to despawning
-                    (this.truck && projectile.mesh.position.distanceTo(this.truck.position) < 20) || // Always check when close to player
-                    (i % 2 === 0); // Otherwise check every other projectile
-                
-                if (shouldCheckCollisions) {
-                    // Check for collisions with walls
-                    const wallHit = this.checkProjectileWallCollisions(projectile);
-                    
-                    // Check for turret collisions
-                    const hitResult = (typeof this.checkProjectileCollisions === 'function') ? 
-                        this.checkProjectileCollisions(projectile) : null;
+            // Limit how many trails we create per frame to avoid performance issues
+            const maxTrailsPerFrame = 5;
+            let trailsCreatedThisFrame = 0;
             
-            // Remove if lifetime ended or collision occurred
-                    if (projectile.lifetime <= 0 || wallHit || hitResult) {
-                this.scene.remove(projectile.mesh);
-                this.projectiles.splice(i, 1);
-                
-                // Create impact effect if collision occurred
-                if (hitResult) {
-                            this.createOptimizedImpactEffect(projectile.mesh.position, hitResult);
-                        } else if (wallHit) {
-                            // Create simple wall impact effect
-                            this.createOptimizedWallImpactEffect(projectile.mesh.position);
-                        }
-                    }
-                }
-                else if (projectile.lifetime <= 0) {
-                    // Just remove if expired
-                    this.scene.remove(projectile.mesh);
-                    this.projectiles.splice(i, 1);
-                }
-            }
-        
-            // Now update turret projectiles and check for collision with player
-            if (this.turretProjectiles.length > 0 && this.truck) {
-                for (let i = this.turretProjectiles.length - 1; i >= 0; i--) {
-                    const projectile = this.turretProjectiles[i];
+            // Loop backward to safely remove elements while iterating
+            for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                try {
+                    const projectile = this.projectiles[i];
                     
-                    // Skip invalid projectiles
-                    if (!projectile || !projectile.mesh || !projectile.direction) {
-                        if (projectile && projectile.mesh) {
-                            this.scene.remove(projectile.mesh);
-                        }
-                        this.turretProjectiles.splice(i, 1);
+                    if (!projectile || !projectile.mesh) {
+                        // Remove invalid projectile
+                        this.projectiles.splice(i, 1);
                         continue;
                     }
                     
-                    // Update position
-                    projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
-                    projectile.mesh.position.y += projectile.direction.y * projectile.speed * deltaTime;
-                    projectile.mesh.position.z += projectile.direction.z * projectile.speed * deltaTime;
+                    // Update position based on velocity
+                    projectile.update();
                     
-                    // Decrease lifetime
-                    projectile.lifetime -= deltaTime;
+                    // Create trail for player projectiles
+                    if (projectile.source === 'player' && Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
+                        this.createOptimizedProjectileTrail(projectile);
+                        trailsCreatedThisFrame++;
+                    }
                     
                     // Create trail for turret projectiles
                     if (Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
@@ -2378,41 +2368,85 @@ class Game {
                                 this.takeDamage(projectile.damage);
                                 
                                 // Play hit sound
-                                if (window.SoundFX) {
-                                    window.SoundFX.play('vehicle_hit');
+                                if (window.soundManager) {
+                                    window.soundManager.playSound('vehicle_hit');
                                 }
                                 
                                 // Create hit effect
-                                this.createOptimizedHitEffect(projectile.mesh.position);
+                                this.createProjectileImpactOnVehicle(projectile.mesh.position.clone());
                             }
                             
                             // Remove projectile
-                            this.scene.remove(projectile.mesh);
-                            this.turretProjectiles.splice(i, 1);
-                            continue;
+                            if (projectile.mesh && projectile.mesh.parent) {
+                                projectile.mesh.parent.remove(projectile.mesh);
+                            }
+                            this.projectiles.splice(i, 1);
+                            continue; // Skip to next iteration
                         }
                     }
                     
-                    // Check for wall collisions
-                    if (projectile.mesh.position.y <= 0) {
-                        // Hit ground
-                        this.scene.remove(projectile.mesh);
-                        this.turretProjectiles.splice(i, 1);
-                        
-                        // Create impact effect
-                        this.createOptimizedWallImpactEffect(projectile.mesh.position);
-                        continue;
+                    // Check for collision with other targets
+                    const hitResult = this.checkProjectileCollisions(projectile);
+                    if (hitResult) {
+                        // Remove projectile if it hit something
+                        if (projectile.mesh && projectile.mesh.parent) {
+                            projectile.mesh.parent.remove(projectile.mesh);
+                        }
+                        this.projectiles.splice(i, 1);
+                        continue; // Skip to next iteration
                     }
                     
-                    // Remove if lifetime expired
-                    if (projectile.lifetime <= 0) {
-                        this.scene.remove(projectile.mesh);
-                        this.turretProjectiles.splice(i, 1);
+                    // Check for collision with walls
+                    const wallCollision = this.checkProjectileWallCollisions(projectile);
+                    if (wallCollision) {
+                        // Create impact effect
+                        this.createOptimizedWallImpactEffect(projectile.mesh.position.clone());
+                        
+                        // Play hit sound
+                        if (window.soundManager) {
+                            window.soundManager.playSound('wall_hit');
+                        }
+                        
+                        // Remove projectile
+                        if (projectile.mesh && projectile.mesh.parent) {
+                            projectile.mesh.parent.remove(projectile.mesh);
+                        }
+                        this.projectiles.splice(i, 1);
+                        continue; // Skip to next iteration
+                    }
+                    
+                    // Remove if too far
+                    if (projectile.mesh.position.length() > 1000) {
+                        // Remove from scene
+                        if (projectile.mesh.parent) {
+                            projectile.mesh.parent.remove(projectile.mesh);
+                        }
+                        this.projectiles.splice(i, 1);
+                    }
+                } catch (projectileError) {
+                    console.warn('Error updating projectile:', projectileError);
+                    // Remove problematic projectile
+                    if (i >= 0 && i < this.projectiles.length) {
+                        const badProjectile = this.projectiles[i];
+                        if (badProjectile && badProjectile.mesh && badProjectile.mesh.parent) {
+                            badProjectile.mesh.parent.remove(badProjectile.mesh);
+                        }
+                        this.projectiles.splice(i, 1);
                     }
                 }
             }
         } catch (error) {
             console.error("Error updating projectiles:", error);
+            // In case of catastrophic failure, clear all projectiles to recover
+            if (this.projectiles && this.projectiles.length > 0) {
+                console.warn("Clearing all projectiles due to error");
+                for (const projectile of this.projectiles) {
+                    if (projectile && projectile.mesh && projectile.mesh.parent) {
+                        projectile.mesh.parent.remove(projectile.mesh);
+                    }
+                }
+                this.projectiles = [];
+            }
         }
     }
     
@@ -2420,21 +2454,33 @@ class Game {
     createOptimizedProjectileTrail(projectile) {
         if (!projectile || !projectile.mesh) return;
         
-        // Get a particle from the pool
-        const trailColor = projectile.source === 'player' ? 0xff00ff : 0xff0000;
-        const trail = this.getParticle(trailColor);
-        
-        // Set trail properties
-        trail.position.copy(projectile.mesh.position);
-        trail.userData.lifetime = 10; // Shorter lifetime
-        trail.userData.fadeRate = 0.07; // Faster fade
-        trail.userData.shrinkRate = 0.03; // Gradually shrink
-        
-        // Add to active trails for updating
-        if (!this.activeTrails) {
-            this.activeTrails = [];
+        try {
+            // Get a particle from the pool
+            const trailColor = projectile.source === 'player' ? 0xff00ff : 0xff0000;
+            const trail = this.getParticle(trailColor);
+            
+            // Check if we got a valid particle
+            if (!trail) {
+                console.warn('Failed to get particle for projectile trail');
+                return;
+            }
+            
+            // Set trail properties
+            trail.position.copy(projectile.mesh.position);
+            trail.userData = trail.userData || {};
+            trail.userData.lifetime = 10; // Shorter lifetime
+            trail.userData.fadeRate = 0.07; // Faster fade
+            trail.userData.shrinkRate = 0.03; // Gradually shrink
+            
+            // Add to active trails for updating
+            if (!this.activeTrails) {
+                this.activeTrails = [];
+            }
+            this.activeTrails.push(trail);
+        } catch (error) {
+            console.error('Error creating projectile trail:', error);
+            // Continue game execution - better to miss a trail than crash
         }
-        this.activeTrails.push(trail);
     }
     
     // Update all active trails in one pass
@@ -2442,21 +2488,48 @@ class Game {
         if (!this.activeTrails || this.activeTrails.length === 0) return;
         
         for (let i = this.activeTrails.length - 1; i >= 0; i--) {
-            const trail = this.activeTrails[i];
-            
-            // Reduce lifetime
-            trail.userData.lifetime--;
-            
-            // Fade and shrink
-            if (trail.material) {
-                trail.material.opacity -= trail.userData.fadeRate;
-                trail.scale.multiplyScalar(1 - trail.userData.shrinkRate);
-            }
-            
-            // Remove if faded out
-            if (trail.userData.lifetime <= 0 || trail.material.opacity <= 0) {
-                this.releaseParticle(trail);
-                this.activeTrails.splice(i, 1);
+            try {
+                const trail = this.activeTrails[i];
+                
+                // Skip if trail is invalid
+                if (!trail || !trail.userData) {
+                    this.activeTrails.splice(i, 1);
+                    continue;
+                }
+                
+                // Update lifetime
+                trail.userData.lifetime -= 1;
+                
+                // Update opacity based on lifetime
+                if (trail.material && typeof trail.material.opacity !== 'undefined') {
+                    trail.material.opacity -= trail.userData.fadeRate;
+                }
+                
+                // Update scale to create shrinking effect
+                if (trail.scale) {
+                    const shrinkAmount = trail.userData.shrinkRate || 0.02;
+                    trail.scale.x -= shrinkAmount;
+                    trail.scale.y -= shrinkAmount;
+                    trail.scale.z -= shrinkAmount;
+                    
+                    // Ensure scale doesn't go negative
+                    if (trail.scale.x < 0.01) {
+                        trail.scale.set(0.01, 0.01, 0.01);
+                    }
+                }
+                
+                // Remove if faded away
+                if (trail.userData.lifetime <= 0 || (trail.material && trail.material.opacity <= 0)) {
+                    // Release back to pool
+                    this.releaseParticle(trail);
+                    this.activeTrails.splice(i, 1);
+                }
+            } catch (error) {
+                console.warn('Error updating trail:', error);
+                // Remove problematic trail
+                if (i >= 0 && i < this.activeTrails.length) {
+                    this.activeTrails.splice(i, 1);
+                }
             }
         }
     }
