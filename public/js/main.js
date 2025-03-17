@@ -2327,6 +2327,28 @@ class Game {
     // Optimized projectile update
     updateProjectiles(deltaTime = 1) {
         try {
+            // First, ensure turret projectiles are merged into the main projectiles array
+            if (this.turretProjectiles && this.turretProjectiles.length > 0) {
+                console.log(`Merging ${this.turretProjectiles.length} turret projectiles into main projectiles array`);
+                
+                // Initialize projectiles array if needed
+                if (!this.projectiles) {
+                    this.projectiles = [];
+                }
+                
+                // Add turret projectiles to main projectiles array with proper source
+                for (const turretProjectile of this.turretProjectiles) {
+                    if (turretProjectile && turretProjectile.mesh) {
+                        // Ensure source is set correctly
+                        turretProjectile.source = 'turret';
+                        this.projectiles.push(turretProjectile);
+                    }
+                }
+                
+                // Clear the turret projectiles array
+                this.turretProjectiles = [];
+            }
+            
             if (!this.projectiles || this.projectiles.length === 0) return;
             
             // Limit how many trails we create per frame to avoid performance issues
@@ -2345,6 +2367,20 @@ class Game {
                     }
                     
                     // Update position based on velocity
+                    projectile.update = projectile.update || function() {
+                        // Fallback update method for projectiles without one
+                        if (this.direction && this.speed) {
+                            this.mesh.position.x += this.direction.x * this.speed * deltaTime;
+                            this.mesh.position.y += this.direction.y * this.speed * deltaTime;
+                            this.mesh.position.z += this.direction.z * this.speed * deltaTime;
+                        }
+                        
+                        // Decrease lifetime
+                        if (this.lifetime !== undefined) {
+                            this.lifetime -= deltaTime;
+                        }
+                    };
+                    
                     projectile.update();
                     
                     // Create trail for player projectiles
@@ -2354,17 +2390,18 @@ class Game {
                     }
                     
                     // Create trail for turret projectiles
-                    if (Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
+                    if (projectile.source === 'turret' && Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
                         this.createOptimizedProjectileTrail(projectile);
                         trailsCreatedThisFrame++;
                     }
                     
-                    // Check for collision with player
-                    if (this.truck) {
+                    // Check for collision with player - only for non-player projectiles
+                    if (this.truck && projectile.source !== 'player') {
                         const distance = projectile.mesh.position.distanceTo(this.truck.position);
                         if (distance < 3) { // Player hitbox
                             // Apply damage to player
                             if (typeof this.takeDamage === 'function') {
+                                console.log(`Player hit by ${projectile.source} projectile for ${projectile.damage} damage`);
                                 this.takeDamage(projectile.damage);
                                 
                                 // Play hit sound
