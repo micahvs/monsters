@@ -69,27 +69,34 @@ export class SoundManager {
         this.createSoundPool('engine_idle', 'sounds/engine_idle.mp3', 1);
         this.createSoundPool('engine_rev', 'sounds/engine_rev.mp3', 1);
         this.createSoundPool('tire_screech', 'sounds/tire_screech.mp3', 3);
+        this.createSoundPool('suspension_bounce', 'sounds/suspension_bounce.mp3', 3);
         
         // Weapon sounds
-        this.createSoundPool('shoot', 'sounds/shoot.mp3', 5);
-        this.createSoundPool('explosion', 'sounds/explosion.mp3', 3);
-        this.createSoundPool('hit', 'sounds/hit.mp3', 3);
-        this.createSoundPool('turret_shoot', 'sounds/turret_shoot.mp3', 5);
+        this.createSoundPool('shoot', 'sounds/weapon_fire.mp3', 5);
+        this.createSoundPool('explosion', 'sounds/vehicle_explosion.mp3', 3);
+        this.createSoundPool('hit', 'sounds/projectile_hit.mp3', 3);
+        this.createSoundPool('turret_shoot', 'sounds/turret_rotate.mp3', 5);
         
         // Damage sounds
-        this.createSoundPool('wall_hit', 'sounds/wall_hit.mp3', 3);
+        this.createSoundPool('wall_hit', 'sounds/metal_impact.mp3', 3);
         this.createSoundPool('vehicle_hit', 'sounds/vehicle_hit.mp3', 3);
         this.createSoundPool('metal_impact', 'sounds/metal_impact.mp3', 3);
+        this.createSoundPool('damage_warning', 'sounds/damage_warning.mp3', 1);
+        this.createSoundPool('shield_hit', 'sounds/shield_hit.mp3', 3);
         
         // Powerup sounds
-        this.createSoundPool('powerup_pickup', 'sounds/powerup.mp3', 3);
+        this.createSoundPool('powerup_pickup', 'sounds/powerup_pickup.mp3', 3);
         this.createSoundPool('powerup_speed', 'sounds/powerup_speed.mp3', 2);
         this.createSoundPool('powerup_shield', 'sounds/powerup_shield.mp3', 2);
         this.createSoundPool('powerup_health', 'sounds/powerup_health.mp3', 2);
+        this.createSoundPool('powerup_damage', 'sounds/powerup_damage.mp3', 2);
+        this.createSoundPool('powerup_ammo', 'sounds/powerup_ammo.mp3', 2);
         
         // UI sounds
         this.createSoundPool('menu_select', 'sounds/menu_select.mp3', 1);
         this.createSoundPool('menu_confirm', 'sounds/menu_confirm.mp3', 1);
+        this.createSoundPool('menu_back', 'sounds/menu_back.mp3', 1);
+        this.createSoundPool('chat_message', 'sounds/chat_message.mp3', 1);
     }
     
     initializeMusicTracks() {
