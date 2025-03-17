@@ -402,6 +402,27 @@ class Game {
                     console.log("Resuming audio context after user interaction");
                     this.soundManager.listener.context.resume();
                 }
+                
+                // Play a silent sound to unlock audio on iOS/Safari
+                try {
+                    const silentSound = new Audio();
+                    silentSound.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD/+7DEAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD/+7DEAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAAAABQZXJmZWN0AAAAAAAAAAAAAAAAAAAAAAA=';
+                    silentSound.play().catch(() => {});
+                    silentSound.volume = 0;
+                } catch (e) {}
+                
+                // Create "Enable Sound" button after a slight delay if needed
+                setTimeout(() => {
+                    // Test audio by trying to play a simple sound
+                    const testAudio = new Audio('/sounds/menu_select.mp3');
+                    const testPromise = testAudio.play();
+                    if (testPromise) {
+                        testPromise.catch(() => {
+                            // If test failed, show the button
+                            this.showSoundEnableButton();
+                        });
+                    }
+                }, 1000);
             }, { once: true });
             
             // Add lights
@@ -1165,7 +1186,7 @@ class Game {
                         
                         // Play weapon sound if shot was successful
                         if (result && this.soundManager) {
-                            // Choose the appropriate sound based on weapon type
+                            // Use our simple sound player with appropriate weapon sound
                             let soundName = "weapon_fire"; // Default sound
                             
                             if (currentWeapon.type.name === "Shotgun") {
@@ -1178,8 +1199,8 @@ class Game {
                                 soundName = "weapon_fire";
                             }
                             
-                            // Play the sound
-                            this.soundManager.playSound(soundName, shootPos);
+                            // Play using our simple direct player
+                            this.playSimpleSound(soundName);
                         }
                         
                         // Update weapon display
@@ -3716,10 +3737,8 @@ class Game {
         try {
             // ... existing powerup code ...
             
-            // Play powerup sound with null check
-            if (this.soundManager) {
-                this.soundManager.playSound(`powerup_${type}`, this.truck.position);
-            }
+            // Play powerup sound using our simple sound player
+            this.playSimpleSound(`powerup_${type}`);
             
             // ... rest of powerup code ...
         } catch (error) {
@@ -5059,14 +5078,84 @@ class Game {
     }
 
     // Create explosion effect using object pooling
+    // Simple direct sound player that works independently of SoundManager
+    playSimpleSound(soundName) {
+        try {
+            const soundPath = `/sounds/${soundName}.mp3`;
+            console.log(`Attempting to play simple sound: ${soundPath}`);
+            
+            // Create a direct HTML5 Audio element
+            const audio = new Audio(soundPath);
+            audio.volume = 0.5;
+            
+            // Force play with user interaction check
+            const playPromise = audio.play();
+            if (playPromise) {
+                playPromise.catch(error => {
+                    console.error(`Error playing ${soundName}:`, error);
+                    
+                    // If autoplay was prevented, try again after a small delay
+                    if (error.name === 'NotAllowedError') {
+                        // Add a button for user to click to enable audio
+                        this.showSoundEnableButton(() => {
+                            // Try playing again after user interaction
+                            setTimeout(() => {
+                                try {
+                                    new Audio(soundPath).play();
+                                } catch (e) {}
+                            }, 100);
+                        });
+                    }
+                });
+            }
+            
+            return true;
+        } catch (e) {
+            console.error('Error in playSimpleSound:', e);
+            return false;
+        }
+    }
+    
+    // Add a temporary button for enabling sound after user interaction
+    showSoundEnableButton(callback) {
+        // Only show the button once
+        if (document.getElementById('sound-enable-button')) return;
+        
+        const button = document.createElement('button');
+        button.id = 'sound-enable-button';
+        button.textContent = 'Enable Sound';
+        button.style.position = 'fixed';
+        button.style.top = '10px';
+        button.style.left = '10px';
+        button.style.zIndex = '9999';
+        button.style.background = '#ff00ff';
+        button.style.color = 'white';
+        button.style.border = 'none';
+        button.style.padding = '10px 20px';
+        button.style.cursor = 'pointer';
+        
+        button.onclick = () => {
+            // Run callback
+            if (callback) callback();
+            
+            // Try to enable audio context
+            if (this.soundManager && this.soundManager.listener && this.soundManager.listener.context) {
+                this.soundManager.listener.context.resume();
+            }
+            
+            // Remove the button after clicking
+            button.remove();
+        };
+        
+        document.body.appendChild(button);
+    }
+
     createExplosion(position, type = 'standard', skipAreaDamage = false) {
         try {
             // ... existing explosion code ...
             
-            // Play explosion sound with null check
-            if (this.soundManager) {
-                this.soundManager.playSound('vehicle_explosion', position);
-            }
+            // Play explosion sound directly
+            this.playSimpleSound('vehicle_explosion');
             
             // ... rest of explosion code ...
         } catch (error) {
