@@ -2,17 +2,27 @@ import * as THREE from 'three';
 
 export class SoundManager {
     constructor(camera) {
-        // Create audio context
-        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Flag to use fallback HTML5 Audio if THREE.js audio fails
+        this.useFallbackAudio = false;
         
-        // Create Three.js audio listener and attach to camera
-        this.listener = new THREE.AudioListener();
-        if (camera) {
-            this.camera = camera;
-            camera.add(this.listener);
-            console.log('Audio listener attached to camera');
-        } else {
-            console.warn('No camera provided to SoundManager');
+        try {
+            // Create audio context
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Create Three.js audio listener and attach to camera
+            this.listener = new THREE.AudioListener();
+            if (camera) {
+                this.camera = camera;
+                camera.add(this.listener);
+                console.log('Audio listener attached to camera');
+            } else {
+                console.warn('No camera provided to SoundManager');
+                // Without a camera, we should use fallback audio
+                this.useFallbackAudio = true;
+            }
+        } catch (error) {
+            console.error('Error initializing THREE.js audio:', error);
+            this.useFallbackAudio = true;
         }
         
         // Initialize sound pools
@@ -30,10 +40,15 @@ export class SoundManager {
         
         // Diagnostic info
         console.log('Audio initialization:');
-        console.log('  - Context state:', this.listener.context.state);
-        console.log('  - Sample rate:', this.listener.context.sampleRate);
-        console.log('  - Output channels:', this.listener.context.destination.channelCount);
+        if (this.useFallbackAudio) {
+            console.log('  - Using HTML5 Audio fallback mode');
+        } else if (this.listener && this.listener.context) {
+            console.log('  - Context state:', this.listener.context.state);
+            console.log('  - Sample rate:', this.listener.context.sampleRate);
+            console.log('  - Output channels:', this.listener.context.destination.channelCount);
+        }
         console.log('  - Browser audio support:', this.detectAudioSupport());
+        console.log('  - Fallback mode active:', this.useFallbackAudio);
         
         console.log('Initializing sound pools...');
         this.initializeSoundPools();
@@ -133,6 +148,19 @@ export class SoundManager {
     }
     
     checkAudioContext() {
+        // If we're already in fallback mode, no need to check
+        if (this.useFallbackAudio) {
+            console.log('Using HTML5 Audio fallback mode - skipping audio context check');
+            return;
+        }
+        
+        // If there's no valid listener or context, switch to fallback mode
+        if (!this.listener || !this.listener.context) {
+            console.warn('No valid audio listener or context found - switching to fallback mode');
+            this.useFallbackAudio = true;
+            return;
+        }
+        
         if (this.listener.context.state === 'suspended') {
             console.log('Audio context is suspended. Waiting for user interaction...');
             const resumeAudio = () => {
@@ -143,6 +171,8 @@ export class SoundManager {
                     this.initializeSoundPools();
                 }).catch(error => {
                     console.error('Error resuming audio context:', error);
+                    // Switch to fallback mode if we can't resume
+                    this.enableFallbackMode();
                 });
                 document.removeEventListener('click', resumeAudio);
                 document.removeEventListener('keydown', resumeAudio);
@@ -152,9 +182,26 @@ export class SoundManager {
             document.addEventListener('click', resumeAudio);
             document.addEventListener('keydown', resumeAudio);
             document.addEventListener('touchstart', resumeAudio);
+            
+            // Set a timeout - if audio context is still suspended after 5 seconds, switch to fallback
+            setTimeout(() => {
+                if (this.listener && this.listener.context && this.listener.context.state === 'suspended') {
+                    console.warn('Audio context still suspended after timeout - switching to fallback mode');
+                    this.enableFallbackMode();
+                }
+            }, 5000);
         } else {
             console.log('Audio context is ready:', this.listener.context.state);
         }
+    }
+    
+    // Method to explicitly enable fallback mode
+    enableFallbackMode() {
+        console.log('Switching to HTML5 Audio fallback mode');
+        this.useFallbackAudio = true;
+        
+        // Play a test sound to verify fallback works
+        this.playFallbackSound('menu_select');
     }
     
     initializeSoundPools() {
@@ -237,17 +284,12 @@ export class SoundManager {
                             sound.setPlaybackRate(options.pitch);
                         }
                         
-                        // Test if the sound can actually be played
-                        try {
-                            // Create a temporary copy to test playback
-                            const testSound = sound.clone();
-                            testSound.setVolume(0); // Silent test
-                            testSound.play();
-                            testSound.stop();
-                            console.log(`Sound ${name} playback test successful`);
-                        } catch (playError) {
-                            console.error(`Sound ${name} playback test failed:`, playError);
-                        }
+                        // Log successful loading without trying to clone
+                        // which seems to be causing issues
+                        console.log(`Sound ${name} loaded successfully with buffer size: ${buffer.length} bytes, duration: ${buffer.duration}s`);
+                        
+                        // Flag that this sound is ready to be played
+                        sound.isReady = true;
                     },
                     (progress) => {
                         const percent = (progress.loaded / progress.total * 100).toFixed(2);
@@ -306,9 +348,13 @@ export class SoundManager {
     playSound(name, position = null) {
         console.log(`Attempting to play sound: ${name}`);
         
+        // Emergency alternative: Use regular HTML5 Audio API as fallback
+        if (this.useFallbackAudio) {
+            return this.playFallbackSound(name);
+        }
+        
         // Debug info about audio context
         console.log(`Audio context state: ${this.listener.context.state}`);
-        console.log(`Audio context sample rate: ${this.listener.context.sampleRate}`);
         
         // Check audio context state
         if (this.listener.context.state === 'suspended') {
@@ -318,6 +364,9 @@ export class SoundManager {
                 this.playSound(name, position);
             }).catch(error => {
                 console.error('Failed to resume audio context:', error);
+                // Switch to fallback audio if we can't resume
+                this.useFallbackAudio = true;
+                return this.playFallbackSound(name);
             });
             return null;
         }
@@ -333,108 +382,78 @@ export class SoundManager {
         const sound = pool.find(s => !s.isPlaying);
         if (!sound) {
             console.warn(`No available sounds in pool: ${name} (all ${pool.length} instances are playing)`);
-            return null;
+            return this.playFallbackSound(name); // Try fallback as last resort
         }
-        
-        // Extra debug info about the sound
-        console.log(`Sound ${name} details:`, {
-            hasBuffer: !!sound.buffer,
-            volume: sound.getVolume(),
-            isPlaying: sound.isPlaying,
-            duration: sound.buffer ? sound.buffer.duration : 'N/A'
-        });
         
         // Check if sound is ready to play
         if (!sound.buffer) {
             console.warn(`Sound ${name} not loaded yet (buffer not ready)`);
-            
-            // Let's try to reload this sound
-            console.log(`Attempting to reload missing sound: ${name}`);
-            const filePath = this.getSoundFilePath(name);
-            if (filePath) {
-                const loader = new THREE.AudioLoader();
-                loader.load(
-                    filePath,
-                    (buffer) => {
-                        console.log(`Reloaded sound: ${name}`);
-                        sound.setBuffer(buffer);
-                        sound.setVolume(this.sfxVolume * this.masterVolume);
-                        // Try to play it after reload
-                        try {
-                            sound.play();
-                            console.log(`Playing sound ${name} after reload`);
-                        } catch (playError) {
-                            console.error(`Failed to play ${name} after reload:`, playError);
-                        }
-                    },
-                    null,
-                    (error) => console.error(`Failed to reload sound ${name}:`, error)
-                );
-            }
-            
-            return null;
+            // Try fallback instead
+            return this.playFallbackSound(name);
         }
         
         try {
-            // If position is provided, make it positional
-            if (position) {
-                console.log(`Creating positional sound at (${position.x}, ${position.y}, ${position.z})`);
-                const posSound = new THREE.PositionalAudio(this.listener);
-                posSound.setBuffer(sound.buffer);
-                posSound.setVolume(this.sfxVolume * this.masterVolume);
-                posSound.setRefDistance(20);
-                posSound.setRolloffFactor(1);
-                posSound.position.copy(position);
-                
-                try {
-                    posSound.play();
-                    console.log(`Successfully started playing positional sound: ${name}`);
-                    return posSound;
-                } catch (error) {
-                    console.error(`Error playing positional sound ${name}:`, error);
-                    return null;
-                }
-            }
-            
             // Set the volume before playing
             sound.setVolume(this.sfxVolume * this.masterVolume);
             
-            // Force release any previous playback
-            if (sound.source) {
-                console.log(`Force stopping previous sound instance for ${name}`);
-                sound.stop();
-            }
-            
-            // Try playing with a delay to allow any release to complete
-            setTimeout(() => {
-                try {
-                    sound.play();
-                    console.log(`Successfully started playing non-positional sound: ${name} with delay`);
-                } catch (delayedError) {
-                    console.error(`Delayed play error for ${name}:`, delayedError);
+            // Only try to play if we have a valid buffer
+            if (sound.buffer) {
+                // If position is provided and Three.js positional audio is supported
+                if (position && THREE.PositionalAudio) {
+                    try {
+                        const pos = new THREE.PositionalAudio(this.listener);
+                        pos.setBuffer(sound.buffer);
+                        pos.setVolume(this.sfxVolume * this.masterVolume);
+                        pos.setRefDistance(20);
+                        pos.setRolloffFactor(1);
+                        pos.position.copy(position);
+                        pos.play();
+                        return pos;
+                    } catch (err) {
+                        console.warn('Positional audio failed, falling back to regular audio');
+                        // Continue to regular audio playback
+                    }
                 }
-            }, 50);
-            
-            // Immediate play attempt
-            sound.play();
-            console.log(`Successfully started playing non-positional sound: ${name}`);
-            return sound;
+                
+                // Regular audio playback
+                sound.play();
+                console.log(`Successfully started playing sound: ${name}`);
+                return sound;
+            } else {
+                console.warn(`Sound buffer for ${name} is not valid`);
+                return this.playFallbackSound(name);
+            }
         } catch (error) {
             console.error(`Error playing sound ${name}:`, error);
+            return this.playFallbackSound(name);
+        }
+    }
+    
+    // Fallback method using standard HTML5 Audio
+    playFallbackSound(name) {
+        try {
+            console.log(`Attempting to play ${name} using HTML5 Audio fallback`);
+            const path = this.getSoundFilePath(name);
+            if (!path) return null;
             
-            // Try to recover by creating a new sound instance
-            try {
-                console.log(`Creating recovery sound for ${name}`);
-                const recoverSound = new THREE.Audio(this.listener);
-                recoverSound.setBuffer(sound.buffer);
-                recoverSound.setVolume(this.sfxVolume * this.masterVolume);
-                recoverSound.play();
-                console.log(`Recovery attempt for ${name} successful`);
-                return recoverSound;
-            } catch (recoverError) {
-                console.error(`Recovery attempt failed for ${name}:`, recoverError);
-                return null;
+            // Create a new Audio element
+            const audio = new Audio(path);
+            audio.volume = this.sfxVolume * this.masterVolume;
+            
+            // Play the sound
+            const playPromise = audio.play();
+            if (playPromise) {
+                playPromise.then(() => {
+                    console.log(`Fallback audio playing: ${name}`);
+                }).catch(error => {
+                    console.error(`Fallback audio failed: ${name}`, error);
+                });
             }
+            
+            return audio;
+        } catch (error) {
+            console.error(`Failed to play fallback sound ${name}:`, error);
+            return null;
         }
     }
     
