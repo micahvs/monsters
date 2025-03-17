@@ -323,6 +323,53 @@
             color: #ff5555;
             text-shadow: 0 0 5px #ff5555;
         }
+        
+        .enter-hint {
+            font-size: 0.8rem;
+            margin-top: 8px;
+            color: rgba(255, 0, 255, 0.8);
+            text-align: center;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        /* Additional styles for callsign container and enter hint */
+        .callsign-container {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .callsign-container label {
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            color: #ff00ff;
+            text-shadow: 0 0 5px #ff00ff;
+        }
+        
+        .callsign-container input {
+            width: 300px;
+            padding: 12px;
+            text-align: center;
+            font-size: 1.1rem;
+            border-radius: 5px;
+        }
+        
+        .color-label {
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            color: #ff00ff;
+            text-shadow: 0 0 5px #ff00ff;
+            text-align: center;
+        }
+        
+        .color-picker {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -340,15 +387,14 @@
             <h1 class="title">MONSTER TRUCK STADIUM</h1>
             <div class="subtitle">AN EPIC MULTIPLAYER BATTLE</div>
 
-            <div class="input-section">
-                <div class="nickname-input">
-                    <label for="nickname">YOUR CALLSIGN:</label>
-                    <input type="text" id="nickname" placeholder="Enter your nickname (3-12 chars)" maxlength="12" minlength="3">
-                </div>
+            <div class="callsign-container">
+                <label for="nickname">ENTER YOUR CALLSIGN:</label>
+                <input type="text" id="nickname" name="nickname" placeholder="Pilot name..." maxlength="12" required>
+                <div class="enter-hint">press ENTER to start</div>
             </div>
 
-            <div class="color-selection">
-                <h3>SELECT YOUR NEON GLOW</h3>
+            <div class="color-picker">
+                <div class="color-label">SELECT YOUR COLOR:</div>
                 <div class="color-options">
                     <div class="color-option selected" data-color="#ff00ff" style="background-color: #ff00ff; box-shadow: 0 0 10px #ff00ff;"></div>
                     <div class="color-option" data-color="#00ffff" style="background-color: #00ffff; box-shadow: 0 0 10px #00ffff;"></div>
@@ -640,14 +686,51 @@
             if (nicknameInput) {
                 nicknameInput.addEventListener('input', function() {
                     const nickname = this.value.trim();
-                    if (nickname) {
-                        document.getElementById('selectedNickname').textContent = nickname;
-                    } else {
-                        document.getElementById('selectedNickname').textContent = 'Player';
-                    }
-                    
-                    // Store nickname
+                    document.getElementById('selectedNickname').textContent = nickname || 'Player';
                     localStorage.setItem('monsterTruckNickname', nickname);
+                });
+                
+                // Add event listener for Enter key
+                nicknameInput.addEventListener('keydown', function(event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        
+                        // Run the same validation and navigation logic as the play button
+                        const nickname = this.value.trim();
+                        if (nickname.length < 3) {
+                            alert("Callsign must be at least 3 characters long");
+                            this.focus();
+                            return;
+                        }
+                        
+                        // Store all selections in localStorage
+                        localStorage.setItem('monsterTruckNickname', nickname);
+                        
+                        // Get and store selected truck
+                        const selectedTruck = document.querySelector('.truck-option.selected');
+                        if (selectedTruck) {
+                            localStorage.setItem('monsterTruckType', selectedTruck.id);
+                        }
+                        
+                        // Get and store selected color
+                        const selectedColor = document.querySelector('.color-option.selected');
+                        if (selectedColor) {
+                            localStorage.setItem('monsterTruckColor', selectedColor.dataset.color);
+                        }
+                        
+                        // Get and store graphics quality
+                        const quality = document.getElementById('quality').value;
+                        localStorage.setItem('monsterTruckQuality', quality);
+                        
+                        // Store multiplayer preference
+                        localStorage.setItem('monsterTruckMultiplayer', 
+                            document.getElementById('multiplayer').checked);
+                        
+                        console.log('Navigating to game.html via Enter key'); // Debug log
+                        
+                        // Navigate to game page
+                        window.location.href = '/game.html';
+                    }
                 });
             }
             
