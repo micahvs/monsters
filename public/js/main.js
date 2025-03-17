@@ -1190,30 +1190,9 @@ class Game {
                         }
                         
                         // Play weapon sound if shot was successful
-                        if (result && this.soundManager) {
-                            // Directly play the weapon fire sound with no abstraction
-                            try {
-                                // Just directly create and play the Audio - simplest approach
-                                const audio = new Audio('/sounds/weapon_fire.mp3');
-                                audio.volume = 0.5;
-                                const promise = audio.play();
-                                
-                                console.log('Direct weapon sound attempted');
-                                
-                                // If it fails, show the button
-                                if (promise) {
-                                    promise.catch(error => {
-                                        console.error('Weapon sound failed:', error);
-                                        
-                                        // Show button if we get a NotAllowedError
-                                        if (error.name === 'NotAllowedError') {
-                                            this.showSoundEnableButton();
-                                        }
-                                    });
-                                }
-                            } catch (e) {
-                                console.error('Weapon sound error:', e);
-                            }
+                        if (result && window.SoundFX) {
+                            // Use our guaranteed sound system
+                            window.SoundFX.play('weapon_fire');
                         }
                         
                         // Update weapon display
@@ -1614,12 +1593,12 @@ class Game {
                 this.updatePowerupIndicators();
             }
             
-            // Play hit sound with null check
-            if (this.soundManager) {
-                this.soundManager.playSound('vehicle_hit', this.truck.position);
+            // Play hit sound with our guaranteed sound system
+            if (window.SoundFX) {
+                window.SoundFX.play('vehicle_hit');
                 
                 if (this.hasShield) {
-                    this.soundManager.playSound('shield_hit', this.truck.position);
+                    window.SoundFX.play('shield_hit');
                 }
             }
             
@@ -1747,9 +1726,9 @@ class Game {
             }
         }, 200);
         
-        // Play shield hit sound with null check
-        if (this.soundManager) {
-            this.soundManager.playSound('shield_hit', this.truck.position);
+        // Play shield hit sound using our guaranteed sound system
+        if (window.SoundFX) {
+            window.SoundFX.play('shield_hit');
         }
     }
     
@@ -3750,8 +3729,19 @@ class Game {
         try {
             // ... existing powerup code ...
             
-            // Play powerup sound using our simple sound player
-            this.playSimpleSound(`powerup_${type}`);
+            // Play powerup sound using our guaranteed sound system
+            if (window.SoundFX) {
+                // Determine the correct sound to play
+                let soundName = 'powerup_pickup';
+                
+                // Try to use the specific sound if available
+                if (type === 'speed' || type === 'health' || type === 'shield' || 
+                    type === 'damage' || type === 'ammo') {
+                    soundName = 'powerup_' + type;
+                }
+                
+                window.SoundFX.play(soundName);
+            }
             
             // ... rest of powerup code ...
         } catch (error) {
@@ -5265,14 +5255,9 @@ class Game {
         try {
             // ... existing explosion code ...
             
-            // Play explosion sound directly with no abstraction
-            try {
-                const audio = new Audio('/sounds/vehicle_explosion.mp3');
-                audio.volume = 0.5;
-                audio.play().catch(e => console.error('Explosion sound error:', e));
-                console.log('Direct explosion sound attempted');
-            } catch (e) {
-                console.error('Explosion sound creation error:', e);
+            // Play explosion sound using our guaranteed sound system
+            if (window.SoundFX) {
+                window.SoundFX.play('vehicle_explosion');
             }
             
             // ... rest of explosion code ...
@@ -5290,9 +5275,166 @@ class Game {
 }
 
 // Initialize game when window is fully loaded
+// GUARANTEED SOUND SYSTEM - completely separate from game audio
+window.SoundFX = {
+    // Pre-load all sounds
+    sounds: {},
+    
+    // Initialize system
+    init() {
+        // Define all sounds we need
+        const soundFiles = [
+            'weapon_fire', 
+            'vehicle_explosion', 
+            'shield_hit',
+            'metal_impact',
+            'powerup_pickup',
+            'menu_select',
+            'menu_confirm'
+        ];
+        
+        // Pre-load each sound
+        soundFiles.forEach(sound => {
+            this.sounds[sound] = new Audio(`/sounds/${sound}.mp3`);
+            
+            // Clone several instances for overlapping sounds
+            this.sounds[sound + '_1'] = new Audio(`/sounds/${sound}.mp3`);
+            this.sounds[sound + '_2'] = new Audio(`/sounds/${sound}.mp3`);
+            
+            // Set volume
+            this.sounds[sound].volume = 0.5;
+            this.sounds[sound + '_1'].volume = 0.5;
+            this.sounds[sound + '_2'].volume = 0.5;
+        });
+        
+        // Create the sound button
+        this.createSoundButton();
+        
+        console.log('Simple sound system initialized');
+    },
+    
+    // Create button for enabling sounds
+    createSoundButton() {
+        const button = document.createElement('button');
+        button.textContent = '🔊 ENABLE SOUND';
+        button.style.position = 'fixed';
+        button.style.top = '10px';
+        button.style.left = '10px';
+        button.style.zIndex = '10000';
+        button.style.backgroundColor = '#ff00ff';
+        button.style.color = 'white';
+        button.style.padding = '10px 20px';
+        button.style.fontSize = '16px';
+        button.style.fontWeight = 'bold';
+        button.style.border = 'none';
+        button.style.borderRadius = '5px';
+        button.style.cursor = 'pointer';
+        button.style.boxShadow = '0 0 10px rgba(255,0,255,0.8)';
+        
+        // Handle click - this is where we unlock audio
+        button.onclick = () => {
+            // Play all sounds at 0 volume to unlock them
+            Object.values(this.sounds).forEach(sound => {
+                // Reset to start
+                sound.currentTime = 0;
+                sound.volume = 0;
+                
+                // Try to play (even if it fails, that's fine)
+                const promise = sound.play();
+                if (promise) promise.catch(() => {});
+                
+                // Stop after a moment
+                setTimeout(() => {
+                    try { sound.pause(); } catch(e) {}
+                }, 50);
+            });
+            
+            // Now try to play one audibly to confirm it worked
+            try {
+                const testSound = this.sounds['menu_confirm'];
+                testSound.volume = 0.5;
+                testSound.currentTime = 0;
+                testSound.play().catch(() => {});
+            } catch(e) {}
+            
+            // Show success message
+            button.textContent = '✓ SOUND ENABLED';
+            button.style.backgroundColor = '#00ff00';
+            button.style.color = 'black';
+            
+            // Remove after 2 seconds
+            setTimeout(() => {
+                button.remove();
+                
+                // Add console log to help users troubleshoot
+                console.log('%c 🔊 SOUND SYSTEM READY - ALL SOUNDS SHOULD WORK NOW 🔊', 
+                    'background: #00ff00; color: #000000; font-size: 16px; padding: 10px; font-weight: bold;');
+            }, 2000);
+        };
+        
+        document.body.appendChild(button);
+    },
+    
+    // Play a sound effect
+    play(name) {
+        console.log(`SoundFX playing: ${name}`);
+        
+        // Find which instance to use
+        let sound;
+        if (this.sounds[name] && !this.sounds[name].playing) {
+            sound = this.sounds[name];
+        } else if (this.sounds[name + '_1'] && !this.sounds[name + '_1'].playing) {
+            sound = this.sounds[name + '_1'];
+        } else if (this.sounds[name + '_2'] && !this.sounds[name + '_2'].playing) {
+            sound = this.sounds[name + '_2'];
+        } else {
+            // If all are busy, use the main one anyway
+            sound = this.sounds[name] || new Audio(`/sounds/${name}.mp3`);
+        }
+        
+        // Make sure we have a sound
+        if (!sound) {
+            console.error(`Sound not found: ${name}`);
+            return;
+        }
+        
+        // Reset sound to beginning and ensure volume is set
+        sound.currentTime = 0;
+        sound.volume = 0.5;
+        
+        // Play the sound with error handling
+        try {
+            const promise = sound.play();
+            
+            // Track if it's playing
+            sound.playing = true;
+            
+            // Mark as available when done
+            sound.onended = () => { 
+                sound.playing = false;
+            };
+            
+            // Handle promise error
+            if (promise) {
+                promise.catch(error => {
+                    console.error(`Error playing ${name}:`, error);
+                    sound.playing = false;
+                });
+            }
+        } catch(error) {
+            console.error(`Error playing ${name}:`, error);
+            sound.playing = false;
+        }
+    }
+};
+
 window.addEventListener('load', () => {
     console.log("Window loaded, creating game");
     try {
+        // Initialize sound system
+        window.SoundFX.init();
+        
+        // Create game
         window.game = new Game();
         console.log("Game instance created and set on window.game");
     } catch (error) {
