@@ -2,14 +2,18 @@ import * as THREE from 'three';
 
 export class SoundManager {
     constructor(camera) {
-        this.camera = camera;
-        this.listener = new THREE.AudioListener();
-        this.camera.add(this.listener);
+        // Create audio context
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
         
-        // Sound pools for frequently used sounds
+        // Create audio listener and attach to camera
+        this.listener = this.audioContext.listener;
+        if (camera) {
+            this.camera = camera;
+            this.updateListenerPosition();
+        }
+        
+        // Initialize sound pools
         this.soundPools = new Map();
-        
-        // Currently playing sounds
         this.activeSounds = new Map();
         
         // Music tracks
@@ -17,12 +21,15 @@ export class SoundManager {
         this.currentMusic = null;
         
         // Volume settings
-        this.masterVolume = 0.7;
+        this.masterVolume = 1.0;
         this.sfxVolume = 0.5;
         this.musicVolume = 0.3;
         
-        // Initialize sound pools
+        console.log('Initializing sound pools...');
         this.initializeSoundPools();
+        
+        // Load music tracks
+        console.log('Loading music tracks...');
         this.initializeMusicTracks();
         
         // Check audio context state
@@ -36,6 +43,8 @@ export class SoundManager {
                 console.log('Attempting to resume audio context...');
                 this.listener.context.resume().then(() => {
                     console.log('Audio context resumed successfully');
+                    // Retry loading sounds after context is resumed
+                    this.initializeSoundPools();
                 }).catch(error => {
                     console.error('Error resuming audio context:', error);
                 });
@@ -57,33 +66,27 @@ export class SoundManager {
         this.createSoundPool('engine_idle', 'sounds/engine_idle.mp3', 1);
         this.createSoundPool('engine_rev', 'sounds/engine_rev.mp3', 1);
         this.createSoundPool('tire_screech', 'sounds/tire_screech.mp3', 3);
-        this.createSoundPool('suspension_bounce', 'sounds/suspension_bounce.mp3', 3);
         
         // Weapon sounds
-        this.createSoundPool('weapon_fire', 'sounds/weapon_fire.mp3', 5);
-        this.createSoundPool('projectile_hit', 'sounds/projectile_hit.mp3', 5);
-        this.createSoundPool('turret_fire', 'sounds/weapon_fire.mp3', 5, { pitch: 0.5 }); // Pitched down version
+        this.createSoundPool('shoot', 'sounds/shoot.mp3', 5);
+        this.createSoundPool('explosion', 'sounds/explosion.mp3', 3);
+        this.createSoundPool('hit', 'sounds/hit.mp3', 3);
+        this.createSoundPool('turret_shoot', 'sounds/turret_shoot.mp3', 5);
         
         // Damage sounds
+        this.createSoundPool('wall_hit', 'sounds/wall_hit.mp3', 3);
         this.createSoundPool('vehicle_hit', 'sounds/vehicle_hit.mp3', 3);
-        this.createSoundPool('vehicle_explosion', 'sounds/vehicle_explosion.mp3', 3);
         this.createSoundPool('metal_impact', 'sounds/metal_impact.mp3', 3);
-        this.createSoundPool('damage_warning', 'sounds/damage_warning.mp3', 1);
-        this.createSoundPool('shield_hit', 'sounds/shield_hit.mp3', 3);
         
         // Powerup sounds
-        this.createSoundPool('powerup_pickup', 'sounds/powerup_pickup.mp3', 3);
+        this.createSoundPool('powerup_pickup', 'sounds/powerup.mp3', 3);
         this.createSoundPool('powerup_speed', 'sounds/powerup_speed.mp3', 2);
         this.createSoundPool('powerup_shield', 'sounds/powerup_shield.mp3', 2);
         this.createSoundPool('powerup_health', 'sounds/powerup_health.mp3', 2);
-        this.createSoundPool('powerup_damage', 'sounds/powerup_damage.mp3', 2);
-        this.createSoundPool('powerup_ammo', 'sounds/powerup_ammo.mp3', 2);
         
         // UI sounds
         this.createSoundPool('menu_select', 'sounds/menu_select.mp3', 1);
         this.createSoundPool('menu_confirm', 'sounds/menu_confirm.mp3', 1);
-        this.createSoundPool('menu_back', 'sounds/menu_back.mp3', 1);
-        this.createSoundPool('chat_message', 'sounds/chat_message.mp3', 1);
     }
     
     initializeMusicTracks() {
@@ -100,31 +103,50 @@ export class SoundManager {
     
     createSoundPool(name, path, poolSize, options = {}) {
         console.log(`Creating sound pool for ${name} with path ${path}`);
+        
+        // Check if pool already exists
+        if (this.soundPools.has(name)) {
+            console.log(`Sound pool ${name} already exists, skipping creation`);
+            return;
+        }
+        
         const pool = [];
         for (let i = 0; i < poolSize; i++) {
-            const sound = new THREE.Audio(this.listener);
-            const loader = new THREE.AudioLoader();
-            
-            loader.load(path, 
-                (buffer) => {
-                    console.log(`Successfully loaded sound: ${name}`);
-                    sound.setBuffer(buffer);
-                    sound.setVolume(this.sfxVolume * this.masterVolume);
-                    if (options.pitch) {
-                        sound.setPlaybackRate(options.pitch);
+            try {
+                const sound = new THREE.Audio(this.listener);
+                const loader = new THREE.AudioLoader();
+                
+                loader.load(
+                    path, 
+                    (buffer) => {
+                        console.log(`Successfully loaded sound: ${name} (instance ${i + 1}/${poolSize})`);
+                        sound.setBuffer(buffer);
+                        sound.setVolume(this.sfxVolume * this.masterVolume);
+                        if (options.pitch) {
+                            sound.setPlaybackRate(options.pitch);
+                        }
+                    },
+                    (progress) => {
+                        const percent = (progress.loaded / progress.total * 100).toFixed(2);
+                        console.log(`Loading sound ${name} (instance ${i + 1}/${poolSize}): ${percent}%`);
+                    },
+                    (error) => {
+                        console.error(`Error loading sound ${name} from ${path} (instance ${i + 1}/${poolSize}):`, error);
                     }
-                },
-                (progress) => {
-                    console.log(`Loading sound ${name}: ${(progress.loaded / progress.total * 100).toFixed(2)}%`);
-                },
-                (error) => {
-                    console.error(`Error loading sound ${name} from ${path}:`, error);
-                }
-            );
-            
-            pool.push(sound);
+                );
+                
+                pool.push(sound);
+            } catch (error) {
+                console.error(`Error creating sound instance for ${name}:`, error);
+            }
         }
-        this.soundPools.set(name, pool);
+        
+        if (pool.length > 0) {
+            this.soundPools.set(name, pool);
+            console.log(`Created sound pool for ${name} with ${pool.length} instances`);
+        } else {
+            console.error(`Failed to create any sound instances for ${name}`);
+        }
     }
     
     loadMusicTrack(name, path) {
@@ -142,41 +164,62 @@ export class SoundManager {
     
     playSound(name, position = null) {
         console.log(`Attempting to play sound: ${name}`);
+        
+        // Check audio context state
+        if (this.listener.context.state === 'suspended') {
+            console.warn('Audio context is suspended, attempting to resume...');
+            this.listener.context.resume().then(() => {
+                console.log('Audio context resumed, retrying sound playback');
+                this.playSound(name, position);
+            });
+            return null;
+        }
+        
         const pool = this.soundPools.get(name);
         if (!pool) {
-            console.warn(`Sound not found in pool: ${name}`);
+            console.warn(`Sound pool not found: ${name}`);
+            console.log('Available sound pools:', Array.from(this.soundPools.keys()));
             return null;
         }
         
         // Find an available sound from the pool
         const sound = pool.find(s => !s.isPlaying);
         if (!sound) {
-            console.warn(`No available sounds in pool: ${name}`);
+            console.warn(`No available sounds in pool: ${name} (all ${pool.length} instances are playing)`);
             return null;
         }
         
         // Check if sound is ready to play
         if (!sound.buffer) {
-            console.warn(`Sound ${name} not loaded yet`);
+            console.warn(`Sound ${name} not loaded yet (buffer not ready)`);
             return null;
         }
         
         try {
             // If position is provided, make it positional
             if (position) {
+                console.log(`Creating positional sound at (${position.x}, ${position.y}, ${position.z})`);
                 const posSound = new THREE.PositionalAudio(this.listener);
                 posSound.setBuffer(sound.buffer);
-                posSound.setVolume(sound.volume);
+                posSound.setVolume(this.sfxVolume * this.masterVolume);
                 posSound.setRefDistance(20);
                 posSound.setRolloffFactor(1);
                 posSound.position.copy(position);
-                posSound.play();
-                console.log(`Playing positional sound: ${name}`);
-                return posSound;
+                
+                try {
+                    posSound.play();
+                    console.log(`Successfully started playing positional sound: ${name}`);
+                    return posSound;
+                } catch (error) {
+                    console.error(`Error playing positional sound ${name}:`, error);
+                    return null;
+                }
             }
             
+            // Set the volume before playing
+            sound.setVolume(this.sfxVolume * this.masterVolume);
             sound.play();
-            console.log(`Playing non-positional sound: ${name}`);
+            console.log(`Successfully started playing non-positional sound: ${name}`);
             return sound;
         } catch (error) {
             console.error(`Error playing sound ${name}:`, error);
