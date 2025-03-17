@@ -3342,6 +3342,12 @@ class Game {
         // Create explosion at turret position with skipAreaDamage=true to prevent recursion
         this.createExplosion(turret.mesh.position, 'large', true);
         
+        // Store the turret's position for respawning
+        const turretPosition = {
+            x: turret.mesh.position.x,
+            z: turret.mesh.position.z
+        };
+        
         // Remove turret from scene
         this.scene.remove(turret.mesh);
         
@@ -3351,15 +3357,74 @@ class Game {
             this.turrets.splice(index, 1);
         }
         
-        // Create a new turret after some time
+        // Create a visual indicator for respawn
+        this.createRespawnIndicator(turretPosition);
+        
+        // Respawn the turret at the same position after 30 seconds
         setTimeout(() => {
-            if (this.turrets.length < this.maxTurrets) {
-                this.createTurret(
-                    (Math.random() - 0.5) * 180,
-                    (Math.random() - 0.5) * 180
-                );
-            }
-        }, 10000); // 10 seconds
+            // Create a new turret at the same position
+            this.createTurret(turretPosition.x, turretPosition.z);
+            console.log(`Turret respawned at position (${turretPosition.x}, ${turretPosition.z})`);
+        }, 30000); // 30 seconds
+    }
+    
+    // Create a visual indicator for turret respawn
+    createRespawnIndicator(position) {
+        // Create a pulsing light to indicate where the turret will respawn
+        const respawnLight = new THREE.PointLight(0x00ffff, 1, 20);
+        respawnLight.position.set(position.x, 1, position.z);
+        this.scene.add(respawnLight);
+        
+        // Create a marker mesh
+        const markerGeometry = new THREE.CylinderGeometry(2, 2, 0.1, 16);
+        const markerMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ffff,
+            emissive: 0x00ffff,
+            emissiveIntensity: 0.5,
+            transparent: true,
+            opacity: 0.7
+        });
+        
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.set(position.x, 0.05, position.z);
+        this.scene.add(marker);
+        
+        // Store start time for animation
+        const startTime = Date.now();
+        const duration = 30000; // 30 seconds
+        
+        // Add to special effects for updating
+        if (!this.specialEffects) {
+            this.specialEffects = [];
+        }
+        
+        this.specialEffects.push({
+            update: () => {
+                const elapsed = Date.now() - startTime;
+                const remaining = duration - elapsed;
+                
+                if (remaining <= 0) {
+                    // Remove the indicator when time is up
+                    this.scene.remove(respawnLight);
+                    this.scene.remove(marker);
+                    return true; // Return true to remove from specialEffects
+                }
+                
+                // Pulse the light and marker
+                const pulse = 0.5 + 0.5 * Math.sin(elapsed * 0.005);
+                respawnLight.intensity = pulse;
+                
+                // Make the opacity pulse and fade out as time passes
+                const fadeProgress = elapsed / duration;
+                marker.material.opacity = 0.7 * (1 - fadeProgress) * (0.5 + 0.5 * Math.sin(elapsed * 0.005));
+                
+                // Rotate the marker
+                marker.rotation.y += 0.01;
+                
+                return false; // Keep updating
+            },
+            mesh: marker // Reference to the mesh for cleanup
+        });
     }
 
     // Initialize with weapon and ammo display
