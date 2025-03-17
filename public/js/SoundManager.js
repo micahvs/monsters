@@ -37,6 +37,8 @@ export class SoundManager {
         this.masterVolume = 1.0;
         this.sfxVolume = 0.7; // Increase default volume to make sounds more noticeable
         this.musicVolume = 0.3;
+        this.isMuted = false;
+        this.sfxMuted = false;
         
         // Diagnostic info
         console.log('Audio initialization:');
@@ -513,20 +515,68 @@ export class SoundManager {
     
     setMasterVolume(volume) {
         this.masterVolume = Math.max(0, Math.min(1, volume));
+        
+        // Update all active sounds and pools
         this.updateAllVolumes();
-    }
-    
-    setSFXVolume(volume) {
-        this.sfxVolume = Math.max(0, Math.min(1, volume));
-        this.updateAllVolumes();
+        
+        console.log(`Master volume set to ${this.masterVolume}`);
     }
     
     setMusicVolume(volume) {
         this.musicVolume = Math.max(0, Math.min(1, volume));
+        
+        // Update music volume if playing
         this.updateAllVolumes();
+        
+        console.log(`Music volume set to ${this.musicVolume}`);
+    }
+    
+    setSFXVolume(volume) {
+        this.sfxVolume = Math.max(0, Math.min(1, volume));
+        
+        // Update all sound effects volumes
+        this.updateAllVolumes();
+        
+        console.log(`SFX volume set to ${this.sfxVolume}`);
+    }
+    
+    setMuted(isMuted) {
+        const wasMuted = this.isMuted;
+        this.isMuted = isMuted;
+        
+        // Update all volumes
+        this.updateAllVolumes();
+        
+        if (wasMuted !== isMuted) {
+            console.log(`Sound ${isMuted ? 'muted' : 'unmuted'}`);
+        }
+    }
+    
+    setSFXMuted(isMuted) {
+        const wasMuted = this.sfxMuted;
+        this.sfxMuted = isMuted;
+        
+        // Update all volumes
+        this.updateAllVolumes();
+        
+        if (wasMuted !== isMuted) {
+            console.log(`SFX ${isMuted ? 'muted' : 'unmuted'}`);
+        }
     }
     
     updateAllVolumes() {
+        // Update active sounds
+        for (const [soundId, sound] of this.activeSounds.entries()) {
+            if (sound.isSFX) {
+                this.updateSoundVolume(sound);
+            }
+        }
+        
+        // Also update the central music player if available
+        if (window.musicPlayer && typeof window.musicPlayer.updateMusicVolume === 'function') {
+            window.musicPlayer.updateMusicVolume();
+        }
+        
         // Update sound pools
         for (const pool of this.soundPools.values()) {
             for (const sound of pool) {
@@ -537,6 +587,21 @@ export class SoundManager {
         // Update music tracks
         for (const music of this.musicTracks.values()) {
             music.setVolume(this.musicVolume * this.masterVolume);
+        }
+    }
+    
+    updateSoundVolume(sound) {
+        if (!sound || this.useFallbackAudio) return;
+        
+        // Calculate effective volume
+        const effectiveVolume = this.isMuted || (sound.isSFX && this.sfxMuted) ? 
+            0 : this.masterVolume * this.sfxVolume * sound.baseVolume;
+        
+        // Update sound volume
+        if (sound.audioNode && sound.gainNode) {
+            sound.gainNode.gain.value = effectiveVolume;
+        } else if (sound.audio) {
+            sound.audio.volume = effectiveVolume;
         }
     }
     

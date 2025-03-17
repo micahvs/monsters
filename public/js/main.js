@@ -4034,16 +4034,34 @@ class Game {
         }, 5000);
     }
 
-    // Add this method to toggle audio
+    // Toggle audio (will use the unified audio panel)
     toggleAudio() {
-        if (this.soundManager) {
-            const newVolume = this.soundManager.masterVolume > 0 ? 0 : 0.7;
-            this.soundManager.setMasterVolume(newVolume);
-            
-            // Update UI to show muted/unmuted state
-            const audioButton = document.getElementById('audioButton');
-            if (audioButton) {
-                audioButton.textContent = newVolume > 0 ? '🔊' : '🔇';
+        // This is now handled by the unified audio panel
+        // We'll keep this method for backward compatibility with keyboard shortcuts
+        if (window.musicPlayer && typeof window.musicPlayer.toggleMasterMute === 'function') {
+            window.musicPlayer.toggleMasterMute();
+        }
+    }
+
+    // Show sound enable button - modified to use the unified audio panel
+    showSoundEnableButton(callback) {
+        // The button is already in the UI as part of the unified audio panel
+        console.log('Sound enable available through the unified audio panel');
+        
+        // If there's a callback, we'll ensure the audio context is running
+        if (callback && typeof callback === 'function') {
+            // Resume audio context if needed
+            if (this.soundManager && this.soundManager.listener && 
+                this.soundManager.listener.context && 
+                this.soundManager.listener.context.state === 'suspended') {
+                
+                this.soundManager.listener.context.resume().then(() => {
+                    console.log('Audio context resumed by user interaction');
+                    callback();
+                });
+            } else {
+                // Audio context is already running
+                callback();
             }
         }
     }

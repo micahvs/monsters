@@ -2,259 +2,431 @@
  * Dynamic Music Player for Monster Truck Stadium
  * 
  * This module handles loading and playing music files from the /music/ directory.
- * It automatically detects available music files and plays them in alphabetical order.
+ * It integrates with the unified audio control panel.
  */
-
 class MusicPlayer {
     constructor() {
+        // Audio element
         this.audioElement = document.getElementById('backgroundMusic');
-        this.playPauseButton = document.getElementById('playPauseButton');
-        this.audioToggle = document.getElementById('audioToggle');
         
-        this.playPauseIcon = this.playPauseButton.querySelector('i');
-        this.audioIcon = this.audioToggle.querySelector('i');
-        
+        // Track management
         this.musicTracks = [];
         this.currentTrackIndex = 0;
-        this.isPlaying = false;
-        this.supportedExtensions = ['.mp3']; // Only scan for MP3 files to reduce errors
-        this.isScanning = false;
         
-        // Initialize the player
-        this.init();
+        // UI elements
+        this.trackDisplay = document.getElementById('current-track-name');
+        
+        // Control buttons
+        this.musicPlayButton = document.getElementById('music-play');
+        this.musicPrevButton = document.getElementById('music-prev');
+        this.musicNextButton = document.getElementById('music-next');
+        this.musicMuteButton = document.getElementById('music-mute');
+        this.musicVolumeSlider = document.getElementById('music-volume');
+        
+        // Master controls that affect music
+        this.masterMuteButton = document.getElementById('master-mute');
+        this.masterVolumeSlider = document.getElementById('master-volume');
+        
+        // Panel toggle
+        this.audioPanelToggle = document.getElementById('audio-panel-toggle');
+        this.audioPanel = document.getElementById('audio-panel');
+        
+        // State
+        this.isMusicMuted = false;
+        this.isMasterMuted = false;
+        this.musicVolume = 0.3; // 0 to 1
+        this.masterVolume = 1.0; // 0 to 1
+        
+        // Initialize
+        this.initControlListeners();
+        this.loadSavedSettings();
+        this.scanForMusicFiles();
+        
+        // Make player globally available
+        window.musicPlayer = this;
     }
     
-    init() {
-        // Set up event listeners
-        this.setupEventListeners();
-        
-        // Check if audio was previously muted
-        const audioMuted = localStorage.getItem('monsterTruckAudioMuted') === 'true';
-        this.audioElement.muted = audioMuted;
-        
-        // Update UI to reflect muted state
-        if (audioMuted) {
-            this.audioToggle.classList.add('muted');
-            this.audioIcon.className = 'fas fa-volume-mute';
-        } else {
-            this.audioToggle.classList.remove('muted');
-            this.audioIcon.className = 'fas fa-volume-up';
+    initControlListeners() {
+        // Play/Pause button
+        if (this.musicPlayButton) {
+            this.musicPlayButton.addEventListener('click', () => this.togglePlayPause());
         }
         
-        // Scan for music files
-        this.scanForMusicFiles();
+        // Previous track button
+        if (this.musicPrevButton) {
+            this.musicPrevButton.addEventListener('click', () => this.prevTrack());
+        }
+        
+        // Next track button
+        if (this.musicNextButton) {
+            this.musicNextButton.addEventListener('click', () => this.nextTrack());
+        }
+        
+        // Music mute button
+        if (this.musicMuteButton) {
+            this.musicMuteButton.addEventListener('click', () => this.toggleMusicMute());
+        }
+        
+        // Music volume slider
+        if (this.musicVolumeSlider) {
+            this.musicVolumeSlider.addEventListener('input', () => {
+                this.musicVolume = parseInt(this.musicVolumeSlider.value) / 100;
+                this.updateMusicVolume();
+                this.saveSettings();
+                this.updateMusicMuteButtonIcon();
+            });
+        }
+        
+        // Master mute button
+        if (this.masterMuteButton) {
+            this.masterMuteButton.addEventListener('click', () => this.toggleMasterMute());
+        }
+        
+        // Master volume slider
+        if (this.masterVolumeSlider) {
+            this.masterVolumeSlider.addEventListener('input', () => {
+                this.masterVolume = parseInt(this.masterVolumeSlider.value) / 100;
+                this.updateMusicVolume();
+                if (window.soundManager) {
+                    window.soundManager.setMasterVolume(this.masterVolume);
+                }
+                this.saveSettings();
+                this.updateMasterMuteButtonIcon();
+            });
+        }
+        
+        // Panel toggle
+        if (this.audioPanelToggle && this.audioPanel) {
+            this.audioPanelToggle.addEventListener('click', () => {
+                this.audioPanel.classList.toggle('collapsed');
+                // Update icon
+                const icon = this.audioPanelToggle.querySelector('i');
+                if (this.audioPanel.classList.contains('collapsed')) {
+                    icon.className = 'fas fa-chevron-down';
+                } else {
+                    icon.className = 'fas fa-chevron-up';
+                }
+                this.saveSettings();
+            });
+        }
+        
+        // Audio element events
+        if (this.audioElement) {
+            this.audioElement.addEventListener('ended', () => this.nextTrack());
+            this.audioElement.addEventListener('play', () => this.updatePlayButtonIcon(true));
+            this.audioElement.addEventListener('pause', () => this.updatePlayButtonIcon(false));
+            this.audioElement.addEventListener('error', (e) => {
+                console.error('Audio error:', e);
+                this.nextTrack(); // Try next track if there's an error
+            });
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // M key for master mute
+            if (e.key === 'M' || e.key === 'm') {
+                this.toggleMasterMute();
+            }
+        });
     }
     
-    setupEventListeners() {
-        // When one track ends, play the next one
-        this.audioElement.addEventListener('ended', () => {
-            console.log('Audio ended, playing next track');
-            this.playNextTrack();
-        });
-        
-        // Handle audio errors
-        this.audioElement.addEventListener('error', (e) => {
-            console.error('Audio error:', e);
-            // Try the next track if this one fails
-            setTimeout(() => this.playNextTrack(), 1000);
-        });
-        
-        // Update play/pause button when audio plays or pauses
-        this.audioElement.addEventListener('play', () => {
-            this.isPlaying = true;
-            this.playPauseIcon.className = 'fas fa-pause';
-        });
-        
-        this.audioElement.addEventListener('pause', () => {
-            this.isPlaying = false;
-            this.playPauseIcon.className = 'fas fa-play';
-        });
-        
-        // Toggle audio on button click
-        this.audioToggle.addEventListener('click', () => this.toggleMute());
-        
-        // Play/Pause button functionality
-        this.playPauseButton.addEventListener('click', () => this.togglePlay());
+    loadSavedSettings() {
+        // Load saved settings from localStorage
+        try {
+            const savedSettings = JSON.parse(localStorage.getItem('monsterTruckAudioSettings')) || {};
+            
+            // Music settings
+            this.musicVolume = savedSettings.musicVolume !== undefined ? savedSettings.musicVolume : 0.3;
+            this.isMusicMuted = savedSettings.isMusicMuted === true;
+            
+            // Master settings
+            this.masterVolume = savedSettings.masterVolume !== undefined ? savedSettings.masterVolume : 1.0;
+            this.isMasterMuted = savedSettings.isMasterMuted === true;
+            
+            // Panel state
+            const isPanelCollapsed = savedSettings.isPanelCollapsed === true;
+            
+            // Apply settings to UI
+            if (this.musicVolumeSlider) {
+                this.musicVolumeSlider.value = Math.round(this.musicVolume * 100);
+            }
+            
+            if (this.masterVolumeSlider) {
+                this.masterVolumeSlider.value = Math.round(this.masterVolume * 100);
+            }
+            
+            // Apply mute states
+            this.updateMusicMuteButtonIcon();
+            this.updateMasterMuteButtonIcon();
+            
+            // Apply audio settings
+            this.updateMusicVolume();
+            
+            // Apply panel state
+            if (isPanelCollapsed && this.audioPanel) {
+                this.audioPanel.classList.add('collapsed');
+                if (this.audioPanelToggle) {
+                    const icon = this.audioPanelToggle.querySelector('i');
+                    if (icon) icon.className = 'fas fa-chevron-down';
+                }
+            }
+            
+            console.log('Loaded audio settings:', {
+                musicVolume: this.musicVolume,
+                isMusicMuted: this.isMusicMuted,
+                masterVolume: this.masterVolume,
+                isMasterMuted: this.isMasterMuted,
+                isPanelCollapsed
+            });
+        } catch (error) {
+            console.error('Error loading audio settings:', error);
+        }
+    }
+    
+    saveSettings() {
+        // Save settings to localStorage
+        try {
+            const settings = {
+                musicVolume: this.musicVolume,
+                isMusicMuted: this.isMusicMuted,
+                masterVolume: this.masterVolume,
+                isMasterMuted: this.isMasterMuted,
+                isPanelCollapsed: this.audioPanel ? this.audioPanel.classList.contains('collapsed') : false
+            };
+            
+            localStorage.setItem('monsterTruckAudioSettings', JSON.stringify(settings));
+        } catch (error) {
+            console.error('Error saving audio settings:', error);
+        }
     }
     
     scanForMusicFiles() {
-        if (this.isScanning) return;
+        const foundTracks = new Set();
         
-        this.isScanning = true;
+        // Add the standard tracks that we know exist
         const basePath = '/music/';
-        const foundTracks = new Set(); // Use a Set to avoid duplicates
-        const scanPromises = [];
         
-        // Only scan for known pattern files that actually exist
-        const filePatterns = [
-            // Pattern files with numbered sequence - only these are known to exist
-            { prefix: 'pattern_bar_live_part', maxIndex: 19, padLength: 2 },
-            { prefix: 'fallback', maxIndex: 1, padLength: 0 }
+        // Load all music tracks from the pattern_bar_live series
+        for (let i = 0; i <= 18; i++) {
+            const trackNum = i.toString().padStart(2, '0');
+            const trackName = `pattern_bar_live_part${trackNum}`;
+            foundTracks.add(`${basePath}${trackName}.mp3`);
+        }
+        
+        // Add any custom tracks you might have
+        const customTracks = [
+            'cyber_cruiser.mp3',
+            'neon_chase.mp3',
+            'retro_sunset.mp3'
         ];
         
-        // Try each pattern with MP3 extension only
-        filePatterns.forEach(pattern => {
-            for (let i = 0; i < pattern.maxIndex; i++) {
-                const paddedIndex = pattern.padLength > 0 ? 
-                    i.toString().padStart(pattern.padLength, '0') : '';
-                
-                const filename = `${pattern.prefix}${paddedIndex}.mp3`;
-                scanPromises.push(
-                    this.tryLoadTrack(basePath + filename, true) // Silent mode for known files
-                        .then(success => {
-                            if (success) {
-                                foundTracks.add(basePath + filename);
-                            }
-                            return success;
-                        })
-                );
-            }
+        customTracks.forEach(track => {
+            this.checkFileExists(`${basePath}${track}`, (exists) => {
+                if (exists) {
+                    foundTracks.add(`${basePath}${track}`);
+                    console.log(`Found custom track: ${track}`);
+                }
+            });
         });
         
-        // When all scan attempts are done
-        Promise.all(scanPromises).then(() => {
-            // Convert Set to Array and sort
-            this.musicTracks = Array.from(foundTracks).sort();
-            console.log(`Found ${this.musicTracks.length} music tracks:`, this.musicTracks);
-            
-            if (this.musicTracks.length > 0) {
-                this.audioElement.src = this.musicTracks[0];
-                this.audioElement.load();
-                console.log(`Loaded first track: ${this.musicTracks[0]}`);
-            } else {
-                console.warn('No music tracks found. Please add MP3 files to the /music/ directory.');
-            }
-            
-            this.isScanning = false;
-        });
+        // Convert to array and sort
+        this.musicTracks = Array.from(foundTracks).sort();
+        console.log(`Found ${this.musicTracks.length} music tracks:`, this.musicTracks);
+        
+        // Set initial track
+        if (this.musicTracks.length > 0) {
+            // Choose a random track to start with
+            this.currentTrackIndex = Math.floor(Math.random() * this.musicTracks.length);
+            this.loadTrack(this.currentTrackIndex);
+            console.log(`Loaded initial track: ${this.musicTracks[this.currentTrackIndex]}`);
+        } else {
+            console.warn('No music tracks found. Please add MP3 files to the /music/ directory.');
+        }
     }
     
-    tryLoadTrack(url, silent = false) {
-        return new Promise(resolve => {
-            const tempAudio = new Audio();
-            
-            // Set a timeout in case the file doesn't exist
-            const timeout = setTimeout(() => {
-                tempAudio.removeEventListener('canplaythrough', handleCanPlay);
-                tempAudio.removeEventListener('error', handleError);
-                resolve(false);
-            }, 500); // Shorter timeout for faster scanning
-            
-            const handleCanPlay = () => {
-                clearTimeout(timeout);
-                tempAudio.removeEventListener('canplaythrough', handleCanPlay);
-                tempAudio.removeEventListener('error', handleError);
-                if (!silent) console.log(`Track found: ${url}`);
-                resolve(true);
-            };
-            
-            const handleError = () => {
-                clearTimeout(timeout);
-                tempAudio.removeEventListener('canplaythrough', handleCanPlay);
-                tempAudio.removeEventListener('error', handleError);
-                resolve(false);
-            };
-            
-            // Suppress console errors for 404s during scanning
-            if (silent) {
-                tempAudio.onerror = () => {
-                    handleError();
-                    return true; // Prevents the error from appearing in console
-                };
-            }
-            
-            tempAudio.addEventListener('canplaythrough', handleCanPlay);
-            if (!silent) {
-                tempAudio.addEventListener('error', handleError);
-            }
-            
-            tempAudio.src = url;
-            tempAudio.load();
-        });
+    checkFileExists(url, callback) {
+        const tempAudio = new Audio();
+        
+        const handleCanPlay = () => {
+            tempAudio.removeEventListener('canplaythrough', handleCanPlay);
+            callback(true);
+        };
+        
+        const handleError = () => {
+            tempAudio.removeEventListener('error', handleError);
+            callback(false);
+        };
+        
+        tempAudio.addEventListener('canplaythrough', handleCanPlay);
+        tempAudio.addEventListener('error', handleError);
+        
+        tempAudio.src = url;
+        tempAudio.load();
     }
     
-    playNextTrack() {
-        if (this.musicTracks.length === 0) return;
+    loadTrack(index) {
+        if (!this.musicTracks.length) return;
         
-        this.currentTrackIndex = (this.currentTrackIndex + 1) % this.musicTracks.length;
-        const nextFile = this.musicTracks[this.currentTrackIndex];
-        console.log(`Loading next track (${this.currentTrackIndex + 1}/${this.musicTracks.length}): ${nextFile}`);
+        // Ensure index is valid
+        this.currentTrackIndex = ((index % this.musicTracks.length) + this.musicTracks.length) % this.musicTracks.length;
         
-        this.audioElement.src = nextFile;
+        // Update audio element
+        const trackPath = this.musicTracks[this.currentTrackIndex];
+        this.audioElement.src = trackPath;
         this.audioElement.load();
         
-        if (this.isPlaying) {
-            this.audioElement.play().catch(error => {
-                console.error(`Error playing next track: ${error.message}`);
-                // If a track fails, try the next one
-                setTimeout(() => this.playNextTrack(), 1000);
-            });
-        }
+        // Update display
+        this.updateTrackDisplay();
+        
+        // Apply volume settings
+        this.updateMusicVolume();
     }
     
-    togglePlay() {
-        if (this.isPlaying) {
+    updateTrackDisplay() {
+        if (!this.trackDisplay || !this.musicTracks.length) return;
+        
+        // Get current track name from path
+        const trackPath = this.musicTracks[this.currentTrackIndex];
+        const trackName = trackPath.split('/').pop().replace('.mp3', '');
+        
+        // Format track name for display
+        let displayName = trackName
+            .replace(/pattern_bar_live_part(\d+)/, 'Synthwave Track $1')
+            .replace(/_/g, ' ')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+        
+        this.trackDisplay.textContent = displayName;
+    }
+    
+    togglePlayPause() {
+        if (!this.audioElement) return;
+        
+        if (this.audioElement.paused) {
+            this.audioElement.play().catch(e => console.error('Error playing audio:', e));
+        } else {
             this.audioElement.pause();
-        } else {
-            // If no tracks are loaded yet, wait for them to load
-            if (this.musicTracks.length === 0) {
-                // Wait a bit for tracks to be found
-                setTimeout(() => {
-                    if (this.musicTracks.length > 0) {
-                        this.audioElement.play().catch(e => {
-                            console.error('Cannot play audio:', e);
-                            alert('Click again to enable audio. Your browser may be blocking autoplay.');
-                        });
-                    }
-                }, 2000);
-            } else {
-                this.audioElement.play().catch(e => {
-                    console.error('Cannot play audio:', e);
-                    alert('Click again to enable audio. Your browser may be blocking autoplay.');
-                });
-            }
         }
     }
     
-    toggleMute() {
-        if (this.audioElement.muted) {
-            this.audioElement.muted = false;
-            this.audioToggle.classList.remove('muted');
-            this.audioIcon.className = 'fas fa-volume-up';
-            localStorage.setItem('monsterTruckAudioMuted', 'false');
-        } else {
-            this.audioElement.muted = true;
-            this.audioToggle.classList.add('muted');
-            this.audioIcon.className = 'fas fa-volume-mute';
-            localStorage.setItem('monsterTruckAudioMuted', 'true');
+    nextTrack() {
+        this.loadTrack(this.currentTrackIndex + 1);
+        if (!this.audioElement.paused) {
+            this.audioElement.play().catch(e => console.error('Error playing audio:', e));
         }
     }
     
-    // Method to manually add a track (can be called from console for testing)
-    addTrack(url) {
-        if (!this.musicTracks.includes(url)) {
-            this.musicTracks.push(url);
-            this.musicTracks.sort();
-            console.log(`Added track: ${url}`);
-            console.log(`Total tracks: ${this.musicTracks.length}`);
+    prevTrack() {
+        this.loadTrack(this.currentTrackIndex - 1);
+        if (!this.audioElement.paused) {
+            this.audioElement.play().catch(e => console.error('Error playing audio:', e));
+        }
+    }
+    
+    toggleMusicMute() {
+        this.isMusicMuted = !this.isMusicMuted;
+        this.updateMusicVolume();
+        this.updateMusicMuteButtonIcon();
+        this.saveSettings();
+    }
+    
+    toggleMasterMute() {
+        this.isMasterMuted = !this.isMasterMuted;
+        
+        // Update music volume
+        this.updateMusicVolume();
+        
+        // Update SFX volume via SoundManager
+        if (window.soundManager) {
+            window.soundManager.setMuted(this.isMasterMuted);
+        }
+        
+        this.updateMasterMuteButtonIcon();
+        this.saveSettings();
+    }
+    
+    updateMusicVolume() {
+        if (!this.audioElement) return;
+        
+        // Calculate effective volume
+        const effectiveVolume = this.isMasterMuted || this.isMusicMuted ? 
+            0 : this.musicVolume * this.masterVolume;
             
-            // If this is the first track, load it
-            if (this.musicTracks.length === 1) {
-                this.audioElement.src = url;
-                this.audioElement.load();
+        this.audioElement.volume = effectiveVolume;
+        
+        // Also update the SoundManager's music volume if available
+        if (window.soundManager) {
+            window.soundManager.setMusicVolume(this.musicVolume);
+        }
+    }
+    
+    updatePlayButtonIcon(isPlaying) {
+        if (!this.musicPlayButton) return;
+        
+        const icon = this.musicPlayButton.querySelector('i');
+        if (icon) {
+            icon.className = isPlaying ? 'fas fa-pause' : 'fas fa-play';
+        }
+    }
+    
+    updateMusicMuteButtonIcon() {
+        if (!this.musicMuteButton) return;
+        
+        const icon = this.musicMuteButton.querySelector('i');
+        if (icon) {
+            icon.className = this.isMusicMuted ? 'fas fa-music-slash' : 'fas fa-music';
+        }
+        
+        // Update button style
+        if (this.isMusicMuted) {
+            this.musicMuteButton.classList.add('muted');
+        } else {
+            this.musicMuteButton.classList.remove('muted');
+        }
+    }
+    
+    updateMasterMuteButtonIcon() {
+        if (!this.masterMuteButton) return;
+        
+        const icon = this.masterMuteButton.querySelector('i');
+        if (icon) {
+            if (this.isMasterMuted) {
+                icon.className = 'fas fa-volume-mute';
+                this.masterMuteButton.classList.add('muted');
+            } else if (this.masterVolume < 0.1) {
+                icon.className = 'fas fa-volume-off';
+                this.masterMuteButton.classList.remove('muted');
+            } else if (this.masterVolume < 0.5) {
+                icon.className = 'fas fa-volume-down';
+                this.masterMuteButton.classList.remove('muted');
+            } else {
+                icon.className = 'fas fa-volume-up';
+                this.masterMuteButton.classList.remove('muted');
             }
+        }
+    }
+    
+    // API methods for SoundManager integration
+    playMusic(trackName) {
+        // Find track by name in the musicTracks array
+        if (!this.musicTracks.length) return;
+        
+        const trackIndex = this.musicTracks.findIndex(track => track.includes(trackName));
+        if (trackIndex !== -1) {
+            this.loadTrack(trackIndex);
+            this.audioElement.play().catch(e => console.error('Error playing audio:', e));
+        }
+    }
+    
+    stopMusic() {
+        if (this.audioElement) {
+            this.audioElement.pause();
         }
     }
 }
 
-// Initialize the music player when the DOM is loaded
+// Initialize music player when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.musicPlayer = new MusicPlayer();
-    
-    // Add a global method to manually trigger a rescan (can be called from console)
-    window.rescanMusicFiles = () => {
-        if (window.musicPlayer) {
-            window.musicPlayer.scanForMusicFiles();
-        }
-    };
+    window.musicPlayerInstance = new MusicPlayer();
 }); 

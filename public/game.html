@@ -597,6 +597,177 @@
             font-family: 'Orbitron', sans-serif;
             z-index: 101;
         }
+
+        /* Unified Audio Panel Styles */
+        #audio-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ff00ff;
+            border-radius: 8px;
+            color: #00ffff;
+            font-family: 'Orbitron', sans-serif;
+            z-index: 1000;
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .audio-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: linear-gradient(90deg, #ff00ff, #9900ff);
+            cursor: pointer;
+        }
+        
+        .audio-panel-title {
+            font-weight: bold;
+            font-size: 16px;
+            color: #ffffff;
+            text-shadow: 0 0 5px rgba(255, 0, 255, 0.8);
+        }
+        
+        #audio-panel-toggle {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0;
+            font-size: 14px;
+        }
+        
+        .audio-panel-content {
+            padding: 15px;
+            max-height: 300px;
+            transition: max-height 0.3s ease;
+        }
+        
+        .audio-panel-content.collapsed {
+            max-height: 0;
+            padding: 0 15px;
+            overflow: hidden;
+        }
+        
+        .audio-control-group {
+            margin-bottom: 15px;
+        }
+        
+        .audio-control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #00ffff;
+        }
+        
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .volume-slider {
+            flex-grow: 1;
+            height: 8px;
+            -webkit-appearance: none;
+            background: #222;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #ff00ff;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(255, 0, 255, 0.8);
+            border: 2px solid #ffffff;
+        }
+        
+        .volume-slider::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #ff00ff;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(255, 0, 255, 0.8);
+            border: 2px solid #ffffff;
+        }
+        
+        .volume-slider::-webkit-slider-runnable-track {
+            height: 8px;
+            background: linear-gradient(90deg, #ff00ff, #00ffff);
+            border-radius: 4px;
+        }
+        
+        .music-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .audio-button {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #ff00ff;
+            border-radius: 5px;
+            color: #ffffff;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
+        }
+        
+        .audio-button:hover {
+            background: rgba(255, 0, 255, 0.3);
+            box-shadow: 0 0 10px rgba(255, 0, 255, 0.8);
+        }
+        
+        .audio-button.muted {
+            color: #666;
+            border-color: #666;
+        }
+        
+        .current-track {
+            margin-top: 15px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+            border: 1px solid rgba(255, 0, 255, 0.3);
+        }
+        
+        /* Audio buttons when volume is zero */
+        .audio-button.volume-zero i.fa-volume-up::before {
+            content: "\f026"; /* fa-volume-mute */
+        }
+        
+        /* Collapsible functionality */
+        #audio-panel.collapsed .audio-panel-content {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            overflow: hidden;
+        }
+        
+        #audio-panel.collapsed #audio-panel-toggle i.fa-chevron-up::before {
+            content: "\f078"; /* fa-chevron-down */
+        }
+
+        /* Weapon HUD styles */
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -708,44 +879,70 @@
     <div id="chat-status"></div>
     <div id="chat-status-container">CHAT</div>
     
-    <!-- Audio Controls - Bottom Right -->
-    <div id="audio-controls">
-        <!-- Play/Pause Button -->
-        <button id="playPauseButton" class="audio-button">
-            <i class="fas fa-play"></i>
-        </button>
-        
-        <!-- Audio Toggle Button -->
-        <div id="audioToggle" class="audio-button">
-            <i class="fas fa-volume-up"></i>
+    <!-- Unified Audio Controls Panel -->
+    <div id="audio-panel">
+        <div class="audio-panel-header">
+            <div class="audio-panel-title">AUDIO</div>
+            <button id="audio-panel-toggle">
+                <i class="fas fa-chevron-up"></i>
+            </button>
+        </div>
+        <div class="audio-panel-content">
+            <!-- Master Volume -->
+            <div class="audio-control-group">
+                <label>MASTER</label>
+                <div class="volume-control">
+                    <button id="master-mute" class="audio-button">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <input type="range" id="master-volume" min="0" max="100" value="100" class="volume-slider">
+                </div>
+            </div>
+            
+            <!-- Music Controls -->
+            <div class="audio-control-group">
+                <label>MUSIC</label>
+                <div class="volume-control">
+                    <button id="music-mute" class="audio-button">
+                        <i class="fas fa-music"></i>
+                    </button>
+                    <input type="range" id="music-volume" min="0" max="100" value="30" class="volume-slider">
+                </div>
+                <div class="music-controls">
+                    <button id="music-prev" class="audio-button">
+                        <i class="fas fa-step-backward"></i>
+                    </button>
+                    <button id="music-play" class="audio-button">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button id="music-next" class="audio-button">
+                        <i class="fas fa-step-forward"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Sound Effects Controls -->
+            <div class="audio-control-group">
+                <label>SFX</label>
+                <div class="volume-control">
+                    <button id="sfx-mute" class="audio-button">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <input type="range" id="sfx-volume" min="0" max="100" value="70" class="volume-slider">
+                </div>
+            </div>
+            
+            <!-- Current Track Display -->
+            <div class="current-track">
+                <div id="current-track-name">No Track Playing</div>
+            </div>
         </div>
     </div>
 
-    <!-- Audio Element -->
+    <!-- Audio Element (hidden) -->
     <audio id="backgroundMusic" preload="auto">
         <source src="/music/pattern_bar_live_part00.mp3" type="audio/mpeg">
     </audio>
-
-    <!-- Audio toggle button -->
-    <button id="audioButton" style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: rgba(0, 0, 0, 0.7);
-        color: #ff00ff;
-        border: 2px solid #ff00ff;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        font-size: 20px;
-        cursor: pointer;
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
-        transition: all 0.3s ease;
-    ">🔊</button>
 
     <!-- Scripts -->
     <script type="module" src="js/main.js"></script>
@@ -948,15 +1145,99 @@
             const healthBarFill = document.querySelector('.health-bar-fill');
             const ammoBarFill = document.querySelector('.ammo-bar-fill');
             
-            if (healthBarFill && health !== undefined) {
-                healthBarFill.style.width = `${health}%`;
+            if (healthBarFill && typeof health === 'number') {
+                healthBarFill.style.width = `${Math.max(0, Math.min(100, health))}%`;
+                
+                // Update color based on health percentage
+                if (health <= 20) {
+                    healthBarFill.style.backgroundColor = '#ff0000'; // Red
+                } else if (health <= 50) {
+                    healthBarFill.style.backgroundColor = '#ffff00'; // Yellow
+                } else {
+                    healthBarFill.style.backgroundColor = '#00ff00'; // Green
+                }
             }
             
-            if (ammoBarFill && ammo !== undefined && maxAmmo !== undefined) {
-                const ammoPercent = (ammo / maxAmmo) * 100;
-                ammoBarFill.style.width = `${ammoPercent}%`;
+            if (ammoBarFill && typeof ammo === 'number' && typeof maxAmmo === 'number') {
+                const ammoPercentage = Math.max(0, Math.min(100, (ammo / maxAmmo) * 100));
+                ammoBarFill.style.width = `${ammoPercentage}%`;
             }
         };
+        
+        // Initialize SFX volume control
+        document.addEventListener('DOMContentLoaded', function() {
+            const sfxVolumeSlider = document.getElementById('sfx-volume');
+            const sfxMuteButton = document.getElementById('sfx-mute');
+            
+            if (sfxVolumeSlider && sfxMuteButton) {
+                // Load saved SFX volume from localStorage or use default
+                const savedSettings = JSON.parse(localStorage.getItem('monsterTruckAudioSettings')) || {};
+                const sfxVolume = savedSettings.sfxVolume !== undefined ? savedSettings.sfxVolume : 0.7;
+                const isSFXMuted = savedSettings.isSFXMuted === true;
+                
+                // Set initial slider value
+                sfxVolumeSlider.value = Math.round(sfxVolume * 100);
+                
+                // Set initial mute button state
+                if (isSFXMuted) {
+                    sfxMuteButton.classList.add('muted');
+                    updateSFXMuteButtonIcon(true);
+                }
+                
+                // Handle SFX volume change
+                sfxVolumeSlider.addEventListener('input', function() {
+                    const volume = parseInt(sfxVolumeSlider.value) / 100;
+                    
+                    // Apply to SoundManager if available
+                    if (window.soundManager) {
+                        window.soundManager.setSFXVolume(volume);
+                    }
+                    
+                    // Save to settings
+                    const settings = JSON.parse(localStorage.getItem('monsterTruckAudioSettings')) || {};
+                    settings.sfxVolume = volume;
+                    localStorage.setItem('monsterTruckAudioSettings', JSON.stringify(settings));
+                    
+                    // Update mute button icon based on volume
+                    updateSFXMuteButtonIcon(volume === 0);
+                });
+                
+                // Handle SFX mute button click
+                sfxMuteButton.addEventListener('click', function() {
+                    const settings = JSON.parse(localStorage.getItem('monsterTruckAudioSettings')) || {};
+                    const isMuted = !settings.isSFXMuted;
+                    
+                    // Toggle mute state
+                    settings.isSFXMuted = isMuted;
+                    localStorage.setItem('monsterTruckAudioSettings', JSON.stringify(settings));
+                    
+                    // Apply to SoundManager
+                    if (window.soundManager) {
+                        window.soundManager.setSFXMuted(isMuted);
+                    }
+                    
+                    // Update button appearance
+                    updateSFXMuteButtonIcon(isMuted);
+                    sfxMuteButton.classList.toggle('muted', isMuted);
+                });
+                
+                // Function to update the SFX mute button icon
+                function updateSFXMuteButtonIcon(isMuted) {
+                    const icon = sfxMuteButton.querySelector('i');
+                    if (icon) {
+                        if (isMuted) {
+                            icon.className = 'fas fa-volume-mute';
+                        } else if (parseInt(sfxVolumeSlider.value) < 10) {
+                            icon.className = 'fas fa-volume-off';
+                        } else if (parseInt(sfxVolumeSlider.value) < 50) {
+                            icon.className = 'fas fa-volume-down';
+                        } else {
+                            icon.className = 'fas fa-volume-up';
+                        }
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html> 
