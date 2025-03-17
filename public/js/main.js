@@ -2374,8 +2374,8 @@ class Game {
                         const distance = projectile.mesh.position.distanceTo(this.truck.position);
                         if (distance < 3) { // Player hitbox
                             // Apply damage to player
-                            if (typeof this.applyDamage === 'function') {
-                                this.applyDamage(projectile.damage);
+                            if (typeof this.takeDamage === 'function') {
+                                this.takeDamage(projectile.damage);
                                 
                                 // Play hit sound
                                 if (window.SoundFX) {
