@@ -2131,16 +2131,19 @@ class Game {
     }
 
     // Create muzzle flash effect
-    createMuzzleFlash(position, direction) {
+    createMuzzleFlash(position, direction, isEnemyTurret = false) {
+        // Determine color based on source (player vs. enemy)
+        const flashColor = isEnemyTurret ? 0xff0000 : 0x00ffff;
+        
         // Create point light for flash
-        const flashLight = new THREE.PointLight(0x00ffff, 2, 5);
+        const flashLight = new THREE.PointLight(flashColor, 2, 5);
         flashLight.position.copy(position);
         this.scene.add(flashLight);
         
         // Create flash sprite
         const flashGeometry = new THREE.PlaneGeometry(1, 1);
         const flashMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ffff,
+            color: flashColor,
             transparent: true,
             opacity: 1
         });
@@ -2251,9 +2254,14 @@ class Game {
             this.initializeParticlePool();
         }
         
+        // Initialize turret projectiles array if needed
+        if (!this.turretProjectiles) {
+            this.turretProjectiles = [];
+        }
+        
         // Reduce debug logging frequency
         if (this.frameCount % 300 === 0) { // Log once every 5 seconds
-            console.log(`Updating ${this.projectiles.length} projectiles`);
+            console.log(`Updating ${this.projectiles.length} player projectiles and ${this.turretProjectiles.length} turret projectiles`);
         }
         
         // Calculate maximum number of trail particles to create
@@ -2262,11 +2270,12 @@ class Game {
         let trailsCreatedThisFrame = 0;
         
         try {
+        // First update player projectiles
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const projectile = this.projectiles[i];
             
-                // Skip invalid projectiles
-                if (!projectile || !projectile.mesh || !projectile.direction) {
+            // Skip invalid projectiles
+            if (!projectile || !projectile.mesh || !projectile.direction) {
                     if (projectile && projectile.mesh) {
                         this.scene.remove(projectile.mesh);
                     }
@@ -2331,6 +2340,77 @@ class Game {
                     // Just remove if expired
                     this.scene.remove(projectile.mesh);
                     this.projectiles.splice(i, 1);
+                }
+            }
+        
+            // Now update turret projectiles and check for collision with player
+            if (this.turretProjectiles.length > 0 && this.truck) {
+                for (let i = this.turretProjectiles.length - 1; i >= 0; i--) {
+                    const projectile = this.turretProjectiles[i];
+                    
+                    // Skip invalid projectiles
+                    if (!projectile || !projectile.mesh || !projectile.direction) {
+                        if (projectile && projectile.mesh) {
+                            this.scene.remove(projectile.mesh);
+                        }
+                        this.turretProjectiles.splice(i, 1);
+                        continue;
+                    }
+                    
+                    // Update position
+                    projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
+                    projectile.mesh.position.y += projectile.direction.y * projectile.speed * deltaTime;
+                    projectile.mesh.position.z += projectile.direction.z * projectile.speed * deltaTime;
+                    
+                    // Decrease lifetime
+                    projectile.lifetime -= deltaTime;
+                    
+                    // Create trail for turret projectiles
+                    if (Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
+                        this.createOptimizedProjectileTrail(projectile);
+                        trailsCreatedThisFrame++;
+                    }
+                    
+                    // Check for collision with player
+                    if (this.truck) {
+                        const distance = projectile.mesh.position.distanceTo(this.truck.position);
+                        if (distance < 3) { // Player hitbox
+                            // Apply damage to player
+                            if (typeof this.applyDamage === 'function') {
+                                this.applyDamage(projectile.damage);
+                                
+                                // Play hit sound
+                                if (window.SoundFX) {
+                                    window.SoundFX.play('vehicle_hit');
+                                }
+                                
+                                // Create hit effect
+                                this.createOptimizedHitEffect(projectile.mesh.position);
+                            }
+                            
+                            // Remove projectile
+                            this.scene.remove(projectile.mesh);
+                            this.turretProjectiles.splice(i, 1);
+                            continue;
+                        }
+                    }
+                    
+                    // Check for wall collisions
+                    if (projectile.mesh.position.y <= 0) {
+                        // Hit ground
+                        this.scene.remove(projectile.mesh);
+                        this.turretProjectiles.splice(i, 1);
+                        
+                        // Create impact effect
+                        this.createOptimizedWallImpactEffect(projectile.mesh.position);
+                        continue;
+                    }
+                    
+                    // Remove if lifetime expired
+                    if (projectile.lifetime <= 0) {
+                        this.scene.remove(projectile.mesh);
+                        this.turretProjectiles.splice(i, 1);
+                    }
                 }
             }
         } catch (error) {
@@ -3127,14 +3207,84 @@ class Game {
     // Turret shoot method
     turretShoot(turret) {
         try {
-            // ... existing turret shoot code ...
+            if (!turret || !turret.mesh || !this.scene || !this.truck) return;
             
-            // Play turret fire sound with null check
-            if (this.soundManager) {
-                this.soundManager.playSound('turret_fire', turret.position);
+            // Play turret fire sound with our guaranteed sound system
+            if (window.SoundFX) {
+                window.SoundFX.play('weapon_fire');
             }
             
-            // ... rest of turret shoot code ...
+            // Create projectile
+            const barrelTip = new THREE.Vector3(0, 0.9, -1.5);
+            // Transform barrel tip from local to world space
+            const barrelWorld = barrelTip.clone();
+            turret.body.localToWorld(barrelWorld);
+            
+            // Get direction from barrel tip to player with slight randomization for gameplay balance
+            const directionToPlayer = new THREE.Vector3();
+            directionToPlayer.subVectors(this.truck.position, barrelWorld);
+            
+            // Add slight randomization to direction
+            directionToPlayer.x += (Math.random() - 0.5) * 5;
+            directionToPlayer.y += (Math.random() - 0.5) * 2;
+            directionToPlayer.z += (Math.random() - 0.5) * 5;
+            
+            directionToPlayer.normalize();
+            
+            // Create projectile geometry
+            const projectileGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8);
+            projectileGeometry.rotateX(Math.PI / 2); // Rotate to align with travel direction
+            
+            // Create projectile material
+            const projectileMaterial = new THREE.MeshPhongMaterial({
+                color: 0xff0000, // Red for enemy projectiles
+                emissive: 0xff0000,
+                emissiveIntensity: 0.5
+            });
+            
+            // Create projectile mesh
+            const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+            projectile.position.copy(barrelWorld);
+            
+            // Set rotation to match direction
+            projectile.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1),
+                directionToPlayer
+            );
+            
+            // Add light to make it more visible
+            const light = new THREE.PointLight(0xff0000, 0.8, 3);
+            projectile.add(light);
+            
+            // Add to scene
+            this.scene.add(projectile);
+            
+            // Store projectile properties
+            const projectileData = {
+                mesh: projectile,
+                direction: directionToPlayer,
+                speed: 1.5, // Slightly slower than player projectiles for balance
+                damage: 10, // Less damage than player weapons for balance
+                lifetime: 90, // ~1.5 seconds at 60fps
+                source: 'turret'
+            };
+            
+            // Add to active projectiles list if available
+            if (!this.turretProjectiles) {
+                this.turretProjectiles = [];
+            }
+            this.turretProjectiles.push(projectileData);
+            
+            // Muzzle flash effect - red for enemy turrets
+            this.createMuzzleFlash(barrelWorld, directionToPlayer, true);
+            
+            // Add recoil animation to turret
+            turret.body.position.z += 0.1; // Quick backward movement
+            setTimeout(() => {
+                if (turret && turret.body) {
+                    turret.body.position.z -= 0.1; // Return to original position
+                }
+            }, 100);
         } catch (error) {
             console.error("Error in turretShoot:", error);
         }
