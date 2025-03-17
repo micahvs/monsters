@@ -867,6 +867,11 @@ class Game {
             // Update truck position with delta time
             this.updateTruck(deltaTime);
             
+            // Update sound listener position to match camera
+            if (this.soundManager) {
+                this.soundManager.updateListenerPosition();
+            }
+            
             // Update monster truck - essential for gameplay
             if (this.monsterTruck) {
                 this.monsterTruck.update(deltaTime);
