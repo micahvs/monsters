@@ -2508,7 +2508,34 @@ class Game {
                         }
                     };
                     
-                    projectile.update();
+                    // CRITICAL FIX: Special handling for remote projectiles
+                    // This ensures remote projectiles move correctly
+                    if (projectile.source === 'remote') {
+                        // Make remote projectiles more visible and faster to ensure hits register
+                        if (!projectile._remoteEnhanced) {
+                            // Mark as enhanced to avoid repeating
+                            projectile._remoteEnhanced = true;
+                            
+                            // Ensure speed is appropriate
+                            if (!projectile.speed || projectile.speed < 2.0) {
+                                projectile.speed = 2.0; // Faster for better hit detection
+                            }
+                            
+                            // Log for debugging
+                            console.log(`Enhanced remote projectile from ${projectile.playerId} with speed=${projectile.speed}`);
+                        }
+                        
+                        // Ensure remote projectiles have position updates even if their update method is broken
+                        projectile.mesh.position.x += projectile.direction.x * projectile.speed * deltaTime;
+                        projectile.mesh.position.y += projectile.direction.y * projectile.speed * deltaTime;
+                        projectile.mesh.position.z += projectile.direction.z * projectile.speed * deltaTime;
+                        
+                        // Also decrease lifetime
+                        projectile.lifetime -= deltaTime;
+                    } else {
+                        // Regular update for other projectiles
+                        projectile.update();
+                    }
                     
                     // Create trail for player projectiles
                     if (projectile.source === 'player' && Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
@@ -2520,6 +2547,19 @@ class Game {
                     if (projectile.source === 'turret' && Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
                         this.createOptimizedProjectileTrail(projectile);
                         trailsCreatedThisFrame++;
+                    }
+                    
+                    // CRITICAL FIX: Create more prominent trails for remote projectiles to make them more visible
+                    if (projectile.source === 'remote' && Math.random() < 0.5 && trailsCreatedThisFrame < maxTrailsPerFrame) {
+                        // Create extra-visible trail for remote projectiles (more frequent and larger)
+                        this.createOptimizedProjectileTrail(projectile);
+                        trailsCreatedThisFrame++;
+                        
+                        // Sometimes add a second trail for even more visibility
+                        if (Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
+                            this.createOptimizedProjectileTrail(projectile);
+                            trailsCreatedThisFrame++;
+                        }
                     }
                     
                     // Check for collision with player - EXTRA LARGE HITBOX VERSION
@@ -2562,18 +2602,24 @@ class Game {
                                 // CRITICAL: Log the hit for debugging
                                 console.log(`🎯 DIRECT HIT: Player hit by ${projectile.source} projectile from ${projectile.playerId || 'unknown'} for ${projectile.damage} damage`);
                                 
-                                // IMMEDIATELY take damage - most reliable method
-                                this.takeDamage(projectile.damage);
-                                
-                                // Play hit sound
-                                if (window.soundManager) {
-                                    window.soundManager.playSound('vehicle_hit');
-                                } else if (window.SoundFX) {
-                                    window.SoundFX.play('vehicle_hit');
+                                // For multiplayer projectiles, use handleRemoteProjectileHit method
+                                if (projectile.source === 'remote' && this.multiplayer && projectile.playerId) {
+                                    console.log(`Calling handleRemoteProjectileHit for hit from player ${projectile.playerId}`);
+                                    this.handleRemoteProjectileHit(projectile.playerId, projectile.damage);
+                                } else {
+                                    // IMMEDIATELY take damage - most reliable method
+                                    this.takeDamage(projectile.damage);
+                                    
+                                    // Play hit sound
+                                    if (window.soundManager) {
+                                        window.soundManager.playSound('vehicle_hit');
+                                    } else if (window.SoundFX) {
+                                        window.SoundFX.play('vehicle_hit');
+                                    }
+                                    
+                                    // Create hit effect
+                                    this.createProjectileImpactOnVehicle(projectile.mesh.position.clone());
                                 }
-                                
-                                // Create hit effect
-                                this.createProjectileImpactOnVehicle(projectile.mesh.position.clone());
                             }
                             
                             // Remove projectile
@@ -5935,7 +5981,7 @@ class Game {
     handleRemoteProjectileHit(sourcePlayerId, damage) {
         console.log(`GOT HIT by player ${sourcePlayerId} for ${damage} damage`);
         
-        // Visual feedback only - actual damage will come from server
+        // Visual feedback and notify server about the hit
         this.addDamageScreenEffect(damage);
         
         // Play hit sound
@@ -5955,6 +6001,29 @@ class Game {
         
         // Shake camera based on damage
         this.shakeCamera(damage * 0.1);
+        
+        // CRITICAL FIX: Tell the server we were hit
+        if (this.multiplayer && this.multiplayer.isConnected) {
+            console.log(`Sending playerHit event to server for hit from ${sourcePlayerId}`);
+            
+            // Direct socket emission for reliability
+            this.multiplayer.socket.emit('playerHit', {
+                playerId: this.multiplayer.localPlayerId,
+                damage: damage,
+                sourceId: sourcePlayerId
+            });
+            
+            // Also use the method as backup
+            try {
+                this.multiplayer.sendPlayerHit(this.multiplayer.localPlayerId, damage, sourcePlayerId);
+            } catch (err) {
+                console.error("Error using sendPlayerHit method:", err);
+            }
+        } else {
+            // If not in multiplayer mode, apply damage directly
+            console.log("Not in multiplayer mode, applying damage directly");
+            this.takeDamage(damage);
+        }
     }
 }
 
