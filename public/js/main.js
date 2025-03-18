@@ -185,213 +185,34 @@ class Game {
         this.isGameOver = false;
         this.frameCount = 0; // For timing various events
         
-        // Controls
-        this.keys = {
-            ArrowUp: false,
-            ArrowDown: false,
-            ArrowLeft: false,
-            ArrowRight: false,
-            ' ': false,
-            'd': false, // Debug key
-            'm': false, // Debug movement
-            'M': false  // Audio mute toggle
-        };
+        // Flag for multiplayer debugging and error tracking
+        this.multiplayerDebug = true; // Enable detailed multiplayer logs
+        this.hasLoggedMultiplayerError = false;
         
-        // Turning duration tracking
-        this.turnDuration = {
-            left: 0,
-            right: 0
-        };
+        // Force enable multiplayer for development testing
+        localStorage.setItem('monsterTruckMultiplayer', 'true');
+        this.isMultiplayerEnabled = true;
         
-        // Game state
-        this.health = 100;
-        this.score = 0;
-        this.sparks = [];
+        console.log('🎮 [Multiplayer] Enabled flag set to:', this.isMultiplayerEnabled);
         
-        // Audio controls
-        this.backgroundMusic = document.getElementById('backgroundMusic');
-        this.audioToggle = document.getElementById('audioToggle');
-        this.isMuted = localStorage.getItem('monsterTruckAudioMuted') === 'true';
-        
-        // Weapon and shooting mechanics
-        this.projectiles = [];
-        this.weapons = [];
-        this.currentWeaponIndex = 0;
-        this.weaponPickups = [];
-        this.lastWeaponPickupSpawn = 0;
-        this.weaponPickupSpawnInterval = 8000; // Spawn weapon pickup more frequently (8 seconds)
-        
-        // Weapons will be initialized after scene is created
-        // this.initializeWeapons();
-        
-        // Add powerup properties
-        this.powerups = [];
-        this.activePowerups = new Map();
-        this.lastPowerupSpawn = 0;
-        this.powerupSpawnInterval = 5000; // Spawn more frequently (5 seconds)
-        
-        // Powerup definitions
-        this.powerupTypes = {
-            SPEED_BOOST: {
-                name: 'Speed Boost',
-                duration: 5000,
-                effect: 'Doubles speed',
-                color: 0x00ff00,
-                emissive: 0x00ff00,
-                model: 'lightning',
-                apply: () => {
-                    this.truck.maxSpeed *= 2;
-                },
-                remove: () => {
-                    this.truck.maxSpeed /= 2;
-                }
-            },
-            INVINCIBILITY: {
-                name: 'Invincibility',
-                duration: 3000,
-                effect: 'No damage',
-                color: 0xffff00,
-                emissive: 0xffff00,
-                model: 'star',
-                apply: () => {
-                    this.truck.isInvincible = true;
-                },
-                remove: () => {
-                    this.truck.isInvincible = false;
-                }
-            },
-            REPAIR: {
-                name: 'Repair',
-                duration: 0, // Instant effect
-                effect: 'Restore 50 health',
-                color: 0xff0000,
-                emissive: 0xff0000,
-                model: 'heart',
-                apply: () => {
-                    this.health = Math.min(100, this.health + 50);
-                    if (this.monsterTruck) {
-                        this.monsterTruck.health = Math.min(this.monsterTruck.maxHealth, this.monsterTruck.health + 50);
-                    }
-                },
-                remove: () => {} // No removal needed for instant effects
-            },
-            AMMO_REFILL: {
-                name: 'Ammo Refill',
-                duration: 0, // Instant effect
-                effect: 'Refill ammo',
-                color: 0x0000ff,
-                emissive: 0x0000ff,
-                model: 'ammo',
-                apply: () => {
-                    this.ammo = this.maxAmmo;
-                    this.updateAmmoDisplay();
-                },
-                remove: () => {} // No removal needed for instant effects
-            },
-            DAMAGE_BOOST: {
-                name: 'Damage Boost',
-                duration: 8000,
-                effect: 'Double damage',
-                color: 0xff00ff,
-                emissive: 0xff00ff,
-                model: 'lightning',
-                apply: () => {
-                    this.damageMultiplier = 2;
-                },
-                remove: () => {
-                    this.damageMultiplier = 1;
-                }
-            },
-            SHIELD: {
-                name: 'Shield',
-                duration: 10000,
-                effect: 'Absorbs one hit',
-                color: 0x00ffff,
-                emissive: 0x00ffff,
-                model: 'shield',
-                apply: () => {
-                    this.hasShield = true;
-                    this.createShieldEffect();
-                },
-                remove: () => {
-                    this.hasShield = false;
-                    this.removeShieldEffect();
-                }
-            }
-        };
-        
-        // Initialize damage multiplier
-        this.damageMultiplier = 1;
-        this.hasShield = false;
-        this.shieldMesh = null;
-        
-        // Start initialization
+        // Attempt to initialize the game
         this.init();
-
-        // Update the socket connection with error handling
-        try {
-            this.socket = io('https://monster-truck-game-server.fly.dev', {
-                withCredentials: true,
-                transports: ['websocket'],
-                timeout: 10000,
-                reconnection: true,
-                reconnectionAttempts: 5
-            });
-
-            this.socket.on('connect_error', (error) => {
-                console.log('Connection Error:', error);
-                // Handle connection error gracefully
-            });
-
-            this.socket.on('connect', () => {
-                console.log('Connected to game server');
-            });
-        } catch (error) {
-            console.log('Socket initialization error:', error);
-        }
-        
-        // Check multiplayer preference
-        this.isMultiplayerEnabled = localStorage.getItem('monsterTruckMultiplayer') === 'true';
-        
-        // Initialize multiplayer only if enabled
-        if (this.isMultiplayerEnabled) {
-            this.initMultiplayer();
-        }
-        
-        // Powerup sounds
-        this.powerupSounds = {
-            speed: new Audio('sounds/powerup_speed.mp3'),
-            shield: new Audio('sounds/powerup_shield.mp3'),
-            damage: new Audio('sounds/powerup_damage.mp3'),
-            health: new Audio('sounds/powerup_health.mp3'),
-            ammo: new Audio('sounds/powerup_ammo.mp3')
-        };
-        
-        // Set fallback sounds in case the specific ones aren't available
-        Object.keys(this.powerupSounds).forEach(key => {
-            this.powerupSounds[key].addEventListener('error', () => {
-                console.log(`Fallback for powerup sound: ${key}`);
-                this.powerupSounds[key].src = 'sounds/powerup_generic.mp3';
-            });
-        });
-
-        this.soundManager = null;  // Will be initialized after camera setup
     }
-    
+
     init() {
         try {
-            console.log("Starting game initialization...");
+            console.log('Initializing game...');
             
-            // Initialize Three.js scene
-            this.scene = new THREE.Scene();
-            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            // Debug mode output
+            if (this.debugMode) {
+                console.log('Debug mode enabled');
+            }
             
-            // Initialize renderer
-            this.renderer = new THREE.WebGLRenderer({ 
-                canvas: document.getElementById('game'),
-                antialias: true 
-            });
+            // Setup three.js renderer
+            this.renderer = new THREE.WebGLRenderer({ antialias: true });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(this.renderer.domElement);
             
             // Initialize sound manager early
             console.log("Initializing sound manager...");
@@ -1000,7 +821,16 @@ class Game {
                 
                 // Update multiplayer (less critical)
                 if (this.multiplayer) {
-                    this.multiplayer.update();
+                    try {
+                        this.multiplayer.update();
+                    } catch (error) {
+                        console.error('Error updating multiplayer:', error);
+                        // Only log error once per session to avoid console spam
+                        if (!this.hasLoggedMultiplayerError) {
+                            this.hasLoggedMultiplayerError = true;
+                            this.showMessage('Multiplayer error occurred - check console for details');
+                        }
+                    }
                 }
                 
                 // Debug info - update position display (not critical)
@@ -4037,6 +3867,12 @@ class Game {
         try {
             console.log('Initializing multiplayer...');
             
+            // Check if socket.io is loaded
+            if (typeof io === 'undefined') {
+                console.error('Socket.io is not loaded! Cannot initialize multiplayer without socket.io.');
+                throw new Error('Socket.io not found - make sure socket.io is loaded before initializing multiplayer');
+            }
+            
             // Direct initialization
             this.multiplayer = new Multiplayer(this);
             console.log('Multiplayer instance created successfully');
@@ -4079,7 +3915,7 @@ class Game {
             console.error('Failed to initialize multiplayer:', error);
             this.showMessage('Multiplayer initialization failed - playing in single player mode');
             if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                window.addChatMessage('System', 'Error: Multiplayer initialization failed. Chat will not work.');
+                window.addChatMessage('System', 'Error: ' + error.message);
             }
         }
     }

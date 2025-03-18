@@ -3,6 +3,17 @@ import { MonsterTruck } from './MonsterTruck.js';
 
 export default class Multiplayer {
     constructor(game) {
+        // First check for socket.io
+        if (typeof io === 'undefined') {
+            console.error('🎮 CRITICAL ERROR: Socket.io not loaded! Multiplayer will not work.');
+            this.game = game;
+            this.isConnected = false;
+            this.socket = null;
+            throw new Error('Socket.io not found - multiplayer initialization failed');
+        }
+
+        console.log('🎮 [Multiplayer] Constructor called with game instance:', !!game);
+        
         this.game = game;
         this.isConnected = false;
         this.socket = null;
@@ -34,15 +45,36 @@ export default class Multiplayer {
     
     connect() {
         try {
-            console.log('Connecting to multiplayer server...');
+            console.log('🎮 [Multiplayer] Connecting to multiplayer server...');
             
-            // Initialize socket without Promise
+            // Verify io is available (double-check)
+            if (typeof io === 'undefined') {
+                throw new Error('Socket.io not found when attempting to connect');
+            }
+            
+            // Initialize socket with better error handling
+            console.log('🎮 [Multiplayer] Creating socket with options');
+            
             this.socket = io('https://monster-truck-game-server.fly.dev', {
                 withCredentials: true,
                 transports: ['websocket', 'polling'],
                 timeout: 10000,
                 reconnection: true,
-                reconnectionAttempts: 5
+                reconnectionAttempts: 5,
+                autoConnect: true,
+                forceNew: true // Force a new connection to avoid sharing issues
+            });
+
+            console.log('🎮 [Multiplayer] Socket created:', !!this.socket);
+            
+            // Add connection error handler
+            this.socket.on('connect_error', (error) => {
+                console.error('🎮 [Multiplayer] Connection error:', error);
+                window.isMultiplayerInitialized = false;
+                
+                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                    window.addChatMessage('System', 'Error connecting to multiplayer server: ' + error.message);
+                }
             });
 
             // Set up all event handlers
@@ -51,24 +83,31 @@ export default class Multiplayer {
             // Start sending updates and listening for chat toggle
             this.startUpdates();
             
+            console.log('🎮 [Multiplayer] Connection setup completed');
+            
         } catch (error) {
-            console.log('Socket initialization error:', error);
+            console.error('🎮 [Multiplayer] Socket initialization error:', error);
             window.isMultiplayerInitialized = false;
             if (this.game && this.game.showMessage) {
                 this.game.showMessage('Multiplayer initialization failed - playing in single player mode');
             }
             if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                window.addChatMessage('System', 'Error: Multiplayer initialization failed. Chat will not work.');
+                window.addChatMessage('System', 'Error: Multiplayer initialization failed: ' + error.message);
             }
         }
     }
     
     setupSocketEvents() {
-        if (!this.socket) return;
+        if (!this.socket) {
+            console.error('🎮 [Multiplayer] Cannot set up socket events: socket is null');
+            return;
+        }
+        
+        console.log('🎮 [Multiplayer] Setting up socket events');
         
         // When connected to the server
         this.socket.on('connect', () => {
-            console.log('Connected to multiplayer server');
+            console.log('🎮 [Multiplayer] Connected to multiplayer server');
             this.isConnected = true;
             this.localPlayerId = this.socket.id;
             
@@ -93,19 +132,24 @@ export default class Multiplayer {
             this.showNotification(`Connected to multiplayer server`);
         });
         
-        // When disconnected from the server
-        this.socket.on('disconnect', () => {
-            console.log('Disconnected from multiplayer server');
+        // Handle disconnection
+        this.socket.on('disconnect', (reason) => {
+            console.log('🎮 [Multiplayer] Disconnected from server. Reason:', reason);
             this.isConnected = false;
-            
-            // Update global multiplayer initialization status
             window.isMultiplayerInitialized = false;
             
             // Update chat status indicator
             const chatStatus = document.getElementById('chat-status');
             if (chatStatus) chatStatus.classList.remove('online');
             
-            this.showNotification('Disconnected from server', 'error');
+            // Show disconnected message
+            this.showNotification(`Disconnected from multiplayer server: ${reason}`);
+            
+            // Attempt to reconnect if disconnect was not intentional
+            if (reason === 'io server disconnect' || reason === 'transport close') {
+                console.log('🎮 [Multiplayer] Attempting to reconnect...');
+                this.socket.connect();
+            }
         });
         
         // When a connection error occurs
