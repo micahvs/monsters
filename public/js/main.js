@@ -5814,21 +5814,46 @@ window.SoundFX = {
         this.setMasterVolume = (volume) => {
             console.log(`SoundFX: Setting master volume to ${volume}`);
             this.masterVolume = Math.max(0, Math.min(1, volume));
+            this.updateAllSoundVolumes();
         };
         
         this.setSFXVolume = (volume) => {
             console.log(`SoundFX: Setting SFX volume to ${volume}`);
             this.sfxVolume = Math.max(0, Math.min(1, volume));
+            this.updateAllSoundVolumes();
         };
         
         this.setMuted = (isMuted) => {
             this.isMuted = isMuted;
             console.log(`SoundFX: ${isMuted ? 'Muted' : 'Unmuted'}`);
+            this.updateAllSoundVolumes();
         };
         
         this.setSFXMuted = (isMuted) => {
             this.sfxMuted = isMuted;
             console.log(`SoundFX: SFX ${isMuted ? 'Muted' : 'Unmuted'}`);
+            this.updateAllSoundVolumes();
+        };
+        
+        // Helper method to update all sound volumes
+        this.updateAllSoundVolumes = () => {
+            console.log(`SoundFX: Updating all sound volumes (master=${this.masterVolume}, sfx=${this.sfxVolume}, muted=${this.isMuted}, sfxMuted=${this.sfxMuted})`);
+            
+            // Update volume for all loaded sounds
+            for (const [name, sound] of Object.entries(this.sounds)) {
+                // Skip entries that aren't Audio objects
+                if (!(sound instanceof Audio)) continue;
+                
+                // Determine the base name (remove _1, _2 suffixes)
+                const baseName = name.replace(/_[0-9]$/, '');
+                
+                // Calculate effective volume with all factors
+                const volumeMultiplier = this.getVolumeMultiplier(baseName);
+                const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : 0.5 * this.masterVolume * this.sfxVolume * volumeMultiplier;
+                
+                // Set the new volume
+                sound.volume = effectiveVolume;
+            }
         };
     },
     
