@@ -2964,8 +2964,10 @@ class Game {
             return 'wall';
         }
         
-        // Check collision with truck (only if not player's projectile)
-        if (projectile.source !== 'player' && this.truck) {
+        // Check collision with truck (ONLY check if projectile is not from player or local machine)
+        // This includes turret projectiles (source="turret") and remote player projectiles (source="remote")
+        // source="player" would be the local player's projectile, which should not hit themselves
+        if ((projectile.source !== 'player' || projectile.playerId !== this.multiplayer?.localPlayerId) && this.truck) {
             // Get vehicle dimensions and height based on type
             let truckDimensions = {width: 2, length: 3, height: 1};
             
@@ -3007,15 +3009,11 @@ class Game {
                 // Calculate impact point for visuals
                 const impactPoint = new THREE.Vector3(pos.x, pos.y, pos.z);
                 
-                // Apply damage directly from projectile without multiplier
-                const baseDamage = projectile.source === 'turret' ? 
-                    projectile.damage : projectile.damage; // No additional multiplier
+                // Apply damage based on projectile source
+                let actualDamage = projectile.damage || 20;
                 
-                // Ensure damage is reasonable but noticeable
-                const actualDamage = baseDamage;
-                
-                // Log hit information
-                console.log(`Hit registered: Vehicle hit for ${actualDamage} damage`);
+                // Log hit information and show visual feedback
+                console.log(`Hit registered: Vehicle hit by ${projectile.source} (${projectile.playerId || 'unknown'}) for ${actualDamage} damage`);
                 
                 // Take damage - ensure this works by calling directly
                 this.takeDamage(actualDamage);
@@ -5801,6 +5799,64 @@ class Game {
             this.soundManager.dispose();
         }
         // ... any other disposal code ...
+    }
+
+    // Create a new projectile
+    shoot() {
+        if (!this.truck) return;
+        
+        // Get camera position and direction
+        const cameraDirection = new THREE.Vector3();
+        this.camera.getWorldDirection(cameraDirection);
+        
+        // Calculate muzzle position
+        const muzzlePosition = new THREE.Vector3(
+            this.truck.position.x + cameraDirection.x * 2,
+            this.truck.position.y + 1, // Above the truck
+            this.truck.position.z + cameraDirection.z * 2
+        );
+        
+        // Create projectile mesh
+        const projectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+        const projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+        const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
+        
+        // Position the projectile at the muzzle
+        projectileMesh.position.copy(muzzlePosition);
+        
+        // Add to scene
+        this.scene.add(projectileMesh);
+        
+        // Create projectile object
+        const projectile = {
+            mesh: projectileMesh,
+            direction: cameraDirection.clone().normalize(),
+            speed: 1.5,
+            damage: 20,
+            lifetime: 100,
+            source: 'player'
+        };
+        
+        // If multiplayer is active, add the player ID to the projectile
+        if (this.multiplayer && this.multiplayer.isConnected) {
+            projectile.playerId = this.multiplayer.localPlayerId;
+            
+            // Send the projectile info to the server
+            this.multiplayer.sendProjectileCreated(projectile);
+        }
+        
+        // Add to projectiles list
+        this.projectiles.push(projectile);
+        
+        // Add muzzle flash
+        this.createMuzzleFlash(muzzlePosition, cameraDirection);
+        
+        // Play sound
+        if (this.soundManager) {
+            this.soundManager.playSound('weapon_fire', this.truck.position);
+        } else if (window.SoundFX) {
+            window.SoundFX.play('weapon_fire');
+        }
     }
 }
 
