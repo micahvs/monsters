@@ -728,21 +728,23 @@ export default class Multiplayer {
             const projectileLight = new THREE.PointLight(color, 0.7, 3);
             projectile.add(projectileLight);
             
-            // Add to game's projectiles array
+            // Add to game's projectiles array - IMPORTANT: Set correct source for proper collision detection
             this.game.projectiles.push({
                 mesh: projectile,
                 direction: direction,
                 speed: projectileData.speed || 2.0,
                 damage: projectileData.damage || 20,
                 lifetime: 90,
-                source: 'remote',
-                playerId: projectileData.playerId
+                source: 'remote', // Always mark as 'remote' for remote players' projectiles
+                playerId: projectileData.playerId // Store original player ID for damage attribution
             });
             
             // Create muzzle flash effect
             if (this.game.createMuzzleFlash) {
                 this.game.createMuzzleFlash(position, direction);
             }
+            
+            console.log(`Created remote projectile from player ${projectileData.playerId} with source 'remote'`);
         }
     }
     

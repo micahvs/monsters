@@ -2583,18 +2583,32 @@ class Game {
                         trailsCreatedThisFrame++;
                     }
                     
-                    // Check for collision with player - only for non-player projectiles
-                    if (this.truck && projectile.source !== 'player') {
+                    // Check for collision with player - only for non-player projectiles or projectiles from other players
+                    if (this.truck && (projectile.source !== 'player' || 
+                                      (projectile.source === 'remote' || 
+                                      (projectile.playerId && projectile.playerId !== this.multiplayer?.localPlayerId)))) {
+                        
+                        // Skip collision detection against self if this is the local player's projectile
+                        if (projectile.source === 'player' && 
+                            projectile.playerId === this.multiplayer?.localPlayerId) {
+                            // Skip to next iteration if this is our own projectile
+                            continue;
+                        }
+                        
                         const distance = projectile.mesh.position.distanceTo(this.truck.position);
                         if (distance < 3) { // Player hitbox
                             // Apply damage to player
                             if (typeof this.takeDamage === 'function') {
-                                console.log(`Player hit by ${projectile.source} projectile for ${projectile.damage} damage`);
+                                console.log(`Player hit by ${projectile.source} projectile from ${projectile.playerId || 'unknown'} for ${projectile.damage} damage`);
+                                
+                                // Take damage
                                 this.takeDamage(projectile.damage);
                                 
                                 // Play hit sound
                                 if (window.soundManager) {
                                     window.soundManager.playSound('vehicle_hit');
+                                } else if (window.SoundFX) {
+                                    window.SoundFX.play('vehicle_hit');
                                 }
                                 
                                 // Create hit effect
@@ -2946,6 +2960,9 @@ class Game {
 
     // Check projectile collisions
     checkProjectileCollisions(projectile) {
+        // Add debug logging for projectile check
+        console.log(`Checking projectile collision: source=${projectile.source}, playerId=${projectile.playerId || 'unknown'}, localId=${this.multiplayer?.localPlayerId || 'none'}`);
+        
         // Get projectile position
         const pos = projectile.mesh.position;
         
@@ -2964,10 +2981,17 @@ class Game {
             return 'wall';
         }
         
-        // Check collision with truck (ONLY check if projectile is not from player or local machine)
-        // This includes turret projectiles (source="turret") and remote player projectiles (source="remote")
-        // source="player" would be the local player's projectile, which should not hit themselves
-        if ((projectile.source !== 'player' || projectile.playerId !== this.multiplayer?.localPlayerId) && this.truck) {
+        // Check collision with truck (ONLY if projectile is not from local player)
+        // This handles these cases:
+        // 1. Turret projectiles (source="turret") - damage player
+        // 2. Remote player projectiles (source="remote") - damage player
+        // 3. Local player's projectiles (source="player" && playerId=localPlayerId) - NO damage to self
+        const isNotOwnProjectile = projectile.source !== 'player' || 
+            (projectile.playerId && projectile.playerId !== this.multiplayer?.localPlayerId);
+        
+        if (isNotOwnProjectile && this.truck) {
+            console.log(`Checking player collision - valid projectile from: ${projectile.source}/${projectile.playerId}`);
+            
             // Get vehicle dimensions and height based on type
             let truckDimensions = {width: 2, length: 3, height: 1};
             
@@ -2983,19 +3007,23 @@ class Game {
                 }
             }
             
-            // Moderately larger collision box for better hit detection but not overpowered
-            // Slightly larger than actual vehicle for more reliable hit detection
-            const expansionFactor = 0.5; // Reduced from 1.0 for more balanced gameplay
+            // Larger collision box for better hit detection
+            const expansionFactor = 1.0; // Increased for more reliable hit registration
                 
             // Create a proper 3D bounding box for the vehicle with reasonable margins
             const truckBounds = {
                 minX: this.truck.position.x - (truckDimensions.width / 2) - expansionFactor,
                 maxX: this.truck.position.x + (truckDimensions.width / 2) + expansionFactor,
-                minY: this.truck.position.y - 0.2, // Less below-ground extension
-                maxY: this.truck.position.y + truckDimensions.height + 0.5, // Less excessive height
+                minY: this.truck.position.y - 0.5, // More below-ground extension
+                maxY: this.truck.position.y + truckDimensions.height + 1.0, // More height for better hit detection
                 minZ: this.truck.position.z - (truckDimensions.length / 2) - expansionFactor,
                 maxZ: this.truck.position.z + (truckDimensions.length / 2) + expansionFactor
             };
+            
+            // Log position data for debugging
+            console.log(`Projectile: x=${pos.x.toFixed(1)}, y=${pos.y.toFixed(1)}, z=${pos.z.toFixed(1)}`);
+            console.log(`Truck: x=${this.truck.position.x.toFixed(1)}, y=${this.truck.position.y.toFixed(1)}, z=${this.truck.position.z.toFixed(1)}`);
+            console.log(`Bounds: x=[${truckBounds.minX.toFixed(1)} to ${truckBounds.maxX.toFixed(1)}], z=[${truckBounds.minZ.toFixed(1)} to ${truckBounds.maxZ.toFixed(1)}]`);
             
             // Very generous collision detection to ensure hits register
             if (
@@ -3006,17 +3034,24 @@ class Game {
                 pos.y >= truckBounds.minY &&
                 pos.y <= truckBounds.maxY
             ) {
+                // Hit registered!
+                console.log(`HIT REGISTERED: Vehicle hit by ${projectile.source} (${projectile.playerId || 'unknown'}) for ${projectile.damage} damage`);
+                
                 // Calculate impact point for visuals
                 const impactPoint = new THREE.Vector3(pos.x, pos.y, pos.z);
                 
                 // Apply damage based on projectile source
                 let actualDamage = projectile.damage || 20;
                 
-                // Log hit information and show visual feedback
-                console.log(`Hit registered: Vehicle hit by ${projectile.source} (${projectile.playerId || 'unknown'}) for ${actualDamage} damage`);
-                
-                // Take damage - ensure this works by calling directly
+                // Take damage directly
                 this.takeDamage(actualDamage);
+                
+                // Play sound effect
+                if (this.soundManager) {
+                    this.soundManager.playSound('vehicle_hit', this.truck.position);
+                } else if (window.SoundFX) {
+                    window.SoundFX.play('vehicle_hit');
+                }
                 
                 // Create impact effect at hit position
                 this.createProjectileImpactOnVehicle(impactPoint);
