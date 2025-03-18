@@ -183,45 +183,91 @@ export default class Multiplayer {
         
         // When a player takes damage
         this.socket.on('playerDamaged', (damageData) => {
-            console.log('GOT DAMAGE EVENT FROM SERVER:', damageData);
+            console.log('💥 GOT DAMAGE EVENT FROM SERVER:', damageData);
             
             // If it's the local player
             if (damageData.id === this.localPlayerId) {
                 // Only apply damage if it came from someone else
                 if (damageData.sourceId !== this.localPlayerId) {
-                    console.log('APPLYING DAMAGE TO LOCAL PLAYER:', damageData.damage, 'New health:', damageData.health);
+                    console.log('🩸 TAKING DAMAGE FROM REMOTE PLAYER:', damageData.damage, 'New health:', damageData.health);
                     
-                    // CRITICAL FIX: Force immediate health update from server value
-                    this.game.health = Math.max(0, damageData.health);
-                    
-                    // Update monster truck health
-                    if (this.game.monsterTruck) {
-                        this.game.monsterTruck.health = Math.max(0, damageData.health);
-                        // Force visual damage effect
-                        this.game.monsterTruck.showDamageEffect();
-                    }
-                    
-                    // Force HUD update
-                    this.game.updateHUD();
-                    
-                    // CRITICAL FIX: Call the dedicated handler for visual feedback
-                    if (typeof this.game.handleRemoteProjectileHit === 'function') {
-                        this.game.handleRemoteProjectileHit(damageData.sourceId, damageData.damage);
-                    } else {
-                        // Fallback to basic visual feedback
-                        this.game.addDamageScreenEffect(damageData.damage);
+                    // Force health update with server value (MISSION CRITICAL)
+                    if (this.game) {
+                        // Update game health
+                        this.game.health = Math.max(0, damageData.health);
+                        console.log('Game health set to:', this.game.health);
                         
-                        // Play hit sound
-                        if (window.soundManager) {
-                            window.soundManager.playSound('vehicle_hit', this.game.truck.position);
-                        } else if (window.SoundFX) {
-                            window.SoundFX.play('vehicle_hit');
+                        // Update monster truck health
+                        if (this.game.monsterTruck) {
+                            this.game.monsterTruck.health = Math.max(0, damageData.health);
+                            console.log('MonsterTruck health set to:', this.game.monsterTruck.health);
+                            
+                            // Force visual damage effect
+                            if (typeof this.game.monsterTruck.showDamageEffect === 'function') {
+                                this.game.monsterTruck.showDamageEffect();
+                            }
+                        }
+                        
+                        // Try all possible ways to update HUD
+                        try {
+                            if (typeof this.game.updateHUD === 'function') {
+                                this.game.updateHUD();
+                            }
+                            
+                            const healthDisplay = document.getElementById('health');
+                            if (healthDisplay) {
+                                healthDisplay.textContent = `HEALTH: ${this.game.health}`;
+                            }
+                        } catch (e) {
+                            console.error('Error updating HUD:', e);
+                        }
+                        
+                        // Call multiple visual effect methods for redundancy
+                        try {
+                            // Method 1: Use handleRemoteProjectileHit
+                            if (typeof this.game.handleRemoteProjectileHit === 'function') {
+                                this.game.handleRemoteProjectileHit(damageData.sourceId, damageData.damage);
+                            }
+                            
+                            // Method 2: Use addDamageScreenEffect
+                            if (typeof this.game.addDamageScreenEffect === 'function') {
+                                this.game.addDamageScreenEffect(damageData.damage);
+                            }
+                            
+                            // Method 3: Create direct impact effect at player position
+                            if (this.game.truck && typeof this.game.createProjectileImpactOnVehicle === 'function') {
+                                this.game.createProjectileImpactOnVehicle(this.game.truck.position.clone());
+                            }
+                            
+                            // Method 4: Shake camera
+                            if (typeof this.game.shakeCamera === 'function') {
+                                this.game.shakeCamera(damageData.damage * 0.15);
+                            }
+                        } catch (e) {
+                            console.error('Error showing damage effects:', e);
+                        }
+                        
+                        // Sound effects
+                        try {
+                            if (window.soundManager) {
+                                window.soundManager.playSound('vehicle_hit', this.game.truck?.position);
+                            } else if (window.SoundFX) {
+                                window.SoundFX.play('vehicle_hit');
+                            }
+                        } catch (e) {
+                            console.error('Error playing hit sound:', e);
                         }
                     }
                     
                     // Show notification
-                    const attacker = this.players.get(damageData.sourceId)?.nickname || 'Another player';
-                    this.showNotification(`${attacker} hit you for ${damageData.damage} damage!`, 'error');
+                    try {
+                        const attacker = this.players.get(damageData.sourceId)?.nickname || 'Another player';
+                        this.showNotification(`${attacker} hit you for ${damageData.damage} damage!`, 'error');
+                    } catch (e) {
+                        console.error('Error showing notification:', e);
+                    }
+                    
+                    console.log('HEALTH AFTER SERVER DAMAGE:', this.game ? this.game.health : 'Unknown');
                 }
             } else {
                 // Show damage effect on remote player
@@ -1315,70 +1361,93 @@ export default class Multiplayer {
     checkProjectileHits(projectile) {
         if (!projectile || !projectile.mesh || !this.isConnected) return false;
         
-        console.log(`Checking if projectile from ${projectile.playerId} hits other players`);
+        // MISSION CRITICAL DEBUG LOGGING
+        console.log(`CHECKING PROJECTILE HITS: source=${projectile.source}, playerId=${projectile.playerId}, localId=${this.localPlayerId}`);
         
-        // Check if projectile hits any remote player
-        // CRITICAL FIX: Correctly iterate through Map with forEach instead of for...in
+        // Add additional logging for players
+        console.log(`Total remote players to check: ${this.players.size}`);
+        
+        // CRITICAL FIX: We must properly iterate the Map object
         let hitDetected = false;
+        
+        // Debug the players Map to ensure it's populated
+        this.players.forEach((player, id) => {
+            console.log(`Player in map: id=${id}, has mesh=${!!player.truckMesh}`);
+        });
         
         this.players.forEach((player, playerId) => {
             // Skip the local player and the player who fired the projectile
             if (playerId === this.localPlayerId || 
                 (projectile.playerId && playerId === projectile.playerId)) {
-                return; // Skip this iteration (continue in a loop)
+                return;
             }
             
             // Skip if player doesn't have a truck mesh
-            if (!player.truckMesh) return;
+            if (!player.truckMesh) {
+                console.log(`Skipping player ${playerId} - no truck mesh`);
+                return;
+            }
             
-            console.log(`Checking collision with player ${playerId}`);
+            console.log(`⚾ Checking collision with player ${playerId}`);
             
-            // Get vehicle dimensions - make hitbox larger for reliable hit detection
+            // ULTRA-WIDE hitbox for maximum reliability
             const truckDimensions = {
-                width: 4.0,  // Increased from 3.0
-                length: 6.0, // Increased from 5.0
-                height: 3.0  // Increased from 2.0
+                width: 8.0,   // MASSIVELY increased for hit detection
+                length: 12.0,  // MASSIVELY increased for hit detection
+                height: 6.0    // MASSIVELY increased for hit detection
             };
             
-            // Get bounding box for truck with larger margins
+            // Create a larger bounding box to ensure hits register
             const truckBounds = {
                 minX: player.truckMesh.position.x - (truckDimensions.width / 2),
                 maxX: player.truckMesh.position.x + (truckDimensions.width / 2),
-                minY: player.truckMesh.position.y - 0.5,
+                minY: player.truckMesh.position.y - 2.0,
                 maxY: player.truckMesh.position.y + truckDimensions.height,
                 minZ: player.truckMesh.position.z - (truckDimensions.length / 2),
                 maxZ: player.truckMesh.position.z + (truckDimensions.length / 2)
             };
             
-            // Log positions for debugging
-            console.log(`Projectile: ${projectile.mesh.position.x.toFixed(1)}, ${projectile.mesh.position.y.toFixed(1)}, ${projectile.mesh.position.z.toFixed(1)}`);
-            console.log(`Player ${playerId}: ${player.truckMesh.position.x.toFixed(1)}, ${player.truckMesh.position.y.toFixed(1)}, ${player.truckMesh.position.z.toFixed(1)}`);
-            console.log(`Bounds: X(${truckBounds.minX.toFixed(1)}-${truckBounds.maxX.toFixed(1)}), Y(${truckBounds.minY.toFixed(1)}-${truckBounds.maxY.toFixed(1)}), Z(${truckBounds.minZ.toFixed(1)}-${truckBounds.maxZ.toFixed(1)})`);
+            // Detailed position logging
+            console.log(`🚀 Projectile: ${projectile.mesh.position.x.toFixed(1)}, ${projectile.mesh.position.y.toFixed(1)}, ${projectile.mesh.position.z.toFixed(1)}`);
+            console.log(`🚗 Player ${playerId}: ${player.truckMesh.position.x.toFixed(1)}, ${player.truckMesh.position.y.toFixed(1)}, ${player.truckMesh.position.z.toFixed(1)}`);
+            console.log(`📦 Bounds: X(${truckBounds.minX.toFixed(1)}-${truckBounds.maxX.toFixed(1)}), Y(${truckBounds.minY.toFixed(1)}-${truckBounds.maxY.toFixed(1)}), Z(${truckBounds.minZ.toFixed(1)}-${truckBounds.maxZ.toFixed(1)})`);
             
-            // Check if projectile is inside bounding box
+            // Get projectile position
             const pos = projectile.mesh.position;
-            if (
+            
+            // Check if inside bounds - use simpler check for better performance
+            const isHit = 
                 pos.x >= truckBounds.minX && 
                 pos.x <= truckBounds.maxX &&
                 pos.z >= truckBounds.minZ && 
                 pos.z <= truckBounds.maxZ &&
                 pos.y >= truckBounds.minY &&
-                pos.y <= truckBounds.maxY
-            ) {
-                console.log(`HIT DETECTED on player ${playerId}!`);
+                pos.y <= truckBounds.maxY;
+            
+            if (isHit) {
+                console.log(`💥 DIRECT HIT on player ${playerId}!`);
                 
-                // Impact point for visuals
-                const impactPoint = new THREE.Vector3(pos.x, pos.y, pos.z);
+                // Calculate damage - ensure at least 20 damage for reliability
+                const damage = projectile.damage || 20;
                 
-                // CRITICAL FIX: Send hit directly through socket for reliability
-                console.log(`DIRECTLY sending hit to server: target=${playerId}, damage=${projectile.damage}, source=${this.localPlayerId}`);
+                // CRITICAL FIX: Use multiple ways to send hit
+                // 1. Direct socket emission (most important)
+                console.log(`⚡ DIRECTLY sending hit: target=${playerId}, damage=${damage}`);
                 this.socket.emit('playerHit', {
                     playerId: playerId,
-                    damage: projectile.damage || 20,
+                    damage: damage,
                     sourceId: this.localPlayerId
                 });
                 
-                // Show impact effect
+                // 2. Also try the method approach as backup
+                try {
+                    this.sendPlayerHit(playerId, damage, this.localPlayerId);
+                } catch (err) {
+                    console.error("Error using sendPlayerHit method:", err);
+                }
+                
+                // Create impact effect at hit position
+                const impactPoint = new THREE.Vector3(pos.x, pos.y, pos.z);
                 this.showDamageEffect(impactPoint);
                 
                 // Play hit sound
@@ -1388,7 +1457,22 @@ export default class Multiplayer {
                     window.SoundFX.play('vehicle_hit');
                 }
                 
+                // Show notification
+                this.showNotification(`You hit ${player.nickname || 'another player'}!`, 'success');
+                
+                // Mark that we detected a hit
                 hitDetected = true;
+            } else {
+                // Check if close for debugging
+                const distance = Math.sqrt(
+                    Math.pow(player.truckMesh.position.x - pos.x, 2) +
+                    Math.pow(player.truckMesh.position.y - pos.y, 2) +
+                    Math.pow(player.truckMesh.position.z - pos.z, 2)
+                );
+                
+                if (distance < 20) {
+                    console.log(`Near miss! Distance: ${distance.toFixed(2)}`);
+                }
             }
         });
         

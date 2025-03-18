@@ -2543,26 +2543,29 @@ class Game {
                         trailsCreatedThisFrame++;
                     }
                     
-                    // Check for collision with player - only for non-player projectiles or projectiles from other players
+                    // Check for collision with player - EXTRA LARGE HITBOX VERSION
                     if (this.truck && (projectile.source === 'turret' || projectile.source === 'remote' || 
                         (projectile.source === 'player' && projectile.playerId && projectile.playerId !== this.multiplayer?.localPlayerId))) {
                         
-                        // Now check the actual collision with expanded hitbox for better hit detection
+                        // SUPER GENEROUS HITBOX: Create 20x20 space around player
                         const playerX = this.truck.position.x;
-                        const playerY = this.truck.position.y + 1.0; // Account for truck height
+                        const playerY = this.truck.position.y + 1.0; 
                         const playerZ = this.truck.position.z;
                         
-                        // Get a more generous hitbox for players
+                        // MISSION CRITICAL: Detection box is HUGE to ensure hits register
+                        const hitboxSize = 10.0; // Extremely large hitbox for reliable hit detection
+                        
+                        // Create a massive, invisible hitbox
                         const playerBounds = {
-                            minX: playerX - 2.0,
-                            maxX: playerX + 2.0,
-                            minY: playerY - 1.0,
-                            maxY: playerY + 2.0,
-                            minZ: playerZ - 3.0,
-                            maxZ: playerZ + 3.0
+                            minX: playerX - hitboxSize,
+                            maxX: playerX + hitboxSize,
+                            minY: playerY - hitboxSize, // Below ground level even
+                            maxY: playerY + hitboxSize, // High into the air
+                            minZ: playerZ - hitboxSize,
+                            maxZ: playerZ + hitboxSize
                         };
                         
-                        // True if projectile is within the hitbox
+                        // SIMPLE LARGE HITBOX CHECK
                         const isHit = (
                             projectile.mesh.position.x >= playerBounds.minX &&
                             projectile.mesh.position.x <= playerBounds.maxX &&
@@ -2572,10 +2575,13 @@ class Game {
                             projectile.mesh.position.z <= playerBounds.maxZ
                         );
                         
+                        console.log(`Checking projectile collision: ${isHit ? 'HIT!' : 'miss'}`);
+                        
                         if (isHit) {
                             // Apply damage to player
                             if (typeof this.takeDamage === 'function') {
-                                console.log(`DIRECT HIT: Player hit by ${projectile.source} projectile from ${projectile.playerId || 'unknown'} for ${projectile.damage} damage`);
+                                // CRITICAL: Log the hit for debugging
+                                console.log(`🎯 DIRECT HIT: Player hit by ${projectile.source} projectile from ${projectile.playerId || 'unknown'} for ${projectile.damage} damage`);
                                 
                                 // IMMEDIATELY take damage - most reliable method
                                 this.takeDamage(projectile.damage);
