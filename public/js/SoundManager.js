@@ -276,6 +276,10 @@ export class SoundManager {
         for (let i = 0; i < poolSize; i++) {
             try {
                 const sound = new THREE.Audio(this.listener);
+                // Mark this as a sound effect (not music)
+                sound.isSFX = true;
+                sound.baseVolume = 1.0;
+                
                 const loader = new THREE.AudioLoader();
                 
                 loader.load(
@@ -283,7 +287,9 @@ export class SoundManager {
                     (buffer) => {
                         console.log(`Successfully loaded sound: ${name} (instance ${i + 1}/${poolSize})`);
                         sound.setBuffer(buffer);
-                        sound.setVolume(this.sfxVolume * this.masterVolume);
+                        // Apply correct volume based on current settings
+                        const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume;
+                        sound.setVolume(effectiveVolume);
                         if (options.pitch) {
                             sound.setPlaybackRate(options.pitch);
                         }
@@ -399,7 +405,8 @@ export class SoundManager {
         try {
             // Apply volume with sound-specific multiplier
             const volumeMultiplier = this.getSoundVolumeMultiplier(name);
-            sound.setVolume(this.sfxVolume * this.masterVolume * volumeMultiplier);
+            const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume * volumeMultiplier;
+            sound.setVolume(effectiveVolume);
             
             // Only try to play if we have a valid buffer
             if (sound.buffer) {
@@ -408,7 +415,7 @@ export class SoundManager {
                     try {
                         const pos = new THREE.PositionalAudio(this.listener);
                         pos.setBuffer(sound.buffer);
-                        pos.setVolume(this.sfxVolume * this.masterVolume * volumeMultiplier);
+                        pos.setVolume(effectiveVolume);
                         pos.setRefDistance(20);
                         pos.setRolloffFactor(1);
                         pos.position.copy(position);
@@ -446,7 +453,8 @@ export class SoundManager {
             
             // Apply volume with sound-specific multiplier
             const volumeMultiplier = this.getSoundVolumeMultiplier(name);
-            audio.volume = this.sfxVolume * this.masterVolume * volumeMultiplier;
+            const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume * volumeMultiplier;
+            audio.volume = effectiveVolume;
             
             // Play the sound
             const playPromise = audio.play();
@@ -597,9 +605,7 @@ export class SoundManager {
     updateAllVolumes() {
         // Update active sounds
         for (const [soundId, sound] of this.activeSounds.entries()) {
-            if (sound.isSFX) {
-                this.updateSoundVolume(sound);
-            }
+            this.updateSoundVolume(sound);
         }
         
         // Also update the central music player if available
@@ -607,25 +613,40 @@ export class SoundManager {
             window.musicPlayer.updateMusicVolume();
         }
         
-        // Update sound pools
+        // Update sound pools (SFX)
+        const effectiveSfxVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume;
         for (const pool of this.soundPools.values()) {
             for (const sound of pool) {
-                sound.setVolume(this.sfxVolume * this.masterVolume);
+                sound.setVolume(effectiveSfxVolume);
             }
         }
         
         // Update music tracks
+        const effectiveMusicVolume = this.isMuted ? 0 : this.musicVolume * this.masterVolume;
         for (const music of this.musicTracks.values()) {
-            music.setVolume(this.musicVolume * this.masterVolume);
+            music.setVolume(effectiveMusicVolume);
         }
     }
     
     updateSoundVolume(sound) {
         if (!sound || this.useFallbackAudio) return;
         
-        // Calculate effective volume
-        const effectiveVolume = this.isMuted || (sound.isSFX && this.sfxMuted) ? 
-            0 : this.masterVolume * this.sfxVolume * sound.baseVolume;
+        // Calculate effective volume based on whether it's SFX or music
+        let effectiveVolume = 0;
+        
+        if (this.isMuted) {
+            effectiveVolume = 0;
+        } else if (sound.isSFX) {
+            // For SFX, apply master and sfx volumes
+            if (this.sfxMuted) {
+                effectiveVolume = 0;
+            } else {
+                effectiveVolume = this.masterVolume * this.sfxVolume * sound.baseVolume;
+            }
+        } else {
+            // For music, apply master and music volumes
+            effectiveVolume = this.masterVolume * this.musicVolume * sound.baseVolume;
+        }
         
         // Update sound volume
         if (sound.audioNode && sound.gainNode) {
