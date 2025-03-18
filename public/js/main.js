@@ -5,6 +5,9 @@ import Multiplayer from './Multiplayer.js';
 import { Weapon, WeaponTypes, WeaponPickup } from './Weapons.js';
 import { SoundManager } from './SoundManager.js';
 
+// Import the sound system
+import './sound-fix.js';
+
 const TRUCK_SPECS = {
     'NEON CRUSHER': {
         acceleration: 0.019,   // Reduced by 5%
@@ -6025,6 +6028,23 @@ class Game {
             this.takeDamage(damage);
         }
     }
+
+    initializeSimpleSounds() {
+        // No sound button is created - sounds are enabled by default
+        console.log('Sound button creation skipped in Game - sounds are enabled by default');
+    }
+
+    // Auto-enable sounds
+    autoEnableSounds() {
+        // No sound button is created - sounds are enabled by default
+        console.log('Sound button creation skipped in Game - sounds are enabled by default');
+    }
+
+    // Create button for enabling sounds - now disabled as sounds auto-enable
+    createSoundButton() {
+        // No sound button is created - sounds are now enabled by default
+        console.log('Sound button creation skipped in Game - sounds are enabled by default');
+    }
 }
 
 // Initialize game when window is fully loaded
@@ -6078,13 +6098,40 @@ window.SoundFX = {
             this.sounds[sound + '_2'].volume = baseVolume * effectiveVolume;
         });
         
-        // Create the sound button
-        this.createSoundButton();
+        // Auto-enable sounds immediately
+        this.autoEnableSounds();
         
         console.log('Simple sound system initialized with', Object.keys(this.sounds).length, 'sounds');
         
         // Set up methods to integrate with the audio panel
         this.setupVolumeControls();
+    },
+    
+    // Auto-enable sounds during initialization
+    autoEnableSounds() {
+        // Immediately unlock all sounds
+        Object.values(this.sounds).forEach(sound => {
+            sound.currentTime = 0;
+            sound.volume = 0;
+            const promise = sound.play();
+            if (promise) promise.catch(() => {});
+            setTimeout(() => { try { sound.pause(); } catch(e) {} }, 50);
+        });
+        
+        // Verify with a test sound
+        try {
+            const testSound = this.sounds['menu_confirm'];
+            if (testSound) {
+                testSound.volume = 0.5 * this.getVolumeMultiplier('menu_confirm');
+                testSound.currentTime = 0;
+                testSound.play().catch(() => {});
+            }
+        } catch(e) {
+            console.warn('Could not play test sound:', e);
+        }
+        
+        console.log('%c 🔊 SOUND SYSTEM READY - ALL SOUNDS ENABLED BY DEFAULT 🔊', 
+            'background: #00ff00; color: #000000; font-size: 16px; padding: 10px; font-weight: bold;');
     },
     
     // Connect with the SoundManager volume controls
@@ -6213,69 +6260,7 @@ window.SoundFX = {
             console.error(`Error playing ${name}:`, error);
             sound.playing = false;
         }
-    },
-    
-    // Create button for enabling sounds
-    createSoundButton() {
-        const button = document.createElement('button');
-        button.textContent = '🔊 ENABLE SOUND';
-        button.style.position = 'fixed';
-        button.style.top = '10px';
-        button.style.left = '10px';
-        button.style.zIndex = '10000';
-        button.style.backgroundColor = '#ff00ff';
-        button.style.color = 'white';
-        button.style.padding = '10px 20px';
-        button.style.fontSize = '16px';
-        button.style.fontWeight = 'bold';
-        button.style.border = 'none';
-        button.style.borderRadius = '5px';
-        button.style.cursor = 'pointer';
-        button.style.boxShadow = '0 0 10px rgba(255,0,255,0.8)';
-        
-        // Handle click - this is where we unlock audio
-        button.onclick = () => {
-            // Play all sounds at 0 volume to unlock them
-            Object.values(this.sounds).forEach(sound => {
-                // Reset to start
-                sound.currentTime = 0;
-                sound.volume = 0;
-                
-                // Try to play (even if it fails, that's fine)
-                const promise = sound.play();
-                if (promise) promise.catch(() => {});
-                
-                // Stop after a moment
-                setTimeout(() => {
-                    try { sound.pause(); } catch(e) {}
-                }, 50);
-            });
-            
-            // Now try to play one audibly to confirm it worked
-            try {
-                const testSound = this.sounds['menu_confirm'];
-                testSound.volume = 0.5 * this.getVolumeMultiplier('menu_confirm');
-                testSound.currentTime = 0;
-                testSound.play().catch(() => {});
-            } catch(e) {}
-            
-            // Show success message
-            button.textContent = '✓ SOUND ENABLED';
-            button.style.backgroundColor = '#00ff00';
-            button.style.color = 'black';
-            
-            // Remove after 2 seconds
-            setTimeout(() => {
-                button.remove();
-                
-                // Add console log to help users troubleshoot
-                console.log('%c 🔊 SOUND SYSTEM READY - ALL SOUNDS SHOULD WORK NOW 🔊', 
-                    'background: #00ff00; color: #000000; font-size: 16px; padding: 10px; font-weight: bold;');
-            }, 2000);
-        };
-        
-        document.body.appendChild(button);
-    },
+    }
 };
 
 window.addEventListener('load', () => {
