@@ -37,6 +37,9 @@ class MusicPlayer {
         this.musicVolume = 0.3; // 0 to 1
         this.masterVolume = 1.0; // 0 to 1
         
+        // Flag to prevent circular updates between SoundManager and MusicPlayer
+        this.isUpdatingVolume = false;
+        
         // Initialize
         this.initControlListeners();
         this.loadSavedSettings();
@@ -369,8 +372,17 @@ class MusicPlayer {
         this.audioElement.volume = effectiveVolume;
         
         // Also update the SoundManager's music volume if available
-        if (window.soundManager) {
-            window.soundManager.setMusicVolume(this.musicVolume);
+        // but only if we're not already in an update cycle
+        if (window.soundManager && !this.isUpdatingVolume) {
+            try {
+                this.isUpdatingVolume = true;
+                window.soundManager.setMusicVolume(this.musicVolume);
+            } finally {
+                // Reset flag after a small delay to ensure any pending callbacks complete
+                setTimeout(() => {
+                    this.isUpdatingVolume = false;
+                }, 0);
+            }
         }
     }
     

@@ -5,6 +5,9 @@ export class SoundManager {
         // Flag to use fallback HTML5 Audio if THREE.js audio fails
         this.useFallbackAudio = false;
         
+        // Flag to prevent circular updates between SoundManager and MusicPlayer
+        this.isUpdatingVolume = false;
+        
         try {
             // Create audio context
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -633,9 +636,17 @@ export class SoundManager {
         }
         
         // Also update the central music player if available
-        if (window.musicPlayer && typeof window.musicPlayer.updateMusicVolume === 'function') {
-            console.log('Updating music player volume');
-            window.musicPlayer.updateMusicVolume();
+        if (window.musicPlayer && typeof window.musicPlayer.updateMusicVolume === 'function' && !this.isUpdatingVolume) {
+            try {
+                this.isUpdatingVolume = true;
+                console.log('Updating music player volume');
+                window.musicPlayer.updateMusicVolume();
+            } finally {
+                // Reset flag after a small delay to ensure any pending callbacks complete
+                setTimeout(() => {
+                    this.isUpdatingVolume = false;
+                }, 0);
+            }
         }
         
         // Update sound pools (SFX)
