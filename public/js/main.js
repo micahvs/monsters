@@ -315,28 +315,36 @@ class Game {
             this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
             
             // Add lights to scene
+            console.log("Adding lights to scene...");
             this.addLights();
             
             // Create the arena
+            console.log("Creating arena...");
             this.createArena();
             
             // Create the truck
+            console.log("Creating truck...");
             this.createSimpleTruck();
             
             // Setup controls
+            console.log("Setting up controls...");
             this.setupControls();
             
             // Initialize HUD
+            console.log("Initializing HUD...");
             this.initHUD();
             
             // Initialize weapons
+            console.log("Initializing weapons...");
             this.initializeWeapons();
             
             // Initialize particle pools
+            console.log("Initializing particle pools...");
             this.initializeParticlePools();
             
             // Initialize multiplayer if enabled
             if (localStorage.getItem('monsterTruckMultiplayer') === 'true') {
+                console.log("Initializing multiplayer...");
                 this.initMultiplayer();
             }
             
@@ -350,9 +358,26 @@ class Game {
             // Mark as initialized
             this.isInitialized = true;
             
-            console.log('Game initialization complete');
+            console.log('Game initialization complete, removing loading screen...');
+            
+            // Remove loading screen after everything is initialized
+            this.removeLoadingScreen();
+            
+            // Start the game loop
+            console.log('Starting game loop...');
+            this.animate();
+            
         } catch (error) {
             console.error('Error during game initialization:', error);
+            // Show error on loading screen
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                const loadingText = loadingScreen.querySelector('.loading-text');
+                if (loadingText) {
+                    loadingText.textContent = 'Error loading game. Please refresh.';
+                    loadingText.style.color = '#ff0000';
+                }
+            }
             throw error;
         }
     }
@@ -5980,12 +6005,6 @@ window.addEventListener('load', () => {
         
         // Initialize the game
         window.game.init();
-        
-        // Remove loading screen after initialization
-        window.game.removeLoadingScreen();
-        
-        // Start the game loop
-        window.game.animate();
         
         console.log("Game instance created and initialized");
     } catch (error) {
