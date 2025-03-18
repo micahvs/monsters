@@ -564,9 +564,6 @@ export class SoundManager {
         this.updateAllVolumes();
         
         console.log(`Master volume set to ${this.masterVolume}`);
-        
-        // Test with a sample sound to verify volume change
-        this.playTestVolume();
     }
     
     setMusicVolume(volume) {
@@ -587,17 +584,6 @@ export class SoundManager {
         this.updateAllVolumes();
         
         console.log(`SFX volume set to ${this.sfxVolume}`);
-        
-        // Test with a sample sound to verify volume change
-        this.playTestVolume();
-    }
-    
-    // Helper to test volume changes
-    playTestVolume() {
-        if (this.soundPools.has('menu_select')) {
-            console.log('Playing test sound to verify volume settings');
-            this.playSound('menu_select');
-        }
     }
     
     setMuted(isMuted) {
