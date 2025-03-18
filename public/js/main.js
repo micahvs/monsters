@@ -1639,22 +1639,41 @@ class Game {
         // Bounce effect - reverse velocity with damping
         this.truck.velocity = -this.truck.velocity * 0.7;
         
-        // Add visual and audio feedback
-        this.showCollisionEffect(impactSpeed);
-        
-        // Add camera shake based on impact
-        this.shakeCamera(impactSpeed * 3);
+        // Add visual and audio feedback - wrap in try/catch to prevent game crashes
+        try {
+            // Add camera shake based on impact
+            this.shakeCamera(impactSpeed * 3);
+            
+            // Add visual feedback if the scene is ready
+            if (this.scene && this.truck) {
+                // Create wall collision effect with particles
+                this.createWallCollisionEffect(this.truck.position, normal);
+                
+                // Try to show collision effect, but don't crash if it fails
+                try {
+                    this.showCollisionEffect(impactSpeed);
+                } catch (collisionEffectError) {
+                    console.error('Error showing collision effect:', collisionEffectError);
+                }
+            }
+        } catch (error) {
+            console.error('Error in wall collision handling:', error);
+        }
 
         // Play collision sound with proper fallback
-        if (this.soundManager) {
-            this.soundManager.playSound('metal_impact', this.truck.position);
-        } else if (window.SoundFX) {
-            // Use fallback audio system
-            console.log("Using SoundFX for wall collision sound");
-            window.SoundFX.play('metal_impact');
-            
-            // Also play suspension/bounce sound to enhance the effect
-            window.SoundFX.play('suspension_bounce');
+        try {
+            if (this.soundManager) {
+                this.soundManager.playSound('metal_impact', this.truck.position);
+            } else if (window.SoundFX) {
+                // Use fallback audio system
+                console.log("Using SoundFX for wall collision sound");
+                window.SoundFX.play('metal_impact');
+                
+                // Also play suspension/bounce sound to enhance the effect
+                window.SoundFX.play('suspension_bounce');
+            }
+        } catch (soundError) {
+            console.error('Error playing collision sound:', soundError);
         }
     }
 
@@ -1888,6 +1907,24 @@ class Game {
 
     // Create spark particles at collision point
     createCollisionSparks() {
+        // Safe-guard against null scene or uninitalized particle system
+        if (!this.scene || !this.truck) {
+            console.warn('Cannot create collision sparks: scene or truck not initialized');
+            return;
+        }
+        
+        // Make sure particle pool is initialized
+        if (!this.particlePool) {
+            console.log('Initializing particle pool for collision sparks');
+            this.initializeParticlePool();
+            
+            // Double-check initialization worked
+            if (!this.particlePool || !this.particlePool.length) {
+                console.warn('Failed to initialize particle pool, skipping collision sparks');
+                return;
+            }
+        }
+        
         // Create the spark particle system
         const sparkCount = 15;
         
@@ -1903,7 +1940,11 @@ class Game {
             // Reuse sprite from pool if available
             const spark = this.getParticle(0xffaa33);
             
-            if (!spark) continue;
+            // Skip if we couldn't get a particle
+            if (!spark) {
+                console.warn('Could not get particle for collision spark');
+                continue;
+            }
             
             // Set initial position
             spark.position.copy(sparkPos);
@@ -1924,7 +1965,7 @@ class Game {
                 Math.cos(this.truck.rotation.y)
             );
             
-            // Store velocity and lifetime in userData
+            // Initialize userData if needed
             spark.userData = spark.userData || {};
             spark.userData.velocity = new THREE.Vector3(
                 dirX + forward.x * 0.5,
@@ -2380,79 +2421,87 @@ class Game {
     
     // Get a particle from the pool
     getParticle(color = 0xffffff) {
-        if (!this.particlePool) {
-            this.initializeParticlePool();
-        }
-        
-        // Find an available particle
-        for (let i = 0; i < this.particlePool.length; i++) {
-            const particle = this.particlePool[i];
-            if (particle && !particle.inUse) {
-                // Check if material exists
-                if (!particle.material) {
-                    console.warn('Particle without material found in pool - reinitializing particle');
-                    // Create a new material if missing
-                    particle.material = new THREE.MeshBasicMaterial({
-                        color: color,
-                        transparent: true,
-                        opacity: 0.7
-                    });
-                } else {
-                    // Set color on existing material
-                    if (particle.material.color) {
-                        particle.material.color.set(color);
-                    }
-                }
+        try {
+            // Make sure particle pool exists
+            if (!this.particlePool || !Array.isArray(this.particlePool) || this.particlePool.length === 0) {
+                console.log('Particle pool not initialized, initializing now...');
+                this.initializeParticlePool();
                 
-                particle.material.opacity = 0.7;
-                particle.visible = true;
-                particle.inUse = true;
-                particle.scale.set(1, 1, 1);
-                return particle;
+                // Double check that initialization worked
+                if (!this.particlePool || !Array.isArray(this.particlePool) || this.particlePool.length === 0) {
+                    console.error('Failed to initialize particle pool');
+                    return null;
+                }
             }
-        }
-        
-        // If all particles are in use, reuse the oldest one
-        // This is more performant than creating new ones
-        const particleIndex = this.nextParticleIndex || 0;
-        this.nextParticleIndex = (particleIndex + 1) % this.particlePoolSize;
-        
-        const particle = this.particlePool[particleIndex];
-        if (!particle) {
-            console.error('Cannot reuse particle at index', particleIndex, 'particlePool length:', this.particlePool.length);
-            // Create a new emergency particle - not ideal for performance but prevents crash
-            const emergencyParticle = new THREE.Mesh(
-                new THREE.SphereGeometry(0.1, 4, 4),
-                new THREE.MeshBasicMaterial({
+            
+            // Find an available particle
+            for (let i = 0; i < this.particlePool.length; i++) {
+                const particle = this.particlePool[i];
+                if (!particle) continue; // Skip null/undefined particles
+                
+                if (!particle.inUse) {
+                    // Check if material exists
+                    if (!particle.material) {
+                        console.warn('Particle without material found in pool - reinitializing particle');
+                        // Create a new material if missing
+                        particle.material = new THREE.MeshBasicMaterial({
+                            color: color,
+                            transparent: true,
+                            opacity: 0.7
+                        });
+                    } else {
+                        // Set color on existing material
+                        if (particle.material.color) {
+                            particle.material.color.set(color);
+                        }
+                    }
+                    
+                    particle.material.opacity = 0.7;
+                    particle.visible = true;
+                    particle.inUse = true;
+                    particle.scale.set(1, 1, 1);
+                    return particle;
+                }
+            }
+            
+            // If all particles are in use, reuse the oldest one
+            // This is more performant than creating new ones
+            const particleIndex = this.nextParticleIndex || 0;
+            this.nextParticleIndex = (particleIndex + 1) % this.particlePoolSize;
+            
+            // Make sure we have a valid index
+            if (particleIndex >= this.particlePool.length || !this.particlePool[particleIndex]) {
+                console.warn(`Invalid particle index ${particleIndex}, max: ${this.particlePool.length - 1}`);
+                return null;
+            }
+            
+            const particle = this.particlePool[particleIndex];
+            if (!particle) {
+                console.error('Cannot reuse particle at index', particleIndex, 'particlePool length:', this.particlePool.length);
+                return null;
+            }
+            
+            // Reset particle for reuse
+            if (!particle.material || !particle.material.color) {
+                particle.material = new THREE.MeshBasicMaterial({
                     color: color,
                     transparent: true,
                     opacity: 0.7
-                })
-            );
-            emergencyParticle.inUse = true;
-            emergencyParticle.visible = true;
-            this.scene.add(emergencyParticle);
-            return emergencyParticle;
+                });
+            } else {
+                particle.material.color.set(color);
+            }
+            
+            particle.material.opacity = 0.7;
+            particle.visible = true;
+            particle.inUse = true;
+            particle.scale.set(1, 1, 1);
+            
+            return particle;
+        } catch (error) {
+            console.error('Error in getParticle:', error);
+            return null;
         }
-        
-        // Set up the particle for reuse
-        if (!particle.material) {
-            // Create a new material if missing
-            particle.material = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.7
-            });
-        } else if (particle.material.color) {
-            particle.material.color.set(color);
-        }
-        
-        particle.material.opacity = 0.7;
-        particle.visible = true;
-        particle.inUse = true;
-        particle.scale.set(1, 1, 1);
-        
-        return particle;
     }
     
     // Release a particle back to the pool
