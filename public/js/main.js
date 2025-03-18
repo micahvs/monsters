@@ -397,6 +397,10 @@ class Game {
             console.log("Initializing sound manager...");
             this.soundManager = new SoundManager(this.camera);
             
+            // Expose sound manager globally for UI controls
+            window.soundManager = this.soundManager;
+            console.log("Sound manager initialized and exposed globally");
+            
             // Start with a random music track
             const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0');
             console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
@@ -5680,7 +5684,8 @@ class Game {
                 
                 // Then try an audible sound
                 const testSound = new Audio('/sounds/menu_confirm.mp3');
-                testSound.volume = 0.5;
+                testSound.volume = 0.5 * this.getVolumeMultiplier('menu_confirm');
+                testSound.currentTime = 0;
                 testSound.play().catch(() => {});
             } catch (e) {
                 console.error('Error unlocking audio:', e);
@@ -5749,6 +5754,12 @@ window.SoundFX = {
     // Pre-load all sounds
     sounds: {},
     
+    // Volume settings - these will mirror the SoundManager settings
+    masterVolume: 1.0,
+    sfxVolume: 0.7,
+    isMuted: false,
+    sfxMuted: false,
+    
     // Initialize system
     init() {
         // Define all sounds we need
@@ -5781,16 +5792,44 @@ window.SoundFX = {
             // Set volume based on sound type
             const baseVolume = 0.5;
             const volumeMultiplier = this.getVolumeMultiplier(sound);
+            const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.masterVolume * this.sfxVolume * volumeMultiplier;
             
-            this.sounds[sound].volume = baseVolume * volumeMultiplier;
-            this.sounds[sound + '_1'].volume = baseVolume * volumeMultiplier;
-            this.sounds[sound + '_2'].volume = baseVolume * volumeMultiplier;
+            this.sounds[sound].volume = baseVolume * effectiveVolume;
+            this.sounds[sound + '_1'].volume = baseVolume * effectiveVolume;
+            this.sounds[sound + '_2'].volume = baseVolume * effectiveVolume;
         });
         
         // Create the sound button
         this.createSoundButton();
         
         console.log('Simple sound system initialized with', Object.keys(this.sounds).length, 'sounds');
+        
+        // Set up methods to integrate with the audio panel
+        this.setupVolumeControls();
+    },
+    
+    // Connect with the SoundManager volume controls
+    setupVolumeControls() {
+        // Methods that will be called by the audio panel
+        this.setMasterVolume = (volume) => {
+            console.log(`SoundFX: Setting master volume to ${volume}`);
+            this.masterVolume = Math.max(0, Math.min(1, volume));
+        };
+        
+        this.setSFXVolume = (volume) => {
+            console.log(`SoundFX: Setting SFX volume to ${volume}`);
+            this.sfxVolume = Math.max(0, Math.min(1, volume));
+        };
+        
+        this.setMuted = (isMuted) => {
+            this.isMuted = isMuted;
+            console.log(`SoundFX: ${isMuted ? 'Muted' : 'Unmuted'}`);
+        };
+        
+        this.setSFXMuted = (isMuted) => {
+            this.sfxMuted = isMuted;
+            console.log(`SoundFX: SFX ${isMuted ? 'Muted' : 'Unmuted'}`);
+        };
     },
     
     // Get volume multiplier for sound types
@@ -5837,9 +5876,15 @@ window.SoundFX = {
             return;
         }
         
+        // Calculate effective volume with all factors
+        const volumeMultiplier = this.getVolumeMultiplier(name);
+        const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : 0.5 * this.masterVolume * this.sfxVolume * volumeMultiplier;
+        
         // Reset sound to beginning and ensure volume is set
         sound.currentTime = 0;
-        sound.volume = 0.5 * this.getVolumeMultiplier(name);
+        sound.volume = effectiveVolume;
+        
+        console.log(`Playing ${name} with volume=${effectiveVolume} (master=${this.masterVolume}, sfx=${this.sfxVolume}, muted=${this.isMuted}, sfxMuted=${this.sfxMuted})`);
         
         // Play the sound with error handling
         try {
@@ -5937,6 +5982,13 @@ window.addEventListener('load', () => {
         
         // Create game
         window.game = new Game();
+        
+        // Ensure sound manager is exposed globally for UI controls
+        if (window.game && window.game.soundManager) {
+            window.soundManager = window.game.soundManager;
+            console.log("Sound manager exposed globally from game instance");
+        }
+        
         console.log("Game instance created and set on window.game");
     } catch (error) {
         console.error("Error creating game instance:", error);

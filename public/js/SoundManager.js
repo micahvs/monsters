@@ -357,6 +357,7 @@ export class SoundManager {
     
     playSound(name, position = null) {
         console.log(`Attempting to play sound: ${name}`);
+        console.log(`Current volume settings - Master: ${this.masterVolume}, SFX: ${this.sfxVolume}, Muted: ${this.isMuted}, SFXMuted: ${this.sfxMuted}`);
         
         // Emergency alternative: Use regular HTML5 Audio API as fallback
         if (this.useFallbackAudio) {
@@ -406,6 +407,7 @@ export class SoundManager {
             // Apply volume with sound-specific multiplier
             const volumeMultiplier = this.getSoundVolumeMultiplier(name);
             const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume * volumeMultiplier;
+            console.log(`Setting sound volume: name=${name}, multiplier=${volumeMultiplier}, effective=${effectiveVolume}`);
             sound.setVolume(effectiveVolume);
             
             // Only try to play if we have a valid buffer
@@ -552,15 +554,20 @@ export class SoundManager {
     }
     
     setMasterVolume(volume) {
+        console.log(`Setting master volume to ${volume} (previous: ${this.masterVolume})`);
         this.masterVolume = Math.max(0, Math.min(1, volume));
         
         // Update all active sounds and pools
         this.updateAllVolumes();
         
         console.log(`Master volume set to ${this.masterVolume}`);
+        
+        // Test with a sample sound to verify volume change
+        this.playTestVolume();
     }
     
     setMusicVolume(volume) {
+        console.log(`Setting music volume to ${volume} (previous: ${this.musicVolume})`);
         this.musicVolume = Math.max(0, Math.min(1, volume));
         
         // Update music volume if playing
@@ -570,12 +577,24 @@ export class SoundManager {
     }
     
     setSFXVolume(volume) {
+        console.log(`Setting SFX volume to ${volume} (previous: ${this.sfxVolume})`);
         this.sfxVolume = Math.max(0, Math.min(1, volume));
         
         // Update all sound effects volumes
         this.updateAllVolumes();
         
         console.log(`SFX volume set to ${this.sfxVolume}`);
+        
+        // Test with a sample sound to verify volume change
+        this.playTestVolume();
+    }
+    
+    // Helper to test volume changes
+    playTestVolume() {
+        if (this.soundPools.has('menu_select')) {
+            console.log('Playing test sound to verify volume settings');
+            this.playSound('menu_select');
+        }
     }
     
     setMuted(isMuted) {
@@ -603,29 +622,53 @@ export class SoundManager {
     }
     
     updateAllVolumes() {
+        console.log(`Updating all volumes: Master=${this.masterVolume}, SFX=${this.sfxVolume}, Music=${this.musicVolume}, Muted=${this.isMuted}, SFXMuted=${this.sfxMuted}`);
+        
         // Update active sounds
+        const activeCount = this.activeSounds.size;
+        console.log(`Updating ${activeCount} active sounds`);
         for (const [soundId, sound] of this.activeSounds.entries()) {
+            console.log(`Updating active sound: ${soundId}, isSFX=${sound.isSFX || false}`);
             this.updateSoundVolume(sound);
         }
         
         // Also update the central music player if available
         if (window.musicPlayer && typeof window.musicPlayer.updateMusicVolume === 'function') {
+            console.log('Updating music player volume');
             window.musicPlayer.updateMusicVolume();
         }
         
         // Update sound pools (SFX)
         const effectiveSfxVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume;
-        for (const pool of this.soundPools.values()) {
+        console.log(`Effective SFX volume for pools: ${effectiveSfxVolume}`);
+        
+        let poolCount = 0;
+        let soundCount = 0;
+        for (const [poolName, pool] of this.soundPools.entries()) {
+            poolCount++;
+            console.log(`Updating pool: ${poolName} with ${pool.length} sounds`);
             for (const sound of pool) {
+                soundCount++;
+                if (sound.isPlaying) {
+                    console.log(`- Sound in pool ${poolName} is playing, setting volume to ${effectiveSfxVolume}`);
+                }
                 sound.setVolume(effectiveSfxVolume);
             }
         }
+        console.log(`Updated ${soundCount} sounds in ${poolCount} pools with volume ${effectiveSfxVolume}`);
         
         // Update music tracks
         const effectiveMusicVolume = this.isMuted ? 0 : this.musicVolume * this.masterVolume;
-        for (const music of this.musicTracks.values()) {
+        console.log(`Effective music volume: ${effectiveMusicVolume}`);
+        let musicCount = 0;
+        for (const [trackName, music] of this.musicTracks.entries()) {
+            musicCount++;
+            if (music.isPlaying) {
+                console.log(`- Music track ${trackName} is playing, setting volume to ${effectiveMusicVolume}`);
+            }
             music.setVolume(effectiveMusicVolume);
         }
+        console.log(`Updated ${musicCount} music tracks with volume ${effectiveMusicVolume}`);
     }
     
     updateSoundVolume(sound) {

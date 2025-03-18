@@ -87,9 +87,17 @@ class MusicPlayer {
             this.masterVolumeSlider.addEventListener('input', () => {
                 this.masterVolume = parseInt(this.masterVolumeSlider.value) / 100;
                 this.updateMusicVolume();
+                
+                // Update SoundManager
                 if (window.soundManager) {
                     window.soundManager.setMasterVolume(this.masterVolume);
                 }
+                
+                // Also update SoundFX system
+                if (window.SoundFX && typeof window.SoundFX.setMasterVolume === 'function') {
+                    window.SoundFX.setMasterVolume(this.masterVolume);
+                }
+                
                 this.saveSettings();
                 this.updateMasterMuteButtonIcon();
             });
@@ -340,6 +348,11 @@ class MusicPlayer {
         // Update SFX volume via SoundManager
         if (window.soundManager) {
             window.soundManager.setMuted(this.isMasterMuted);
+        }
+        
+        // Also update SoundFX system
+        if (window.SoundFX && typeof window.SoundFX.setMuted === 'function') {
+            window.SoundFX.setMuted(this.isMasterMuted);
         }
         
         this.updateMasterMuteButtonIcon();

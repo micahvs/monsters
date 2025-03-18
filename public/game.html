@@ -1193,6 +1193,11 @@
                         window.soundManager.setSFXVolume(volume);
                     }
                     
+                    // Also apply to SoundFX system
+                    if (window.SoundFX && typeof window.SoundFX.setSFXVolume === 'function') {
+                        window.SoundFX.setSFXVolume(volume);
+                    }
+                    
                     // Save to settings
                     const settings = JSON.parse(localStorage.getItem('monsterTruckAudioSettings')) || {};
                     settings.sfxVolume = volume;
@@ -1214,6 +1219,11 @@
                     // Apply to SoundManager
                     if (window.soundManager) {
                         window.soundManager.setSFXMuted(isMuted);
+                    }
+                    
+                    // Also apply to SoundFX system
+                    if (window.SoundFX && typeof window.SoundFX.setSFXMuted === 'function') {
+                        window.SoundFX.setSFXMuted(isMuted);
                     }
                     
                     // Update button appearance
