@@ -1645,9 +1645,16 @@ class Game {
         // Add camera shake based on impact
         this.shakeCamera(impactSpeed * 3);
 
-        // Play collision sound with null check
+        // Play collision sound with proper fallback
         if (this.soundManager) {
             this.soundManager.playSound('metal_impact', this.truck.position);
+        } else if (window.SoundFX) {
+            // Use fallback audio system
+            console.log("Using SoundFX for wall collision sound");
+            window.SoundFX.play('metal_impact');
+            
+            // Also play suspension/bounce sound to enhance the effect
+            window.SoundFX.play('suspension_bounce');
         }
     }
 
