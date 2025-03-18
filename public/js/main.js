@@ -5869,6 +5869,32 @@ class Game {
             window.SoundFX.play('weapon_fire');
         }
     }
+
+    // Handle projectile hit from a remote player
+    handleRemoteProjectileHit(sourcePlayerId, damage) {
+        console.log(`GOT HIT by player ${sourcePlayerId} for ${damage} damage`);
+        
+        // Visual feedback only - actual damage will come from server
+        this.addDamageScreenEffect(damage);
+        
+        // Play hit sound
+        if (this.soundManager) {
+            this.soundManager.playSound('vehicle_hit', this.truck.position);
+        } else if (window.SoundFX) {
+            window.SoundFX.play('vehicle_hit');
+        }
+        
+        // Create hit effect
+        const impactPoint = new THREE.Vector3(
+            this.truck.position.x,
+            this.truck.position.y + 1,
+            this.truck.position.z
+        );
+        this.createProjectileImpactOnVehicle(impactPoint);
+        
+        // Shake camera based on damage
+        this.shakeCamera(damage * 0.1);
+    }
 }
 
 // Initialize game when window is fully loaded
