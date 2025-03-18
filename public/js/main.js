@@ -419,11 +419,11 @@ class Game {
                 return;
             }
             
-            const arenaSize = 1600; // 16x larger than original (4x larger than current)
+            const arenaSize = 400; // Reduced from 1600 to 400 for better performance
             console.log("Creating arena with size:", arenaSize);
             
-            // Add grid floor - increased spacing for better performance with larger arena
-            const gridHelper = new THREE.GridHelper(arenaSize, arenaSize / 16, 0xff00ff, 0x00ffff);
+            // Add grid floor - increased spacing for better performance
+            const gridHelper = new THREE.GridHelper(arenaSize, arenaSize / 8, 0xff00ff, 0x00ffff);
             this.scene.add(gridHelper);
             
             // Add ground plane
@@ -436,92 +436,29 @@ class Game {
             ground.rotation.x = -Math.PI / 2;
             this.scene.add(ground);
             
-            // Create boundary walls - DIRECT APPROACH
+            // Create boundary walls - SIMPLIFIED APPROACH
             try {
                 this.createSimpleWalls(arenaSize);
             } catch (wallsError) {
                 console.error("Error creating walls:", wallsError);
-                // Continue with arena creation even if walls fail
             }
             
-            // Add distance markers for scale reference
-            try {
-                this.addDistanceMarkers(arenaSize);
-            } catch (markersError) {
-                console.error("Error adding distance markers:", markersError);
-                // Continue with arena creation even if markers fail
-            }
-            
-            console.log("Mega-sized arena created");
+            console.log("Arena created successfully");
         } catch (error) {
             console.error("Error creating arena:", error);
         }
     }
-    
-    // Add distance markers to help players get a sense of scale in the larger arena
-    addDistanceMarkers(arenaSize) {
-        const markerMaterial = new THREE.MeshPhongMaterial({
-            color: 0xffff00,
-            emissive: 0xffff00,
-            emissiveIntensity: 0.3
-        });
-        
-        // Create markers at various distances from center
-        const distances = [100, 200, 400, 600];
-        const directions = [
-            { x: 1, z: 0 },  // East
-            { x: 0, z: 1 },  // North
-            { x: -1, z: 0 }, // West
-            { x: 0, z: -1 }  // South
-        ];
-        
-        distances.forEach(distance => {
-            directions.forEach(dir => {
-                // Create marker post
-                const markerGeometry = new THREE.BoxGeometry(5, 15, 5);
-                const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-                
-                // Position marker
-                marker.position.set(
-                    dir.x * distance,
-                    7.5, // Half the height
-                    dir.z * distance
-                );
-                
-                this.scene.add(marker);
-                
-                // Add a point light to make the marker more visible
-                const markerLight = new THREE.PointLight(0xffff00, 0.5, 50);
-                markerLight.position.set(
-                    dir.x * distance,
-                    15,
-                    dir.z * distance
-                );
-                this.scene.add(markerLight);
-            });
-        });
-    }
-    
-    // Enhanced wall creation for the larger arena
+
     createSimpleWalls(arenaSize) {
         try {
-            console.log("Creating walls for mega arena");
+            console.log("Creating walls for arena");
             const halfSize = arenaSize / 2;
+            const wallHeight = 20; // Reduced wall height
             
-            // Create more impressive walls with details
-            const wallHeight = 30; // Taller walls for the larger arena
-            
-            // Base wall material with glow effect
+            // Base wall material
             const wallMaterial = new THREE.MeshPhongMaterial({ 
                 color: 0xff00ff,
                 emissive: 0x330033,
-                shininess: 70
-            });
-            
-            // Alternate material for visual variety
-            const altWallMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x00ffff,
-                emissive: 0x003333,
                 shininess: 70
             });
             
@@ -557,51 +494,16 @@ class Game {
                 }
             ];
             
-            // Create walls with details
+            // Create basic walls without decorative elements
             walls.forEach(wallData => {
                 const wall = new THREE.Mesh(wallData.geometry, wallData.material);
                 wall.position.set(...wallData.position);
-                wall.name = wallData.name; // Set the name property so we can filter out walls later
+                wall.name = wallData.name;
                 this.scene.add(wall);
                 console.log(`${wallData.name} added at`, wall.position);
-                
-                // Add decorative elements along wall at intervals
-                const segmentCount = 20; // Number of segments along each wall
-                const segmentSize = arenaSize / segmentCount;
-                
-                // Add pillars along the wall
-                for (let i = 0; i < segmentCount; i++) {
-                    // Skip some pillars for variety
-                    if (i % 3 === 0) continue;
-                    
-                    // Calculate position along the wall
-                    let pillarX, pillarZ;
-                    if (wallData.name.includes("North") || wallData.name.includes("South")) {
-                        pillarX = -halfSize + (i * segmentSize) + segmentSize/2;
-                        pillarZ = wallData.position[2];
-                    } else {
-                        pillarX = wallData.position[0];
-                        pillarZ = -halfSize + (i * segmentSize) + segmentSize/2;
-                    }
-                    
-                    // Create pillar
-                    const pillar = new THREE.Mesh(
-                        new THREE.BoxGeometry(10, wallHeight + 10, 10),
-                        i % 2 === 0 ? wallMaterial : altWallMaterial
-                    );
-                    pillar.position.set(pillarX, (wallHeight + 10)/2, pillarZ);
-                    this.scene.add(pillar);
-                    
-                    // Add light on top of some pillars
-                    if (i % 4 === 0) {
-                        const light = new THREE.PointLight(0xff00ff, 1, 100);
-                        light.position.set(pillarX, wallHeight + 15, pillarZ);
-                        this.scene.add(light);
-                    }
-                }
             });
             
-            // Create impressive corner towers
+            // Add simple corner towers
             const cornerMaterial = new THREE.MeshPhongMaterial({ 
                 color: 0x00ffff,
                 emissive: 0x003333,
@@ -616,31 +518,21 @@ class Game {
             ];
             
             cornerPositions.forEach((pos, index) => {
-                // Base tower
+                // Simple corner tower
                 const cornerTower = new THREE.Mesh(
-                    new THREE.BoxGeometry(30, wallHeight * 2, 30),
+                    new THREE.BoxGeometry(20, wallHeight * 1.5, 20),
                     cornerMaterial
                 );
-                cornerTower.position.set(pos[0], wallHeight, pos[2]);
+                cornerTower.position.set(pos[0], wallHeight * 0.75, pos[2]);
                 this.scene.add(cornerTower);
                 
-                // Tower top
-                const towerTop = new THREE.Mesh(
-                    new THREE.ConeGeometry(20, 30, 4),
-                    cornerMaterial
-                );
-                towerTop.position.set(pos[0], wallHeight * 2 + 15, pos[2]);
-                this.scene.add(towerTop);
-                
                 // Tower light
-                const towerLight = new THREE.PointLight(0x00ffff, 2, 200);
-                towerLight.position.set(pos[0], wallHeight * 2 + 30, pos[2]);
+                const towerLight = new THREE.PointLight(0x00ffff, 1, 100);
+                towerLight.position.set(pos[0], wallHeight * 1.5 + 5, pos[2]);
                 this.scene.add(towerLight);
-                
-                console.log(`Corner tower ${index} added at`, cornerTower.position);
             });
             
-            console.log("Enhanced walls and towers created");
+            console.log("Walls and towers created");
         } catch (error) {
             console.error("Error creating walls:", error);
         }
