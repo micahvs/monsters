@@ -314,122 +314,46 @@ class Game {
             console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
             this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
             
-            // Always show the sound enable button to make it easy to unlock sounds
-            setTimeout(() => {
-                this.showSoundEnableButton();
-            }, 1000);
-            
-            // Add audio context resume handler for browsers that require user interaction
-            document.addEventListener('click', () => {
-                if (this.soundManager && this.soundManager.listener && this.soundManager.listener.context && 
-                    this.soundManager.listener.context.state === 'suspended') {
-                    console.log("Resuming audio context after user interaction");
-                    this.soundManager.listener.context.resume();
-                }
-                
-                // Play a silent sound to unlock audio on iOS/Safari
-                try {
-                    const silentSound = new Audio();
-                    silentSound.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD/+7DEAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAAAABQZXJmZWN0AAAAAAAAAAAAAAAAAAAAAAA=';
-                    silentSound.play().catch(() => {});
-                    silentSound.volume = 0;
-                } catch (e) {}
-                
-                // Create "Enable Sound" button after a slight delay if needed
-                setTimeout(() => {
-                    // Test audio by trying to play a simple sound
-                    const testAudio = new Audio('/sounds/menu_select.mp3');
-                    const testPromise = testAudio.play();
-                    if (testPromise) {
-                        testPromise.catch(() => {
-                            // If test failed, show the button
-                            this.showSoundEnableButton();
-                        });
-                    }
-                }, 1000);
-            }, { once: true });
-            
-            // Add lights
+            // Add lights to scene
             this.addLights();
             
-            // Create arena and stadium
+            // Create the arena
             this.createArena();
-            this.createStadium();
             
-            // Initialize game components
+            // Create the truck
             this.createSimpleTruck();
+            
+            // Setup controls
             this.setupControls();
+            
+            // Initialize HUD
             this.initHUD();
             
-            // Initialize game systems
+            // Initialize weapons
             this.initializeWeapons();
+            
+            // Initialize particle pools
             this.initializeParticlePools();
             
-            // Initialize general particle pool
-            console.log("Initializing general particle pool...");
-            this.particlePool = [];
-            this.particlePoolSize = 100;
-            
-            for (let i = 0; i < this.particlePoolSize; i++) {
-                try {
-                    const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-                    const particleMaterial = new THREE.MeshPhongMaterial({
-                        color: 0xffffff,
-                        emissive: 0xffffff,
-                        emissiveIntensity: 0.5,
-                        transparent: true,
-                        opacity: 0
-                    });
-                    
-                    const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                    particle.visible = false;
-                    particle.scale.set(1, 1, 1);
-                    this.scene.add(particle);
-                    
-                    this.particlePool.push({
-                        mesh: particle,
-                        inUse: false
-                    });
-                } catch (error) {
-                    console.error(`Error creating particle ${i}:`, error);
-                    // Continue loop to create as many valid particles as possible
-                }
+            // Initialize multiplayer if enabled
+            if (localStorage.getItem('monsterTruckMultiplayer') === 'true') {
+                this.initMultiplayer();
             }
             
-            // Initialize next particle index
-            this.nextParticleIndex = 0;
+            // Set up window resize handler
+            window.addEventListener('resize', () => {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            });
             
-            console.log(`Created particle pool with ${this.particlePool.length} particles`);
-            
-            
-            // Initialize multiplayer
-            this.initMultiplayer();
-            
-            // Create turrets
-            this.createTurrets();
-            
-            // Set initial camera position
-            this.camera.position.set(0, 5, -10);
-            
-            // Start animation loop
+            // Mark as initialized
             this.isInitialized = true;
-            this.animate();
             
-            // Remove loading screen after everything is initialized
-            console.log("Game initialization complete, removing loading screen");
-            this.removeLoadingScreen();
-            
+            console.log('Game initialization complete');
         } catch (error) {
-            console.error("Error during initialization:", error);
-            // Show error on loading screen instead of removing it
-            const loadingScreen = document.getElementById('loadingScreen');
-            if (loadingScreen) {
-                const loadingText = loadingScreen.querySelector('.loading-text');
-                if (loadingText) {
-                    loadingText.textContent = 'Error loading game. Please refresh.';
-                    loadingText.style.color = '#ff0000';
-                }
-            }
+            console.error('Error during game initialization:', error);
+            throw error;
         }
     }
     
@@ -6048,240 +5972,25 @@ class Game {
 }
 
 // Initialize game when window is fully loaded
-// GUARANTEED SOUND SYSTEM - completely separate from game audio
-window.SoundFX = {
-    // Pre-load all sounds
-    sounds: {},
-    
-    // Volume settings - these will mirror the SoundManager settings
-    masterVolume: 1.0,
-    sfxVolume: 0.7,
-    isMuted: false,
-    sfxMuted: false,
-    
-    // Initialize system
-    init() {
-        // Define all sounds we need
-        const soundFiles = [
-            'weapon_fire', 
-            'vehicle_explosion', 
-            'shield_hit',
-            'metal_impact',
-            'powerup_pickup',
-            'menu_select',
-            'menu_confirm',
-            // Add vehicle sounds
-            'engine_idle',
-            'engine_rev',
-            'engine_deceleration',
-            'tire_screech',
-            'tire_dirt',
-            'suspension_bounce'
-        ];
-        
-        // Pre-load each sound
-        soundFiles.forEach(sound => {
-            console.log(`Preloading sound: ${sound}`);
-            this.sounds[sound] = new Audio(`/sounds/${sound}.mp3`);
-            
-            // Clone several instances for overlapping sounds
-            this.sounds[sound + '_1'] = new Audio(`/sounds/${sound}.mp3`);
-            this.sounds[sound + '_2'] = new Audio(`/sounds/${sound}.mp3`);
-            
-            // Set volume based on sound type
-            const baseVolume = 0.5;
-            const volumeMultiplier = this.getVolumeMultiplier(sound);
-            const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.masterVolume * this.sfxVolume * volumeMultiplier;
-            
-            this.sounds[sound].volume = baseVolume * effectiveVolume;
-            this.sounds[sound + '_1'].volume = baseVolume * effectiveVolume;
-            this.sounds[sound + '_2'].volume = baseVolume * effectiveVolume;
-        });
-        
-        // Auto-enable sounds immediately
-        this.autoEnableSounds();
-        
-        console.log('Simple sound system initialized with', Object.keys(this.sounds).length, 'sounds');
-        
-        // Set up methods to integrate with the audio panel
-        this.setupVolumeControls();
-    },
-    
-    // Auto-enable sounds during initialization
-    autoEnableSounds() {
-        // Immediately unlock all sounds
-        Object.values(this.sounds).forEach(sound => {
-            sound.currentTime = 0;
-            sound.volume = 0;
-            const promise = sound.play();
-            if (promise) promise.catch(() => {});
-            setTimeout(() => { try { sound.pause(); } catch(e) {} }, 50);
-        });
-        
-        // Verify with a test sound
-        try {
-            const testSound = this.sounds['menu_confirm'];
-            if (testSound) {
-                testSound.volume = 0.5 * this.getVolumeMultiplier('menu_confirm');
-                testSound.currentTime = 0;
-                testSound.play().catch(() => {});
-            }
-        } catch(e) {
-            console.warn('Could not play test sound:', e);
-        }
-        
-        console.log('%c 🔊 SOUND SYSTEM READY - ALL SOUNDS ENABLED BY DEFAULT 🔊', 
-            'background: #00ff00; color: #000000; font-size: 16px; padding: 10px; font-weight: bold;');
-    },
-    
-    // Connect with the SoundManager volume controls
-    setupVolumeControls() {
-        // Methods that will be called by the audio panel
-        this.setMasterVolume = (volume) => {
-            console.log(`SoundFX: Setting master volume to ${volume}`);
-            this.masterVolume = Math.max(0, Math.min(1, volume));
-            this.updateAllSoundVolumes();
-        };
-        
-        this.setSFXVolume = (volume) => {
-            console.log(`SoundFX: Setting SFX volume to ${volume}`);
-            this.sfxVolume = Math.max(0, Math.min(1, volume));
-            this.updateAllSoundVolumes();
-        };
-        
-        this.setMuted = (isMuted) => {
-            this.isMuted = isMuted;
-            console.log(`SoundFX: ${isMuted ? 'Muted' : 'Unmuted'}`);
-            this.updateAllSoundVolumes();
-        };
-        
-        this.setSFXMuted = (isMuted) => {
-            this.sfxMuted = isMuted;
-            console.log(`SoundFX: SFX ${isMuted ? 'Muted' : 'Unmuted'}`);
-            this.updateAllSoundVolumes();
-        };
-        
-        // Helper method to update all sound volumes
-        this.updateAllSoundVolumes = () => {
-            console.log(`SoundFX: Updating all sound volumes (master=${this.masterVolume}, sfx=${this.sfxVolume}, muted=${this.isMuted}, sfxMuted=${this.sfxMuted})`);
-            
-            // Update volume for all loaded sounds
-            for (const [name, sound] of Object.entries(this.sounds)) {
-                // Skip entries that aren't Audio objects
-                if (!(sound instanceof Audio)) continue;
-                
-                // Determine the base name (remove _1, _2 suffixes)
-                const baseName = name.replace(/_[0-9]$/, '');
-                
-                // Calculate effective volume with all factors
-                const volumeMultiplier = this.getVolumeMultiplier(baseName);
-                const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : 0.5 * this.masterVolume * this.sfxVolume * volumeMultiplier;
-                
-                // Set the new volume
-                sound.volume = effectiveVolume;
-            }
-        };
-    },
-    
-    // Get volume multiplier for sound types
-    getVolumeMultiplier(sound) {
-        // Vehicle sounds have reduced volume
-        const vehicleSounds = [
-            'engine_rev', 
-            'engine_deceleration', 
-            'tire_screech', 
-            'tire_dirt', 
-            'suspension_bounce'
-        ];
-        
-        // Reduce idle sound by an additional 10% (total 20% reduction)
-        if (sound === 'engine_idle') {
-            return 0.8; // 20% reduction
-        } else if (vehicleSounds.includes(sound)) {
-            return 0.9; // 10% reduction
-        }
-        
-        return 1.0; // Default volume
-    },
-    
-    // Play a sound effect
-    play(name) {
-        console.log(`SoundFX playing: ${name}`);
-        
-        // Find which instance to use
-        let sound;
-        if (this.sounds[name] && !this.sounds[name].playing) {
-            sound = this.sounds[name];
-        } else if (this.sounds[name + '_1'] && !this.sounds[name + '_1'].playing) {
-            sound = this.sounds[name + '_1'];
-        } else if (this.sounds[name + '_2'] && !this.sounds[name + '_2'].playing) {
-            sound = this.sounds[name + '_2'];
-        } else {
-            // If all are busy, use the main one anyway
-            sound = this.sounds[name] || new Audio(`/sounds/${name}.mp3`);
-        }
-        
-        // Make sure we have a sound
-        if (!sound) {
-            console.error(`Sound not found: ${name}`);
-            return;
-        }
-        
-        // Calculate effective volume with all factors
-        const volumeMultiplier = this.getVolumeMultiplier(name);
-        const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : 0.5 * this.masterVolume * this.sfxVolume * volumeMultiplier;
-        
-        // Reset sound to beginning and ensure volume is set
-        sound.currentTime = 0;
-        sound.volume = effectiveVolume;
-        
-        console.log(`Playing ${name} with volume=${effectiveVolume} (master=${this.masterVolume}, sfx=${this.sfxVolume}, muted=${this.isMuted}, sfxMuted=${this.sfxMuted})`);
-        
-        // Play the sound with error handling
-        try {
-            const promise = sound.play();
-            
-            // Track if it's playing
-            sound.playing = true;
-            
-            // Mark as available when done
-            sound.onended = () => { 
-                sound.playing = false;
-            };
-            
-            // Handle promise error
-            if (promise) {
-                promise.catch(error => {
-                    console.error(`Error playing ${name}:`, error);
-                    sound.playing = false;
-                });
-            }
-        } catch(error) {
-            console.error(`Error playing ${name}:`, error);
-            sound.playing = false;
-        }
-    }
-};
-
 window.addEventListener('load', () => {
     console.log("Window loaded, creating game");
     try {
-        // Initialize sound system
-        window.SoundFX.init();
-        
         // Create game
         window.game = new Game();
         
-        // Ensure sound manager is exposed globally for UI controls
-        if (window.game && window.game.soundManager) {
-            window.soundManager = window.game.soundManager;
-            console.log("Sound manager exposed globally from game instance");
-        }
+        // Initialize the game
+        window.game.init();
         
-        console.log("Game instance created and set on window.game");
+        // Remove loading screen after initialization
+        window.game.removeLoadingScreen();
+        
+        // Start the game loop
+        window.game.animate();
+        
+        console.log("Game instance created and initialized");
     } catch (error) {
         console.error("Error creating game instance:", error);
     }
 });
 
-export default Game;
+export { Game };
