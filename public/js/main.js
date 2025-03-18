@@ -295,24 +295,12 @@ class Game {
                 console.log('Debug mode enabled');
             }
             
-            // Setup three.js renderer
+            // Setup three.js renderer first
+            console.log("Setting up WebGL renderer...");
             this.renderer = new THREE.WebGLRenderer({ antialias: true });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(this.renderer.domElement);
-            
-            // Initialize sound manager early
-            console.log("Initializing sound manager...");
-            this.soundManager = new SoundManager(this.camera);
-            
-            // Expose sound manager globally for UI controls
-            window.soundManager = this.soundManager;
-            console.log("Sound manager initialized and exposed globally");
-            
-            // Start with a random music track
-            const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0');
-            console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
-            this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
             
             // Add lights to scene
             console.log("Adding lights to scene...");
@@ -341,6 +329,19 @@ class Game {
             // Initialize particle pools
             console.log("Initializing particle pools...");
             this.initializeParticlePools();
+            
+            // Initialize sound manager after WebGL context is set up
+            console.log("Initializing sound manager...");
+            this.soundManager = new SoundManager(this.camera);
+            
+            // Expose sound manager globally for UI controls
+            window.soundManager = this.soundManager;
+            console.log("Sound manager initialized and exposed globally");
+            
+            // Start with a random music track
+            const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0');
+            console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
+            this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
             
             // Initialize multiplayer if enabled
             if (localStorage.getItem('monsterTruckMultiplayer') === 'true') {
