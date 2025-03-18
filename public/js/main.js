@@ -1679,6 +1679,9 @@ class Game {
 
     // Take damage method
     takeDamage(amount) {
+        // Add clear logging to debug damage
+        console.log(`TAKING DAMAGE: ${amount}, current health: ${this.health}`);
+        
         // Check if invincible
         if (this.truck && this.truck.isInvincible) {
             console.log("Damage blocked by invincibility");
@@ -1694,82 +1697,39 @@ class Game {
             this.hasShield = false;
             this.removeShieldEffect();
             
-            // Remove from active powerups
-            if (this.activePowerups.has('SHIELD')) {
-                clearTimeout(this.activePowerups.get('SHIELD').timeoutId);
-                this.activePowerups.delete('SHIELD');
-                this.updatePowerupIndicators();
-            }
-            
-            // Play hit sound with our guaranteed sound system
-            if (window.SoundFX) {
-                window.SoundFX.play('vehicle_hit');
-                
-                if (this.hasShield) {
-                    window.SoundFX.play('shield_hit');
-                }
-            }
-            
+            // Don't reduce health
             return 0;
         }
         
-        // Use the provided damage amount directly for better balance
-        // Minor minimum to ensure feedback but not too harsh
-        const minDamage = 5;
-        const appliedAmount = Math.max(amount, minDamage);
-        let actualDamage = 0;
+        // Ensure damage is a positive number
+        amount = Math.max(0, amount);
         
-        // If we have a MonsterTruck instance, use its damage method
-        if (this.monsterTruck) {
-            // Respect the damage cooldown for more balanced gameplay
-            if (this.monsterTruck.damageTimeout <= 0) {
-                // Apply damage through MonsterTruck
-                actualDamage = this.monsterTruck.takeDamage(appliedAmount);
-                
-                // Sync health with monster truck
-                this.health = this.monsterTruck.health;
-                
-                // Add screen flash effect for significant damage
-                if (actualDamage > 8) {
-                    this.addDamageScreenEffect(actualDamage);
-                }
-                
-                console.log(`Damage: ${actualDamage} points. Health: ${this.health}`);
-                
-                // Add subtle camera shake based on impact
-                this.shakeCamera(actualDamage / 6);
-            } else {
-                // Still showing hit but not applying damage during cooldown
-                console.log("Hit during damage cooldown - reduced effect");
-            }
-        } else {
-            // Legacy fallback behavior
-            this.health = Math.max(0, this.health - appliedAmount);
-            actualDamage = appliedAmount;
-            console.log(`Damage: ${appliedAmount} points. Health: ${this.health}`);
+        // Health is directly on the game object
+        if (typeof this.health !== 'undefined') {
+            this.health -= amount;
+            this.health = Math.max(0, this.health);
             
-            // Add screen effect for significant damage
-            if (appliedAmount > 8) {
-                this.addDamageScreenEffect(appliedAmount);
+            // Also update MonsterTruck health if it exists
+            if (this.monsterTruck) {
+                this.monsterTruck.health = this.health;
+                this.monsterTruck.showDamageEffect();
             }
             
-            // Add subtle camera shake
-            this.shakeCamera(appliedAmount / 6);
+            // Update HUD
+            this.updateHUD();
+            
+            console.log(`Health reduced to ${this.health}`);
+            
+            // Check for game over
+            if (this.health <= 0) {
+                console.log("Player died from damage");
+                this.gameOver();
+            }
+            
+            return amount;
         }
         
-        // Update HUD
-        const healthDisplay = document.getElementById('health');
-        if (healthDisplay) {
-            healthDisplay.textContent = `HEALTH: ${this.health}`;
-        }
-        
-        // Check for game over
-        if (this.health <= 0) {
-            console.log("GAME OVER! Health reached zero.");
-            this.gameOver();
-        }
-        
-        return actualDamage;
+        return 0;
     }
     
     // Show shield hit effect
@@ -2584,24 +2544,40 @@ class Game {
                     }
                     
                     // Check for collision with player - only for non-player projectiles or projectiles from other players
-                    if (this.truck && (projectile.source !== 'player' || 
-                                      (projectile.source === 'remote' || 
-                                      (projectile.playerId && projectile.playerId !== this.multiplayer?.localPlayerId)))) {
+                    if (this.truck && (projectile.source === 'turret' || projectile.source === 'remote' || 
+                        (projectile.source === 'player' && projectile.playerId && projectile.playerId !== this.multiplayer?.localPlayerId))) {
                         
-                        // Skip collision detection against self if this is the local player's projectile
-                        if (projectile.source === 'player' && 
-                            projectile.playerId === this.multiplayer?.localPlayerId) {
-                            // Skip to next iteration if this is our own projectile
-                            continue;
-                        }
+                        // Now check the actual collision with expanded hitbox for better hit detection
+                        const playerX = this.truck.position.x;
+                        const playerY = this.truck.position.y + 1.0; // Account for truck height
+                        const playerZ = this.truck.position.z;
                         
-                        const distance = projectile.mesh.position.distanceTo(this.truck.position);
-                        if (distance < 3) { // Player hitbox
+                        // Get a more generous hitbox for players
+                        const playerBounds = {
+                            minX: playerX - 2.0,
+                            maxX: playerX + 2.0,
+                            minY: playerY - 1.0,
+                            maxY: playerY + 2.0,
+                            minZ: playerZ - 3.0,
+                            maxZ: playerZ + 3.0
+                        };
+                        
+                        // True if projectile is within the hitbox
+                        const isHit = (
+                            projectile.mesh.position.x >= playerBounds.minX &&
+                            projectile.mesh.position.x <= playerBounds.maxX &&
+                            projectile.mesh.position.y >= playerBounds.minY &&
+                            projectile.mesh.position.y <= playerBounds.maxY &&
+                            projectile.mesh.position.z >= playerBounds.minZ &&
+                            projectile.mesh.position.z <= playerBounds.maxZ
+                        );
+                        
+                        if (isHit) {
                             // Apply damage to player
                             if (typeof this.takeDamage === 'function') {
-                                console.log(`Player hit by ${projectile.source} projectile from ${projectile.playerId || 'unknown'} for ${projectile.damage} damage`);
+                                console.log(`DIRECT HIT: Player hit by ${projectile.source} projectile from ${projectile.playerId || 'unknown'} for ${projectile.damage} damage`);
                                 
-                                // Take damage
+                                // IMMEDIATELY take damage - most reliable method
                                 this.takeDamage(projectile.damage);
                                 
                                 // Play hit sound

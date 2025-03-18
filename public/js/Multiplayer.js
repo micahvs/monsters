@@ -702,49 +702,54 @@ export default class Multiplayer {
         
         // Use the game's existing projectile system
         if (this.game.projectiles) {
-            const projectileGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.8, 8);
-            projectileGeometry.rotateX(Math.PI / 2); // Rotate to point forward
+            // Use a bigger, more visible projectile for better testing
+            const projectileGeometry = new THREE.SphereGeometry(0.3, 8, 8);
             
+            // Use player color or default to bright color for visibility
             const playerColor = this.players.get(projectileData.playerId)?.color || '#ff0000';
             const color = new THREE.Color(playerColor);
             
+            // Make projectile slightly emissive for better visibility
             const projectileMaterial = new THREE.MeshPhongMaterial({
                 color: color,
                 emissive: color,
-                emissiveIntensity: 1,
+                emissiveIntensity: 1.0,
                 shininess: 30
             });
             
-            const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            projectile.position.copy(position);
+            const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
+            projectileMesh.position.copy(position);
             
             // Set rotation to match direction
-            projectile.lookAt(position.clone().add(direction));
+            projectileMesh.lookAt(position.clone().add(direction));
             
             // Add to scene
-            this.game.scene.add(projectile);
+            this.game.scene.add(projectileMesh);
             
-            // Add light to projectile
-            const projectileLight = new THREE.PointLight(color, 0.7, 3);
-            projectile.add(projectileLight);
+            // Add light to projectile for better visibility
+            const projectileLight = new THREE.PointLight(color, 1.0, 3);
+            projectileMesh.add(projectileLight);
             
-            // Add to game's projectiles array - IMPORTANT: Set correct source for proper collision detection
-            this.game.projectiles.push({
-                mesh: projectile,
+            // CRITICAL FIX: Add to game's projectiles array with correct source and playerId
+            const remoteProjectile = {
+                mesh: projectileMesh,
                 direction: direction,
                 speed: projectileData.speed || 2.0,
                 damage: projectileData.damage || 20,
                 lifetime: 90,
-                source: 'remote', // Always mark as 'remote' for remote players' projectiles
-                playerId: projectileData.playerId // Store original player ID for damage attribution
-            });
+                source: 'remote',  // Always use 'remote' for remote players' projectiles
+                playerId: projectileData.playerId  // Store the original player ID
+            };
+            
+            // Add to the game's projectiles array
+            this.game.projectiles.push(remoteProjectile);
             
             // Create muzzle flash effect
             if (this.game.createMuzzleFlash) {
                 this.game.createMuzzleFlash(position, direction);
             }
             
-            console.log(`Created remote projectile from player ${projectileData.playerId} with source 'remote'`);
+            console.log(`Created remote projectile from player ${projectileData.playerId} with source='remote'`);
         }
     }
     
