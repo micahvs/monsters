@@ -175,8 +175,8 @@ class Game {
         console.log("Game constructor called");
         
         // Basic initialization
-        this.scene = null;
-        this.camera = null;
+        this.scene = new THREE.Scene(); // Initialize scene immediately
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
         this.renderer = null;
         this.truck = null;
         this.multiplayer = null; // Add multiplayer manager
@@ -184,6 +184,90 @@ class Game {
         this.debugMode = true; // Enable debug mode
         this.isGameOver = false;
         this.frameCount = 0; // For timing various events
+        
+        // Initialize keyboard controls object
+        this.keys = {
+            'ArrowUp': false,
+            'ArrowDown': false,
+            'ArrowLeft': false,
+            'ArrowRight': false,
+            ' ': false, // Space
+            'q': false,
+            'Q': false,
+            'e': false,
+            'E': false,
+            'r': false,
+            'R': false,
+            'M': false,
+            'm': false,
+            'd': false,
+            '1': false,
+            '2': false,
+            '3': false,
+            '4': false
+        };
+        
+        // Initialize turn duration tracking
+        this.turnDuration = {
+            left: 0,
+            right: 0
+        };
+        
+        // Initialize powerups and weapons-related data
+        this.score = 0;
+        this.activePowerups = new Map();
+        this.weapons = [];
+        this.projectiles = [];
+        this.sparks = [];
+        
+        // Define powerup types
+        this.powerupTypes = {
+            'SPEED_BOOST': {
+                name: 'Speed Boost',
+                model: 'lightning',
+                color: 0x00ffff,
+                emissive: 0x00ffff,
+                icon: '⚡',
+                duration: 600 // 10 seconds at 60fps
+            },
+            'SHIELD': {
+                name: 'Shield',
+                model: 'shield',
+                color: 0x00ff00,
+                emissive: 0x00ff00,
+                icon: '🛡️',
+                duration: 600
+            },
+            'HEALTH': {
+                name: 'Health',
+                model: 'heart',
+                color: 0xff0000,
+                emissive: 0xff0000,
+                icon: '❤',
+                duration: 1 // Instant effect
+            },
+            'DAMAGE_BOOST': {
+                name: 'Damage Boost',
+                model: 'star',
+                color: 0xff00ff,
+                emissive: 0xff00ff,
+                icon: '⭐',
+                duration: 600
+            },
+            'AMMO': {
+                name: 'Ammo',
+                model: 'ammo',
+                color: 0xffff00,
+                emissive: 0xffff00,
+                icon: '🔫',
+                duration: 1 // Instant effect
+            }
+        };
+        
+        // Powerup spawn settings
+        this.maxPowerups = 5;
+        this.powerupSpawnInterval = 15000; // 15 seconds between spawns
+        this.weaponPickupSpawnInterval = 30000; // 30 seconds between weapon spawns
         
         // Flag for multiplayer debugging and error tracking
         this.multiplayerDebug = true; // Enable detailed multiplayer logs
@@ -234,7 +318,8 @@ class Game {
             
             // Add audio context resume handler for browsers that require user interaction
             document.addEventListener('click', () => {
-                if (this.soundManager && this.soundManager.listener.context.state === 'suspended') {
+                if (this.soundManager && this.soundManager.listener && this.soundManager.listener.context && 
+                    this.soundManager.listener.context.state === 'suspended') {
                     console.log("Resuming audio context after user interaction");
                     this.soundManager.listener.context.resume();
                 }
@@ -336,6 +421,14 @@ class Game {
     
     addLights() {
         try {
+            // Check if scene is initialized
+            if (!this.scene) {
+                console.error("Cannot add lights: Scene is not initialized");
+                return;
+            }
+            
+            console.log("Adding lights to scene");
+            
             // Add ambient light
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             this.scene.add(ambientLight);
@@ -345,7 +438,11 @@ class Game {
             directionalLight.position.set(50, 50, 50);
             this.scene.add(directionalLight);
             
-            console.log("Lights added");
+            // Add a hemisphere light for better ambient lighting
+            const hemiLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
+            this.scene.add(hemiLight);
+            
+            console.log("Lights added successfully");
         } catch (error) {
             console.error("Error adding lights:", error);
         }
@@ -353,6 +450,12 @@ class Game {
     
     createArena() {
         try {
+            // Check if scene is initialized
+            if (!this.scene) {
+                console.error("Cannot create arena: Scene is not initialized");
+                return;
+            }
+            
             const arenaSize = 1600; // 16x larger than original (4x larger than current)
             console.log("Creating arena with size:", arenaSize);
             
@@ -371,10 +474,20 @@ class Game {
             this.scene.add(ground);
             
             // Create boundary walls - DIRECT APPROACH
-            this.createSimpleWalls(arenaSize);
+            try {
+                this.createSimpleWalls(arenaSize);
+            } catch (wallsError) {
+                console.error("Error creating walls:", wallsError);
+                // Continue with arena creation even if walls fail
+            }
             
             // Add distance markers for scale reference
-            this.addDistanceMarkers(arenaSize);
+            try {
+                this.addDistanceMarkers(arenaSize);
+            } catch (markersError) {
+                console.error("Error adding distance markers:", markersError);
+                // Continue with arena creation even if markers fail
+            }
             
             console.log("Mega-sized arena created");
         } catch (error) {
@@ -3757,96 +3870,152 @@ class Game {
     }
 
     createStadium() {
-        // Remove existing obstacles and walls
-        this.scene.children = this.scene.children.filter(child => 
-            !child.isWall && !child.isObstacle
-        );
-
-        const bleacherGeometry = new THREE.CylinderGeometry(100, 120, 30, 96, 5, true);
-        const bleacherMaterial = new THREE.MeshPhongMaterial({
-            color: 0x444444,
-            side: THREE.DoubleSide,
-            flatShading: true
-        });
-        
-        const stadium = new THREE.Mesh(bleacherGeometry, bleacherMaterial);
-        stadium.position.y = 15;
-        this.scene.add(stadium);
-
-        // Create animated crowd
-        const crowdCount = 1000;
-        const spectatorGeometry = new THREE.SphereGeometry(0.5, 8, 8);
-        const spectatorMaterials = [
-            new THREE.MeshPhongMaterial({ color: 0xff0000 }), // Red
-            new THREE.MeshPhongMaterial({ color: 0x00ff00 }), // Green
-            new THREE.MeshPhongMaterial({ color: 0x0000ff }), // Blue
-            new THREE.MeshPhongMaterial({ color: 0xffff00 }), // Yellow
-            new THREE.MeshPhongMaterial({ color: 0xff00ff }), // Purple
-        ];
-
-        this.spectators = [];
-        
-        for (let i = 0; i < crowdCount; i++) {
-            const angle = (Math.random() * Math.PI * 2);
-            const radius = 105 + Math.random() * 10;
-            const height = 20 + Math.random() * 8;
-            
-            const spectator = new THREE.Mesh(
-                spectatorGeometry,
-                spectatorMaterials[Math.floor(Math.random() * spectatorMaterials.length)]
-            );
-            
-            spectator.position.x = Math.cos(angle) * radius;
-            spectator.position.z = Math.sin(angle) * radius;
-            spectator.position.y = height;
-            
-            spectator.userData.animationOffset = Math.random() * Math.PI * 2;
-            spectator.userData.initialY = height;
-            
-            this.spectators.push(spectator);
-            this.scene.add(spectator);
+        // Check if scene exists
+        if (!this.scene) {
+            console.error("Cannot create stadium: Scene is not initialized");
+            return;
         }
+        
+        try {
+            // More careful filtering of children
+            if (Array.isArray(this.scene.children)) {
+                // Filter only objects with isWall or isObstacle flag
+                // This is safer than reassigning the whole children array
+                for (let i = this.scene.children.length - 1; i >= 0; i--) {
+                    const child = this.scene.children[i];
+                    if (child && (child.isWall || child.isObstacle)) {
+                        this.scene.remove(child);
+                    }
+                }
+            }
+            
+            const bleacherGeometry = new THREE.CylinderGeometry(100, 120, 30, 96, 5, true);
+            const bleacherMaterial = new THREE.MeshPhongMaterial({
+                color: 0x444444,
+                side: THREE.DoubleSide,
+                flatShading: true
+            });
+            
+            const stadium = new THREE.Mesh(bleacherGeometry, bleacherMaterial);
+            stadium.position.y = 15;
+            this.scene.add(stadium);
 
-        // Add stadium lights
-        const lightPositions = [
-            { x: 80, z: 80 },
-            { x: -80, z: 80 },
-            { x: 80, z: -80 },
-            { x: -80, z: -80 }
-        ];
+            // Create animated crowd
+            const crowdCount = 1000;
+            const spectatorGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+            const spectatorMaterials = [
+                new THREE.MeshPhongMaterial({ color: 0xff0000 }), // Red
+                new THREE.MeshPhongMaterial({ color: 0x00ff00 }), // Green
+                new THREE.MeshPhongMaterial({ color: 0x0000ff }), // Blue
+                new THREE.MeshPhongMaterial({ color: 0xffff00 }), // Yellow
+                new THREE.MeshPhongMaterial({ color: 0xff00ff }), // Purple
+            ];
 
-        lightPositions.forEach(pos => {
-            const light = new THREE.SpotLight(0xffffff, 100);
-            light.position.set(pos.x, 60, pos.z);
-            light.angle = Math.PI / 6;
-            light.penumbra = 0.3;
-            light.decay = 1;
-            light.distance = 200;
-            light.target.position.set(0, 0, 0);
-            this.scene.add(light);
-            this.scene.add(light.target);
-        });
+            this.spectators = [];
+            
+            // Reduce crowd size in fallback mode for better performance
+            const actualCrowdCount = this.debugMode ? 200 : crowdCount;
+            
+            console.log(`Creating stadium crowd with ${actualCrowdCount} spectators`);
+            
+            for (let i = 0; i < actualCrowdCount; i++) {
+                const angle = (Math.random() * Math.PI * 2);
+                const radius = 105 + Math.random() * 10;
+                const height = 20 + Math.random() * 8;
+                
+                const spectator = new THREE.Mesh(
+                    spectatorGeometry,
+                    spectatorMaterials[Math.floor(Math.random() * spectatorMaterials.length)]
+                );
+                
+                spectator.position.x = Math.cos(angle) * radius;
+                spectator.position.z = Math.sin(angle) * radius;
+                spectator.position.y = height;
+                
+                spectator.userData = {
+                    animationOffset: Math.random() * Math.PI * 2,
+                    initialY: height
+                };
+                
+                this.spectators.push(spectator);
+                this.scene.add(spectator);
+            }
+
+            // Add stadium lights
+            const lightPositions = [
+                { x: 80, z: 80 },
+                { x: -80, z: 80 },
+                { x: 80, z: -80 },
+                { x: -80, z: -80 }
+            ];
+
+            console.log("Adding stadium lights");
+            
+            lightPositions.forEach(pos => {
+                try {
+                    const light = new THREE.SpotLight(0xffffff, 100);
+                    light.position.set(pos.x, 60, pos.z);
+                    light.angle = Math.PI / 6;
+                    light.penumbra = 0.3;
+                    light.decay = 1;
+                    light.distance = 200;
+                    
+                    // Create target if it doesn't exist
+                    if (!light.target) {
+                        light.target = new THREE.Object3D();
+                    }
+                    
+                    light.target.position.set(0, 0, 0);
+                    this.scene.add(light);
+                    this.scene.add(light.target);
+                } catch (lightError) {
+                    console.error(`Error creating stadium light at position ${pos.x},${pos.z}:`, lightError);
+                }
+            });
+            
+            console.log("Stadium creation completed successfully");
+        } catch (error) {
+            console.error("Error creating stadium:", error);
+        }
     }
 
     updateSpectators(deltaTime) {
-        const time = performance.now() * 0.001;
-        
-        this.spectators.forEach(spectator => {
-            const offset = spectator.userData.animationOffset;
-            const initialY = spectator.userData.initialY;
+        try {
+            // Check if spectators array exists and is not empty
+            if (!this.spectators || !Array.isArray(this.spectators) || this.spectators.length === 0) {
+                return; // Nothing to update
+            }
             
-            // Animate spectators bobbing up and down
-            spectator.position.y = initialY + Math.sin(time * 2 + offset) * 0.3;
-            spectator.rotation.x = Math.sin(time * 2 + offset) * 0.1;
-            spectator.rotation.z = Math.cos(time * 3 + offset) * 0.1;
-        });
+            const time = performance.now() * 0.001;
+            
+            this.spectators.forEach(spectator => {
+                try {
+                    // Check if spectator is valid
+                    if (!spectator || !spectator.userData) {
+                        return; // Skip invalid spectator
+                    }
+                    
+                    // Get animation offset with fallback
+                    const offset = spectator.userData.animationOffset || 0;
+                    const initialY = spectator.userData.initialY || spectator.position.y;
+                    
+                    // Animate spectators bobbing up and down
+                    spectator.position.y = initialY + Math.sin(time * 2 + offset) * 0.3;
+                    spectator.rotation.x = Math.sin(time * 2 + offset) * 0.1;
+                    spectator.rotation.z = Math.cos(time * 3 + offset) * 0.1;
+                } catch (specError) {
+                    // Just skip this spectator on error, don't crash the whole animation
+                    console.warn("Error updating individual spectator:", specError);
+                }
+            });
+        } catch (error) {
+            console.error("Error updating spectators:", error);
+        }
     }
 
-    // NOTE: This was duplicate code, removed as it's implemented elsewhere
-
-    // Note: This is just a method, not a second constructor
+    // Redirect the initStadium method to createStadium for backward compatibility
     initStadium() {
-        // Replace standard walls with stadium
+        console.log("initStadium called - redirecting to createStadium");
         this.createStadium();
     }
     

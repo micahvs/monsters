@@ -94,23 +94,44 @@ export class SoundManager {
         const unlockAudio = () => {
             console.log('User interaction detected, attempting to unlock audio');
             
-            // Create and play a silent buffer to unlock audio
-            const buffer = this.listener.context.createBuffer(1, 1, 22050);
-            const source = this.listener.context.createBufferSource();
-            source.buffer = buffer;
-            source.connect(this.listener.context.destination);
-            source.start(0);
+            // Check if listener and context exist first
+            if (!this.listener || !this.listener.context) {
+                console.log('No valid audio listener or context found - using fallback audio');
+                this.useFallbackAudio = true;
+                
+                // Remove event listeners since we can't use the audio context
+                document.removeEventListener('click', unlockAudio);
+                document.removeEventListener('touchstart', unlockAudio);
+                document.removeEventListener('touchend', unlockAudio);
+                document.removeEventListener('keydown', unlockAudio);
+                return;
+            }
             
-            // Resume audio context
-            if (this.listener.context.state === 'suspended') {
-                this.listener.context.resume().then(() => {
-                    console.log('Audio context successfully resumed by user interaction');
-                    
-                    // Try playing a test sound to verify everything is working
-                    setTimeout(() => {
-                        this.playTestSound();
-                    }, 500);
-                });
+            try {
+                // Create and play a silent buffer to unlock audio
+                const buffer = this.listener.context.createBuffer(1, 1, 22050);
+                const source = this.listener.context.createBufferSource();
+                source.buffer = buffer;
+                source.connect(this.listener.context.destination);
+                source.start(0);
+                
+                // Resume audio context
+                if (this.listener.context.state === 'suspended') {
+                    this.listener.context.resume().then(() => {
+                        console.log('Audio context successfully resumed by user interaction');
+                        
+                        // Try playing a test sound to verify everything is working
+                        setTimeout(() => {
+                            this.playTestSound();
+                        }, 500);
+                    }).catch(err => {
+                        console.error('Error resuming audio context:', err);
+                        this.useFallbackAudio = true;
+                    });
+                }
+            } catch (error) {
+                console.error('Error during audio unlock:', error);
+                this.useFallbackAudio = true;
             }
             
             // Remove event listeners once unlocked
@@ -131,25 +152,42 @@ export class SoundManager {
     playTestSound() {
         console.log('Playing test sound to verify audio is working');
         
-        // Create a test oscillator
-        const oscillator = this.listener.context.createOscillator();
-        const gainNode = this.listener.context.createGain();
+        // Check if listener and context exist first
+        if (!this.listener || !this.listener.context) {
+            console.log('No valid audio listener or context for test sound - using fallback audio');
+            this.useFallbackAudio = true;
+            return this.playFallbackSound('menu_select');
+        }
         
-        // Set very low volume so it's barely audible
-        gainNode.gain.value = 0.01;
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(this.listener.context.destination);
-        
-        // Play a short beep
-        oscillator.frequency.value = 440; // A4 note
-        oscillator.start();
-        
-        // Stop after 100ms
-        setTimeout(() => {
-            oscillator.stop();
-            console.log('Test sound completed');
-        }, 100);
+        try {
+            // Create a test oscillator
+            const oscillator = this.listener.context.createOscillator();
+            const gainNode = this.listener.context.createGain();
+            
+            // Set very low volume so it's barely audible
+            gainNode.gain.value = 0.01;
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.listener.context.destination);
+            
+            // Play a short beep
+            oscillator.frequency.value = 440; // A4 note
+            oscillator.start();
+            
+            // Stop after 100ms
+            setTimeout(() => {
+                try {
+                    oscillator.stop();
+                    console.log('Test sound completed');
+                } catch (error) {
+                    console.error('Error stopping test sound:', error);
+                }
+            }, 100);
+        } catch (error) {
+            console.error('Error playing test sound:', error);
+            this.useFallbackAudio = true;
+            this.playFallbackSound('menu_select');
+        }
     }
     
     checkAudioContext() {
@@ -451,7 +489,10 @@ export class SoundManager {
         try {
             console.log(`Attempting to play ${name} using HTML5 Audio fallback`);
             const path = this.getSoundFilePath(name);
-            if (!path) return null;
+            if (!path) {
+                console.warn(`No path found for sound: ${name}`);
+                return null;
+            }
             
             // Create a new Audio element
             const audio = new Audio(path);
@@ -461,20 +502,81 @@ export class SoundManager {
             const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume * volumeMultiplier;
             audio.volume = effectiveVolume;
             
-            // Play the sound
-            const playPromise = audio.play();
-            if (playPromise) {
-                playPromise.then(() => {
-                    console.log(`Fallback audio playing: ${name}`);
-                }).catch(error => {
-                    console.error(`Fallback audio failed: ${name}`, error);
-                });
-            }
+            // Set up onerror handler to catch loading errors
+            audio.onerror = (e) => {
+                console.error(`Error loading fallback sound ${name} from ${path}:`, 
+                    e.target.error || 'Unknown error');
+            };
+            
+            // Play the sound after a short delay to allow time for loading
+            setTimeout(() => {
+                try {
+                    const playPromise = audio.play();
+                    if (playPromise) {
+                        playPromise.then(() => {
+                            console.log(`Fallback audio playing: ${name}`);
+                        }).catch(error => {
+                            console.error(`Fallback audio failed: ${name}`, error);
+                            
+                            // Try one more time with a workaround for iOS/Safari
+                            this.playEmergencyFallbackSound(name);
+                        });
+                    }
+                } catch (playError) {
+                    console.error(`Error playing fallback sound ${name}:`, playError);
+                    this.playEmergencyFallbackSound(name);
+                }
+            }, 100);
             
             return audio;
         } catch (error) {
             console.error(`Failed to play fallback sound ${name}:`, error);
             return null;
+        }
+    }
+    
+    // Last resort for playing sounds
+    playEmergencyFallbackSound(name) {
+        console.log(`Attempting emergency fallback for sound: ${name}`);
+        
+        try {
+            // Use the global SoundFX object if available
+            if (window.SoundFX && typeof window.SoundFX.play === 'function') {
+                window.SoundFX.play(name);
+                return;
+            }
+            
+            // Create silent dummy sound for user interaction
+            const dummy = document.createElement('audio');
+            dummy.controls = false;
+            dummy.autoplay = false;
+            dummy.style.position = 'absolute';
+            dummy.style.left = '-1000px';
+            dummy.style.top = '-1000px';
+            document.body.appendChild(dummy);
+            
+            // Add click handler to play sound on user interaction
+            dummy.addEventListener('click', () => {
+                const audio = new Audio(this.getSoundFilePath(name));
+                if (audio) {
+                    audio.volume = 0.5;
+                    audio.play().catch(e => console.warn('Still could not play sound:', e));
+                }
+                
+                // Remove dummy element after use
+                document.body.removeChild(dummy);
+            });
+            
+            // Simulate click after a short delay
+            setTimeout(() => {
+                try {
+                    dummy.click();
+                } catch (e) {
+                    console.warn('Could not simulate click:', e);
+                }
+            }, 100);
+        } catch (error) {
+            console.error(`Failed to play emergency fallback sound ${name}:`, error);
         }
     }
     
