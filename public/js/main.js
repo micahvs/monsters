@@ -368,25 +368,36 @@ class Game {
             this.particlePoolSize = 100;
             
             for (let i = 0; i < this.particlePoolSize; i++) {
-                const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-                const particleMaterial = new THREE.MeshPhongMaterial({
-                    color: 0xffffff,
-                    emissive: 0xffffff,
-                    emissiveIntensity: 0.5,
-                    transparent: true,
-                    opacity: 0
-                });
-                
-                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                particle.visible = false;
-                particle.scale.set(1, 1, 1);
-                this.scene.add(particle);
-                
-                this.particlePool.push({
-                    mesh: particle,
-                    inUse: false
-                });
+                try {
+                    const particleGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+                    const particleMaterial = new THREE.MeshPhongMaterial({
+                        color: 0xffffff,
+                        emissive: 0xffffff,
+                        emissiveIntensity: 0.5,
+                        transparent: true,
+                        opacity: 0
+                    });
+                    
+                    const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                    particle.visible = false;
+                    particle.scale.set(1, 1, 1);
+                    this.scene.add(particle);
+                    
+                    this.particlePool.push({
+                        mesh: particle,
+                        inUse: false
+                    });
+                } catch (error) {
+                    console.error(`Error creating particle ${i}:`, error);
+                    // Continue loop to create as many valid particles as possible
+                }
             }
+            
+            // Initialize next particle index
+            this.nextParticleIndex = 0;
+            
+            console.log(`Created particle pool with ${this.particlePool.length} particles`);
+            
             
             // Initialize multiplayer
             this.initMultiplayer();
@@ -2276,11 +2287,13 @@ class Game {
                     
                     const particle = new THREE.Mesh(particleGeometry, particleMaterial);
                     particle.visible = false; // Hide initially
-                    particle.inUse = false;
                     
                     // Add to scene but hidden
                     this.scene.add(particle);
-                    this.particlePool.push(particle);
+                    this.particlePool.push({
+                        mesh: particle,
+                        inUse: false
+                    });
                 } catch (particleError) {
                     console.error('Error creating particle ' + i + ':', particleError);
                 }
@@ -2311,9 +2324,11 @@ class Game {
                     });
                     const particle = new THREE.Mesh(geometry, material);
                     particle.visible = false;
-                    particle.inUse = false;
                     if (this.scene) this.scene.add(particle);
-                    this.particlePool.push(particle);
+                    this.particlePool.push({
+                        mesh: particle,
+                        inUse: false
+                    });
                 } catch (e) {
                     console.error('Failed to create emergency particle', e);
                 }
@@ -2343,27 +2358,33 @@ class Game {
                 if (!particle) continue; // Skip null/undefined particles
                 
                 if (!particle.inUse) {
+                    // Check if mesh property exists
+                    if (!particle.mesh) {
+                        console.warn('Particle without mesh found in pool - skipping');
+                        continue;
+                    }
+                    
                     // Check if material exists
-                    if (!particle.material) {
+                    if (!particle.mesh.material) {
                         console.warn('Particle without material found in pool - reinitializing particle');
                         // Create a new material if missing
-                        particle.material = new THREE.MeshBasicMaterial({
+                        particle.mesh.material = new THREE.MeshBasicMaterial({
                             color: color,
                             transparent: true,
                             opacity: 0.7
                         });
                     } else {
                         // Set color on existing material
-                        if (particle.material.color) {
-                            particle.material.color.set(color);
+                        if (particle.mesh.material.color) {
+                            particle.mesh.material.color.set(color);
                         }
                     }
                     
-                    particle.material.opacity = 0.7;
-                    particle.visible = true;
+                    particle.mesh.material.opacity = 0.7;
+                    particle.mesh.visible = true;
                     particle.inUse = true;
-                    particle.scale.set(1, 1, 1);
-                    return particle;
+                    particle.mesh.scale.set(1, 1, 1);
+                    return particle.mesh;
                 }
             }
             
@@ -2379,28 +2400,28 @@ class Game {
             }
             
             const particle = this.particlePool[particleIndex];
-            if (!particle) {
+            if (!particle || !particle.mesh) {
                 console.error('Cannot reuse particle at index', particleIndex, 'particlePool length:', this.particlePool.length);
                 return null;
             }
             
             // Reset particle for reuse
-            if (!particle.material || !particle.material.color) {
-                particle.material = new THREE.MeshBasicMaterial({
+            if (!particle.mesh.material || !particle.mesh.material.color) {
+                particle.mesh.material = new THREE.MeshBasicMaterial({
                     color: color,
                     transparent: true,
                     opacity: 0.7
                 });
             } else {
-                particle.material.color.set(color);
+                particle.mesh.material.color.set(color);
             }
             
-            particle.material.opacity = 0.7;
-            particle.visible = true;
+            particle.mesh.material.opacity = 0.7;
+            particle.mesh.visible = true;
             particle.inUse = true;
-            particle.scale.set(1, 1, 1);
+            particle.mesh.scale.set(1, 1, 1);
             
-            return particle;
+            return particle.mesh;
         } catch (error) {
             console.error('Error in getParticle:', error);
             return null;
@@ -2409,8 +2430,23 @@ class Game {
     
     // Release a particle back to the pool
     releaseParticle(particle) {
-        if (particle) {
+        if (!particle) return;
+        
+        // Handle direct mesh
+        if (particle.isMesh) {
             particle.visible = false;
+            
+            // Find the pool object that contains this mesh
+            const poolObj = this.particlePool?.find(p => p.mesh === particle);
+            if (poolObj) {
+                poolObj.inUse = false;
+            }
+            return;
+        }
+        
+        // Handle pool object
+        if (particle.mesh) {
+            particle.mesh.visible = false;
             particle.inUse = false;
         }
     }
@@ -2629,18 +2665,25 @@ class Game {
                 return;
             }
             
-            // Set trail properties
-            trail.position.copy(projectile.mesh.position);
-            trail.userData = trail.userData || {};
-            trail.userData.lifetime = 10; // Shorter lifetime
-            trail.userData.fadeRate = 0.07; // Faster fade
-            trail.userData.shrinkRate = 0.03; // Gradually shrink
-            
-            // Add to active trails for updating
-            if (!this.activeTrails) {
-                this.activeTrails = [];
+            // Set trail properties - ensure trail has position
+            if (trail.position) {
+                trail.position.copy(projectile.mesh.position);
+                
+                // Initialize userData if needed
+                trail.userData = trail.userData || {};
+                trail.userData.lifetime = 10; // Shorter lifetime
+                trail.userData.fadeRate = 0.07; // Faster fade
+                trail.userData.shrinkRate = 0.03; // Gradually shrink
+                
+                // Add to active trails for updating
+                if (!this.activeTrails) {
+                    this.activeTrails = [];
+                }
+                this.activeTrails.push(trail);
+            } else {
+                console.warn('Trail has no position property');
+                this.releaseParticle(trail);
             }
-            this.activeTrails.push(trail);
         } catch (error) {
             console.error('Error creating projectile trail:', error);
             // Continue game execution - better to miss a trail than crash
@@ -2692,6 +2735,13 @@ class Game {
                 console.warn('Error updating trail:', error);
                 // Remove problematic trail
                 if (i >= 0 && i < this.activeTrails.length) {
+                    // Try to release the trail back to the pool if it exists
+                    const trail = this.activeTrails[i];
+                    if (trail) {
+                        try {
+                            this.releaseParticle(trail);
+                        } catch (e) {} // Ignore errors during cleanup
+                    }
                     this.activeTrails.splice(i, 1);
                 }
             }
