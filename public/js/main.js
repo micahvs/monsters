@@ -1152,9 +1152,9 @@ class Game {
         if (!this.camera || !this.truck) return;
         
         try {
-        // Zoomed out follow camera for better visibility
-        const cameraDistance = 8; // Increased from 5 for wider view
-        const cameraHeight = 5;   // Increased from 3 for higher perspective
+        // Follow camera with original settings
+        const cameraDistance = 5; // Original value
+        const cameraHeight = 3;   // Original value
         
             // Store original position to handle errors
             const originalX = this.camera.position.x;
