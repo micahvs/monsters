@@ -5,9 +5,6 @@ import Multiplayer from './Multiplayer.js';
 import { Weapon, WeaponTypes, WeaponPickup } from './Weapons.js';
 import { SoundManager } from './SoundManager.js';
 
-// Import the sound system
-import './sound-fix.js';
-
 const TRUCK_SPECS = {
     'NEON CRUSHER': {
         acceleration: 0.019,   // Reduced by 5%
