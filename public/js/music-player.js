@@ -225,11 +225,7 @@ class MusicPlayer {
         }
         
         // Add any custom tracks you might have
-        const customTracks = [
-            'cyber_cruiser.mp3',
-            'neon_chase.mp3',
-            'retro_sunset.mp3'
-        ];
+        const customTracks = [];  // Removed missing tracks
         
         customTracks.forEach(track => {
             this.checkFileExists(`${basePath}${track}`, (exists) => {
