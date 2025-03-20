@@ -295,6 +295,12 @@ class Game {
                 console.log('Debug mode enabled');
             }
             
+            // Ensure scene is initialized
+            if (!this.scene) {
+                console.log("Creating new scene");
+                this.scene = new THREE.Scene();
+            }
+            
             // Setup three.js renderer first
             console.log("Setting up WebGL renderer...");
             this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -329,6 +335,11 @@ class Game {
             // Initialize particle pools
             console.log("Initializing particle pools...");
             this.initializeParticlePools();
+            
+            // Debug check for scene
+            console.log(`AFTER INIT: Scene has ${this.scene.children.length} children`);
+            console.log(`Truck added to scene? ${this.truck && this.truck.parent === this.scene}`);
+            console.log(`Camera set up: ${!!this.camera}`);
             
             // Initialize sound manager after WebGL context is set up
             console.log("Initializing sound manager...");
@@ -388,7 +399,8 @@ class Game {
             // Check if scene is initialized
             if (!this.scene) {
                 console.error("Cannot add lights: Scene is not initialized");
-                return;
+                this.scene = new THREE.Scene(); // Create scene if missing
+                console.log("Created new scene for lights");
             }
             
             console.log("Adding lights to scene");
@@ -406,10 +418,56 @@ class Game {
             const hemiLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
             this.scene.add(hemiLight);
             
+            // Add coordinate axes for debugging
+            if (this.debugMode) {
+                this.addCoordinateAxes();
+            }
+            
             console.log("Lights added successfully");
         } catch (error) {
             console.error("Error adding lights:", error);
         }
+    }
+    
+    // Add coordinate axes to help with debugging
+    addCoordinateAxes() {
+        if (!this.scene) return;
+        
+        // Create axes helper
+        const axesHelper = new THREE.AxesHelper(10);
+        this.scene.add(axesHelper);
+        console.log("Added coordinate axes for debugging");
+        
+        // Add axis labels
+        const createLabel = (text, position, color) => {
+            // Create canvas for text
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 64;
+            const context = canvas.getContext('2d');
+            context.fillStyle = color;
+            context.font = '48px Arial';
+            context.fillText(text, 10, 48);
+            
+            // Create texture from canvas
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ 
+                map: texture, 
+                transparent: true,
+                depthTest: false
+            });
+            
+            // Create sprite
+            const sprite = new THREE.Sprite(material);
+            sprite.position.copy(position);
+            sprite.scale.set(5, 2.5, 1);
+            this.scene.add(sprite);
+        };
+        
+        // Create labels
+        createLabel('X', new THREE.Vector3(11, 0, 0), '#ff0000');
+        createLabel('Y', new THREE.Vector3(0, 11, 0), '#00ff00');
+        createLabel('Z', new THREE.Vector3(0, 0, 11), '#0000ff');
     }
     
     createArena() {
@@ -1210,6 +1268,9 @@ class Game {
     animate() {
         if (!this.isInitialized) return;
         
+        // DEBUG - Check scene and truck status
+        this.debugGameState();
+        
         // Calculate delta time for frame-rate independent movement
         const now = performance.now();
         if (!this.lastFrameTime) this.lastFrameTime = now;
@@ -1244,13 +1305,58 @@ class Game {
                 const shouldRender = !this.lastRenderTime || now - this.lastRenderTime >= 33.33; // ~30fps
                 
                 if (shouldRender) {
-                this.renderer.render(this.scene, this.camera);
+                    this.renderer.render(this.scene, this.camera);
                     this.lastRenderTime = now;
                 }
             }
         } catch (error) {
             console.error("Error in animate:", error);
         }
+    }
+
+    // Debug method to check the game state
+    debugGameState() {
+        // Only run this every 60 frames to avoid console spam
+        if (this.frameCount % 60 !== 0) return;
+        
+        console.log("=== DEBUG GAME STATE ===");
+        
+        // Check if scene exists
+        if (!this.scene) {
+            console.error("CRITICAL: Scene does not exist!");
+            return;
+        }
+        
+        // Check scene children
+        console.log(`Scene has ${this.scene.children.length} children`);
+        
+        // Check if truck exists
+        if (!this.truck) {
+            console.error("CRITICAL: Truck does not exist!");
+        } else {
+            console.log(`Truck position: x=${this.truck.position.x.toFixed(2)}, y=${this.truck.position.y.toFixed(2)}, z=${this.truck.position.z.toFixed(2)}`);
+        }
+        
+        // Check if monsterTruck exists
+        if (!this.monsterTruck) {
+            console.error("CRITICAL: MonsterTruck instance does not exist!");
+        } else {
+            console.log(`MonsterTruck health: ${this.monsterTruck.health}/${this.monsterTruck.maxHealth}`);
+        }
+        
+        // Check projectiles
+        if (this.projectiles) {
+            console.log(`Active projectiles: ${this.projectiles.length}`);
+        }
+        
+        // Check camera
+        if (!this.camera) {
+            console.error("CRITICAL: Camera does not exist!");
+        } else {
+            console.log(`Camera position: x=${this.camera.position.x.toFixed(2)}, y=${this.camera.position.y.toFixed(2)}, z=${this.camera.position.z.toFixed(2)}`);
+        }
+        
+        console.log("=======================");
     }
 
     // Add collision detection and handling to the Game class
@@ -2826,8 +2932,23 @@ class Game {
 
     // Check projectile collisions
     checkProjectileCollisions(projectile) {
-        // Add debug logging for projectile check
-        console.log(`Checking projectile collision: source=${projectile.source}, playerId=${projectile.playerId || 'unknown'}, localId=${this.multiplayer?.localPlayerId || 'none'}`);
+        // Log debug info for projectile check
+        if (this.debugMode) {
+            console.log(`DEBUG: Checking projectile collision: source=${projectile.source}, playerId=${projectile.playerId || 'unknown'}`);
+        }
+        
+        // Clearly distinguish between projectiles:
+        // 1. 'player' - from local player (should not hit self)
+        // 2. 'remote' - from remote players (should hit local player)
+        // 3. 'turret' - from AI turrets (should hit local player)
+        
+        // CRITICAL FIX: If this is a player projectile, it should NEVER hit the local player
+        if (projectile.source === 'player' && (!projectile.playerId || projectile.playerId === this.multiplayer?.localPlayerId)) {
+            // This is the local player's projectile - should NOT hit themselves
+            if (this.debugMode) {
+                console.log("DEBUG: Local player projectile - skipping self-collision check");
+            }
+        }
         
         // Get projectile position
         const pos = projectile.mesh.position;
@@ -2852,11 +2973,15 @@ class Game {
         // 1. Turret projectiles (source="turret") - damage player
         // 2. Remote player projectiles (source="remote") - damage player
         // 3. Local player's projectiles (source="player" && playerId=localPlayerId) - NO damage to self
-        const isNotOwnProjectile = projectile.source !== 'player' || 
-            (projectile.playerId && projectile.playerId !== this.multiplayer?.localPlayerId);
+        const isLocalPlayerProjectile = projectile.source === 'player' && 
+            (!projectile.playerId || projectile.playerId === this.multiplayer?.localPlayerId);
         
-        if (isNotOwnProjectile && this.truck) {
-            console.log(`Checking player collision - valid projectile from: ${projectile.source}/${projectile.playerId}`);
+        // Only do truck collision if NOT local player's projectile
+        if (!isLocalPlayerProjectile && this.truck) {
+            // Check if this is a valid projectile that should hit the player
+            if (this.debugMode) {
+                console.log(`DEBUG: Valid projectile from: ${projectile.source}/${projectile.playerId}, checking player collision`);
+            }
             
             // Get vehicle dimensions and height based on type
             let truckDimensions = {width: 2, length: 3, height: 1};
@@ -2873,25 +2998,26 @@ class Game {
                 }
             }
             
-            // Larger collision box for better hit detection
-            const expansionFactor = 1.0; // Increased for more reliable hit registration
+            // Create collision box for the vehicle
+            const expansionFactor = 1.0;
                 
-            // Create a proper 3D bounding box for the vehicle with reasonable margins
+            // Create a 3D bounding box for the vehicle with reasonable margins
             const truckBounds = {
                 minX: this.truck.position.x - (truckDimensions.width / 2) - expansionFactor,
                 maxX: this.truck.position.x + (truckDimensions.width / 2) + expansionFactor,
-                minY: this.truck.position.y - 0.5, // More below-ground extension
-                maxY: this.truck.position.y + truckDimensions.height + 1.0, // More height for better hit detection
+                minY: this.truck.position.y - 0.5,
+                maxY: this.truck.position.y + truckDimensions.height + 1.0,
                 minZ: this.truck.position.z - (truckDimensions.length / 2) - expansionFactor,
                 maxZ: this.truck.position.z + (truckDimensions.length / 2) + expansionFactor
             };
             
-            // Log position data for debugging
-            console.log(`Projectile: x=${pos.x.toFixed(1)}, y=${pos.y.toFixed(1)}, z=${pos.z.toFixed(1)}`);
-            console.log(`Truck: x=${this.truck.position.x.toFixed(1)}, y=${this.truck.position.y.toFixed(1)}, z=${this.truck.position.z.toFixed(1)}`);
-            console.log(`Bounds: x=[${truckBounds.minX.toFixed(1)} to ${truckBounds.maxX.toFixed(1)}], z=[${truckBounds.minZ.toFixed(1)} to ${truckBounds.maxZ.toFixed(1)}]`);
+            // If in debug mode, log position data
+            if (this.debugMode) {
+                console.log(`DEBUG: Projectile: x=${pos.x.toFixed(1)}, y=${pos.y.toFixed(1)}, z=${pos.z.toFixed(1)}`);
+                console.log(`DEBUG: Truck: x=${this.truck.position.x.toFixed(1)}, y=${this.truck.position.y.toFixed(1)}, z=${this.truck.position.z.toFixed(1)}`);
+            }
             
-            // Very generous collision detection to ensure hits register
+            // Check if projectile is inside truck bounds
             if (
                 pos.x >= truckBounds.minX && 
                 pos.x <= truckBounds.maxX &&
@@ -2923,18 +3049,6 @@ class Game {
                 this.createProjectileImpactOnVehicle(impactPoint);
                 
                 return 'player';
-            } else {
-                // Check if projectile is close to vehicle for debugging
-                const distance = Math.sqrt(
-                    Math.pow(this.truck.position.x - pos.x, 2) +
-                    Math.pow(this.truck.position.y + 1 - pos.y, 2) +
-                    Math.pow(this.truck.position.z - pos.z, 2)
-                );
-                
-                // Log near misses for debugging
-                if (distance < 5) {
-                    console.log(`Near miss: distance=${distance.toFixed(2)}, pos=${pos.x.toFixed(1)},${pos.y.toFixed(1)},${pos.z.toFixed(1)}`);
-                }
             }
         }
         
