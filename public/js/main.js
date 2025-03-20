@@ -287,6 +287,9 @@ class Game {
         try {
             console.log('Initializing game...');
             
+            // Setup sound enabler first - this will enable audio on first user interaction
+            this.createSoundEnabler();
+            
             // Debug mode output
             if (this.debugMode) {
                 console.log('Debug mode enabled');
@@ -5884,12 +5887,184 @@ class Game {
         // No sound button is created - sounds are now enabled by default
         console.log('Sound button creation skipped in Game - sounds are enabled by default');
     }
+
+    // Create a sound enabler that starts sounds on user interaction
+    createSoundEnabler() {
+        // Create an invisible overlay to capture first interaction
+        const soundEnabler = document.createElement('div');
+        soundEnabler.id = 'sound-enabler';
+        soundEnabler.style.position = 'fixed';
+        soundEnabler.style.top = '0';
+        soundEnabler.style.left = '0';
+        soundEnabler.style.width = '100%';
+        soundEnabler.style.height = '100%';
+        soundEnabler.style.background = 'rgba(0,0,0,0.01)';
+        soundEnabler.style.zIndex = '9999';
+        soundEnabler.style.cursor = 'pointer';
+        soundEnabler.style.display = 'flex';
+        soundEnabler.style.justifyContent = 'center';
+        soundEnabler.style.alignItems = 'center';
+        
+        // Add text prompt
+        const soundText = document.createElement('div');
+        soundText.textContent = 'CLICK TO ENABLE SOUNDS';
+        soundText.style.color = '#ff00ff';
+        soundText.style.fontSize = '24px';
+        soundText.style.fontFamily = "'Orbitron', sans-serif";
+        soundText.style.textShadow = '0 0 10px #ff00ff';
+        soundEnabler.appendChild(soundText);
+        
+        // Add event listener to enable sounds and remove overlay
+        soundEnabler.addEventListener('click', () => {
+            console.log('User interaction detected, enabling sounds');
+            
+            // Create and play a silent sound to unlock audio
+            try {
+                // Method 1: Using AudioContext
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    const audioCtx = new AudioContext();
+                    const source = audioCtx.createBufferSource();
+                    source.connect(audioCtx.destination);
+                    source.start(0);
+                }
+                
+                // Method 2: Using HTML5 Audio
+                const audio = new Audio();
+                audio.play().catch(e => console.log('Audio unlock attempt:', e));
+                
+                // Method 3: Try direct sound calls
+                if (window.SoundFX) {
+                    window.SoundFX.unlockAudio();
+                }
+                
+                // Remove the overlay
+                document.body.removeChild(soundEnabler);
+                
+                // Play a test sound after a short delay
+                setTimeout(() => {
+                    if (window.SoundFX) {
+                        window.SoundFX.play('menu_select');
+                    }
+                    if (this.soundManager) {
+                        this.soundManager.playSound('menu_select');
+                    }
+                }, 500);
+            } catch (error) {
+                console.error('Error unlocking audio:', error);
+                // Remove the overlay anyway
+                document.body.removeChild(soundEnabler);
+            }
+        });
+        
+        // Add to body
+        document.body.appendChild(soundEnabler);
+        console.log('Sound enabler created - waiting for user interaction');
+    }
 }
 
 // Initialize game when window is fully loaded
 window.addEventListener('load', () => {
     console.log("Window loaded, creating game");
     try {
+        // Initialize SoundFX global utility
+        window.SoundFX = {
+            // Keep track of whether audio is unlocked
+            audioUnlocked: false,
+            
+            // Directly play a sound with error handling
+            play: function(soundName) {
+                if (!soundName) return;
+                
+                try {
+                    // Create a sound path
+                    const soundPath = '/sounds/' + soundName + '.mp3';
+                    
+                    // Create a new audio element
+                    const audio = new Audio(soundPath);
+                    audio.volume = 0.5;
+                    
+                    // Try to play with error handling
+                    const playPromise = audio.play();
+                    if (playPromise) {
+                        playPromise.catch(error => {
+                            console.log(`SoundFX: Could not play ${soundName}:`, error);
+                            
+                            // If not allowed, queue for next user interaction
+                            if (error.name === 'NotAllowedError' && !this.audioUnlocked) {
+                                this.setupUnlockHandlers();
+                            }
+                        });
+                    }
+                    return audio;
+                } catch (error) {
+                    console.error(`SoundFX: Error playing ${soundName}:`, error);
+                    return null;
+                }
+            },
+            
+            // Unlock audio on first user interaction
+            unlockAudio: function() {
+                if (this.audioUnlocked) return;
+                
+                console.log('SoundFX: Unlocking audio context');
+                
+                try {
+                    // Try to play a silent sound
+                    const audio = new Audio();
+                    audio.volume = 0;
+                    const promise = audio.play();
+                    
+                    if (promise) {
+                        promise.then(() => {
+                            console.log('SoundFX: Audio unlocked successfully');
+                            this.audioUnlocked = true;
+                        }).catch(error => {
+                            console.error('SoundFX: Could not unlock audio:', error);
+                        });
+                    }
+                    
+                    // Also try to unlock AudioContext if available
+                    if (window.AudioContext || window.webkitAudioContext) {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        if (ctx.state === 'suspended') {
+                            ctx.resume();
+                        }
+                        
+                        // Create and play a silent buffer
+                        const source = ctx.createBufferSource();
+                        source.buffer = ctx.createBuffer(1, 1, 22050);
+                        source.connect(ctx.destination);
+                        source.start(0);
+                    }
+                } catch (e) {
+                    console.error('SoundFX: Error in audio unlock:', e);
+                }
+            },
+            
+            // Set up event handlers for unlocking audio
+            setupUnlockHandlers: function() {
+                if (this.handlersSet) return;
+                
+                console.log('SoundFX: Setting up unlock handlers');
+                this.handlersSet = true;
+                
+                const unlockFn = () => {
+                    this.unlockAudio();
+                    document.removeEventListener('click', unlockFn);
+                    document.removeEventListener('touchstart', unlockFn);
+                    document.removeEventListener('keydown', unlockFn);
+                };
+                
+                document.addEventListener('click', unlockFn);
+                document.addEventListener('touchstart', unlockFn);
+                document.addEventListener('keydown', unlockFn);
+            }
+        };
+        
+        // Initialize unlock handlers
+        window.SoundFX.setupUnlockHandlers();
+        
         // Create game
         window.game = new Game();
         
