@@ -1,1 +1,9 @@
 .vercel
+
+# Music files
+public/music/*.mp3
+public/music/*.wav
+
+# Backup files
+*.bak
+*.fixed
