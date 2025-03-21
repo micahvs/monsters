@@ -303,10 +303,16 @@ class Game {
             
             // Setup three.js renderer first
             console.log("Setting up WebGL renderer...")
-            this.renderer = new THREE.WebGLRenderer({ antialias: true })
+            const canvas = document.getElementById('game');
+            if (!canvas) {
+                throw new Error("Canvas element with id 'game' not found");
+            }
+            this.renderer = new THREE.WebGLRenderer({ 
+                canvas: canvas,
+                antialias: true 
+            });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.setPixelRatio(window.devicePixelRatio);
-            document.body.appendChild(this.renderer.domElement);
             
             // Add lights to scene
             console.log("Adding lights to scene...")
