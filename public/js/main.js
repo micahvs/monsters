@@ -908,11 +908,11 @@ class Game {
     
     // Check for projectile hits
     checkProjectileHits() {
-            console.error("Error in animate:", error)
-        }
+        // Implementation for checkProjectileHits
     }
+    
     // Debug method to check the game state
-    debugGameState() ;
+    debugGameState() {
         // Only run this every 60 frames to avoid console spam
         if (this.frameCount % 60 !== 0) return;
         
@@ -954,11 +954,11 @@ class Game {
         }
         
         console.log("=======================");
-    ;
+    }
 
     // Add collision detection and handling to the Game class
     // First, let's add a method to check for collisions with walls
-    checkWallCollisions(); {
+    checkWallCollisions() {
         if (!this.truck) return false;
         
         const arenaSize = 1600; // Updated to match the larger arena
@@ -1037,7 +1037,7 @@ class Game {
     }
     
     // Add enhanced wall collision effects for the larger arena
-    createWallCollisionEffect(position, normal); {
+    createWallCollisionEffect(position, normal) {
         // Create a burst of particles at the collision point
         const particleCount = 15;
         const particles = [];
@@ -1120,7 +1120,7 @@ class Game {
     }
 
     // Handle wall collision with damage and bounce effect
-    handleWallCollision(normal); {
+    handleWallCollision(normal) {
         // Calculate impact speed (how fast we're moving toward the wall)
         const impactSpeed = Math.abs(this.truck.velocity);
         
@@ -1177,7 +1177,7 @@ class Game {
     }
 
     // Take damage method
-    takeDamage(amount); {
+    takeDamage(amount) {
         // Add clear logging to debug damage
         console.log(`TAKING DAMAGE: ${amount}, current health: ${this.health}`);
         
@@ -1232,7 +1232,7 @@ class Game {
     }
     
     // Show shield hit effect
-    showShieldHitEffect(); {
+    showShieldHitEffect() {
         if (!this.shieldMesh) return;
         
         // Flash the shield
@@ -1300,7 +1300,7 @@ class Game {
     }
     
     // Add screen flash effect for damage
-    addDamageScreenEffect(amount); {
+    addDamageScreenEffect(amount) {
         // Create a red flash overlay that fades out
         const overlay = document.createElement('div')
         const opacity = Math.min(0.8, amount / 50); // Scale opacity with damage
@@ -1332,7 +1332,7 @@ class Game {
     }
 
     // Show collision effect
-    showCollisionEffect(intensity); {
+    showCollisionEffect(intensity) {
         if (!this.truck) return;
         
         // Visual effects
@@ -1365,7 +1365,7 @@ class Game {
     }
 
     // Create spark particles at collision point
-    createCollisionSparks(); {
+    createCollisionSparks() {
         // Safe-guard against null scene or uninitalized particle system
         if (!this.scene || !this.truck) {
             console.warn('Cannot create collision sparks: scene or truck not initialized')
@@ -1470,7 +1470,7 @@ class Game {
     }
 
     // Add camera shake effect
-    shakeCamera(intensity); {
+    shakeCamera(intensity) {
         if (!this.camera) return;
         
         // Store original camera position
@@ -1495,7 +1495,7 @@ class Game {
     }
 
     // Update camera shake
-    updateCameraShake(); {
+    updateCameraShake() {
         if (!this.isShaking || !this.camera) return;
         
         const elapsed = Date.now() - this.shakeStartTime;
@@ -1519,7 +1519,7 @@ class Game {
     }
 
     // Game over method
-    gameOver(); {
+    gameOver() {
         // Prevent multiple game over screens
         if (this.isGameOver) {
             console.log("Game already over, not showing another game over screen")
@@ -1609,7 +1609,7 @@ class Game {
     }
 
     // Update HUD method
-    updateHUD(); {
+    updateHUD() {
         // Update health display with color coding and bar
         const healthElement = document.getElementById('health')
         if (healthElement) {
@@ -1654,7 +1654,7 @@ class Game {
     }
     
     // Update weapon info display
-    updateWeaponInfo(); {
+    updateWeaponInfo() {
         const weaponNameElement = document.getElementById('currentWeapon')
         const weaponStatsElement = document.getElementById('weaponStats')
         
@@ -1674,7 +1674,7 @@ class Game {
     }
     
     // Update speed display
-    updateSpeedDisplay(); {
+    updateSpeedDisplay() {
         const speedElement = document.getElementById('speed')
         if (speedElement && this.truck) {
             // Calculate speed in MPH (arbitrary conversion for game feel)
@@ -1695,7 +1695,7 @@ class Game {
     }
     
     // Update ammo display
-    updateAmmoDisplay(); {
+    updateAmmoDisplay() {
         const ammoElement = document.getElementById('ammo')
         if (ammoElement) {
             // Get current weapon if available
@@ -1740,7 +1740,7 @@ class Game {
     }
     
     // Update score display
-    updateScoreDisplay(); {
+    updateScoreDisplay() {
         const scoreElement = document.getElementById('score')
         if (scoreElement && this.score !== undefined) {
             scoreElement.innerHTML = `SCORE: <span style="color: #00ffff;">${this.score}</span>`
@@ -1750,7 +1750,7 @@ class Game {
     // Add shooting mechanics to the Game class
 
     // Shoot method
-    shoot(); {
+    shoot() {
         if (this.weaponCooldown > 0) return;
         
         try {
@@ -1768,7 +1768,7 @@ class Game {
     }
 
     // Create muzzle flash effect
-    createMuzzleFlash(position, direction, isEnemyTurret = false); {
+    createMuzzleFlash(position, direction, isEnemyTurret = false) {
         // Determine color based on source (player vs. enemy)
         const flashColor = isEnemyTurret ? 0xff0000 : 0x00ffff;
         
@@ -1809,7 +1809,7 @@ class Game {
 
     // Update projectiles
     // Pool of particles for reuse
-    initializeParticlePool(); {
+    initializeParticlePool() {
         try {
             if (this.particlePool && this.particlePool.length > 0) {
                 console.log('Particle pool already initialized with ' + this.particlePool.length + ' particles')
@@ -1883,7 +1883,7 @@ class Game {
     }
     
     // Get a particle from the pool
-    getParticle(color = 0xffffff); {
+    getParticle(color = 0xffffff) {
         try {
             // Make sure particle pool exists
             if (!this.particlePool || !Array.isArray(this.particlePool) || this.particlePool.length === 0) {
@@ -1974,7 +1974,7 @@ class Game {
     }
     
     // Release a particle back to the pool
-    releaseParticle(particle); {
+    releaseParticle(particle) {
         if (!particle) return;
         
         // Handle direct mesh
@@ -1997,7 +1997,7 @@ class Game {
     }
     
     // Optimized projectile update
-    updateProjectiles(deltaTime = 1); {
+    updateProjectiles(deltaTime = 1) {
         try {
             // First, ensure turret projectiles are merged into the main projectiles array
             if (this.turretProjectiles && this.turretProjectiles.length > 0) {
@@ -2242,7 +2242,7 @@ class Game {
     }
     
     // Optimized trail effect using particle pool
-    createOptimizedProjectileTrail(projectile); {
+    createOptimizedProjectileTrail(projectile) {
         if (!projectile || !projectile.mesh) return;
         
         try {
@@ -2282,7 +2282,7 @@ class Game {
     }
     
     // Update all active trails in one pass
-    updateTrails(); {
+    updateTrails() {
         if (!this.activeTrails || this.activeTrails.length === 0) return;
         
         for (let i = this.activeTrails.length - 1; i >= 0; i--) {
@@ -2340,7 +2340,7 @@ class Game {
     }
     
     // Check if projectile hit a wall
-    checkProjectileWallCollisions(projectile); {
+    checkProjectileWallCollisions(projectile) {
         if (!projectile || !projectile.mesh) return false;
         
         const arenaSize = 1600;
@@ -2362,7 +2362,7 @@ class Game {
     }
     
     // Create an optimized wall impact effect using particle pool
-    createOptimizedWallImpactEffect(position); {
+    createOptimizedWallImpactEffect(position) {
         if (!position) return;
         
         // Use a shared light for multiple impacts to reduce overhead
@@ -2434,7 +2434,7 @@ class Game {
     }
     
     // Update all active impact effects
-    updateImpacts(); {
+    updateImpacts() {
         // Update lights
         if (this.impactLightPool) {
             for (const lightData of this.impactLightPool) {
@@ -2489,13 +2489,13 @@ class Game {
     }
     
     // Create an optimized impact effect for projectile hits
-    createOptimizedImpactEffect(position, hitType); {
+    createOptimizedImpactEffect(position, hitType) {
         const color = hitType === 'wall' ? 0x00ffff : 0xff0000
         this.createOptimizedWallImpactEffect(position);
     }
 
     // Create projectile trail effect
-    createProjectileTrail(projectile); {
+    createProjectileTrail(projectile) {
         // Create small trail particles
         const trailGeometry = new THREE.SphereGeometry(0.05, 8, 8);
         const trailMaterial = new THREE.MeshBasicMaterial({
@@ -2525,7 +2525,7 @@ class Game {
     }
 
     // Check projectile collisions
-    checkProjectileCollisions(projectile); {
+    checkProjectileCollisions(projectile) {
         // Log debug info for projectile check
         if (this.debugMode) {
             console.log(`DEBUG: Checking projectile collision: source=${projectile.source}, playerId=${projectile.playerId || 'unknown'}`)
@@ -2688,7 +2688,7 @@ class Game {
     }
 
     // Create impact effect
-    createImpactEffect(position, targetType); {
+    createImpactEffect(position, targetType) {
         // Create flash
         const impactLight = new THREE.PointLight(
             targetType === 'wall' ? 0x00ffff : 0xff0000, 
@@ -2760,7 +2760,7 @@ class Game {
     }
     
     // Create impact effect specifically for vehicle hits
-    createProjectileImpactOnVehicle(position); {
+    createProjectileImpactOnVehicle(position) {
         if (!this.scene) return;
         
         // Create a more intense impact for vehicle hits
@@ -2904,7 +2904,7 @@ class Game {
     // Add turret-related methods to the Game class
 
     // Create turrets
-    createTurrets(); {
+    createTurrets() {
         if (!this.scene) return;
         
         console.log("Creating turrets")
@@ -2952,7 +2952,7 @@ class Game {
     }
 
     // Create a single turret
-    createTurret(x, z); {
+    createTurret(x, z) {
         // Create base
         const baseGeometry = new THREE.CylinderGeometry(2, 2.5, 1, 16);
         const baseMaterial = new THREE.MeshPhongMaterial({
@@ -3009,7 +3009,7 @@ class Game {
     }
 
     // Update turrets
-    updateTurrets(); {
+    updateTurrets() {
         if (!this.turrets || !this.truck) {
             console.log("No turrets or truck found in updateTurrets")
             return;
@@ -3085,7 +3085,7 @@ class Game {
     }
 
     // Check if turret has line of sight to player
-    canTurretSeePlayer(turret); {
+    canTurretSeePlayer(turret) {
         if (!this.truck) return false;
         
         // Create ray from turret to player
@@ -3108,7 +3108,7 @@ class Game {
     }
 
     // Turret shoot method
-    turretShoot(turret); {
+    turretShoot(turret) {
         try {
             if (!turret || !turret.mesh || !this.scene || !this.truck) return;
             
@@ -3194,7 +3194,7 @@ class Game {
     }
     
     // Helper method to determine which barrel to use based on vehicle type
-    shouldUseUpperBarrel(); {
+    shouldUseUpperBarrel() {
         if (!this.monsterTruck) return false;
         
         const machineType = this.monsterTruck.config.machineType;
@@ -3204,7 +3204,7 @@ class Game {
     }
 
     // Damage turret method
-    damageTurret(turret, amount); {
+    damageTurret(turret, amount) {
         // Reduce health
         turret.health -= amount;
         
@@ -3234,7 +3234,7 @@ class Game {
     }
 
     // Destroy turret method
-    destroyTurret(turret); {
+    destroyTurret(turret) {
         if (!turret || !turret.mesh) return;
         
         // Mark as destroyed to prevent further processing
@@ -3274,7 +3274,7 @@ class Game {
     }
     
     // Create a visual indicator for turret respawn
-    createRespawnIndicator(position); {
+    createRespawnIndicator(position) {
         // Create a pulsing light to indicate where the turret will respawn
         const respawnLight = new THREE.PointLight(0x00ffff, 1, 20);
         respawnLight.position.set(position.x, 1, position.z);
@@ -3333,7 +3333,7 @@ class Game {
     }
 
     // Initialize with weapon and ammo display
-    initHUD(); {
+    initHUD() {
         const playerName = document.getElementById('playerName')
         const health = document.getElementById('health')
         const score = document.getElementById('score')
@@ -3381,7 +3381,7 @@ class Game {
     }
     
     // Create weapon key bindings legend
-    createWeaponLegend(); {
+    createWeaponLegend() {
         // No need to create the element as it's now part of the HTML
         const legend = document.getElementById('weapon-legend')
         if (!legend) return;
@@ -3398,7 +3398,7 @@ class Game {
     }
 
     // Debug method to help diagnose movement issues
-    debugMovement(); {
+    debugMovement() {
         if (!this.truck) return;
         
         console.log({
@@ -3423,7 +3423,7 @@ class Game {
     }
 
     // Update speed display
-    updateSpeedDisplay(); {
+    updateSpeedDisplay() {
         const speedDisplay = document.getElementById('speed')
         if (speedDisplay && this.truck) {
             const speedMPH = Math.abs(Math.round(this.truck.velocity * 100));
@@ -3432,7 +3432,7 @@ class Game {
     }
 
     // Add the missing updateSparks function
-    updateSparks(); {
+    updateSparks() {
         if (!this.sparks || !this.scene || this.sparks.length === 0) return;
         
         for (let i = this.sparks.length - 1; i >= 0; i--) {
@@ -3500,7 +3500,7 @@ class Game {
     }
     
     // Animate stadium spectators
-    updateSpectators(); {
+    updateSpectators() {
         if (!this.spectators || this.spectators.length === 0) return;
         
         const time = performance.now() * 0.001;
@@ -3518,7 +3518,7 @@ class Game {
         })
     }
 
-    createStadium(); {
+    createStadium() {
         // Check if scene exists
         if (!this.scene) {
             console.error("Cannot create stadium: Scene is not initialized")
@@ -3628,7 +3628,7 @@ class Game {
         }
     }
 
-    updateSpectators(deltaTime); {
+    updateSpectators(deltaTime) {
         try {
             // Check if spectators array exists and is not empty
             if (!this.spectators || !Array.isArray(this.spectators) || this.spectators.length === 0) {
@@ -3663,13 +3663,13 @@ class Game {
     }
 
     // Redirect the initStadium method to createStadium for backward compatibility
-    initStadium(); {
+    initStadium() {
         console.log("initStadium called - redirecting to createStadium")
         this.createStadium();
     }
     
     // Initialize multiplayer functionality
-    initMultiplayer(); {
+    initMultiplayer() {
         // Set global multiplayer status flag
         window.isMultiplayerInitialized = false;
         
@@ -3739,7 +3739,7 @@ class Game {
     }
     
     // Separate method to initialize chat listeners
-    initChatListeners(); {
+    initChatListeners() {
         // Initialize chat socket listeners if the function exists
         if (typeof window.initChatSocketListeners === 'function') {
             console.log('Calling initChatSocketListeners from main.js')
@@ -3781,7 +3781,7 @@ class Game {
         }
     }
 
-    createPowerup(); {
+    createPowerup() {
         if (!this.scene) {
             console.error("Cannot create powerup: Scene is not available")
             return null;
@@ -3905,7 +3905,7 @@ class Game {
         }
     }
 
-    applyPowerup(type); {
+    applyPowerup(type) {
         try {
             // ... existing powerup code ...
             
@@ -3930,18 +3930,18 @@ class Game {
     }
 
     // Update any multiplayer-related methods to check if enabled
-    updateMultiplayer(); {
+    updateMultiplayer() {
         if (!this.isMultiplayerEnabled) return;
         // ... existing multiplayer update code ...
     }
 
     // Do the same for other multiplayer methods
-    handleMultiplayerEvents(); {
+    handleMultiplayerEvents() {
         if (!this.isMultiplayerEnabled) return;
         // ... existing multiplayer event code ...
     }
 
-    showMessage(message); {
+    showMessage(message) {
         // Get existing messages
         const existingMessages = document.querySelectorAll('.game-message')
         
@@ -4002,7 +4002,7 @@ class Game {
     }
 
     // Toggle audio (will use the unified audio panel)
-    toggleAudio(); {
+    toggleAudio() {
         // This is now handled by the unified audio panel
         // We'll keep this method for backward compatibility with keyboard shortcuts
         if (window.musicPlayer && typeof window.musicPlayer.toggleMasterMute === 'function') {
@@ -4011,7 +4011,7 @@ class Game {
     }
 
     // Show sound enable button - modified to use the unified audio panel
-    showSoundEnableButton(callback); {
+    showSoundEnableButton(callback) {
         // The button is already in the UI as part of the unified audio panel
         console.log('Sound enable available through the unified audio panel')
         
@@ -4034,7 +4034,7 @@ class Game {
     }
 
     // Update powerups - animations and collision detection
-    updatePowerups(); {
+    updatePowerups() {
         if (!this.scene || !this.truck) {
             return;
         }
@@ -4121,7 +4121,7 @@ class Game {
     }
     
     // Create the shield effect
-    createShieldEffect(); {
+    createShieldEffect() {
         if (!this.truck || !this.scene) return;
         
         // Clean up any existing shield mesh
@@ -4157,7 +4157,7 @@ class Game {
     }
     
     // Add this method for updating the shield effect
-    updateShieldEffect(); {
+    updateShieldEffect() {
         if (!this.truck) return;
         
         // Create shield mesh if it doesn't exist
@@ -4176,15 +4176,16 @@ class Game {
     }
     
     // Add this method for removing the shield effect
-    removeShieldEffect(); {
+    removeShieldEffect() {
         if (this.shieldMesh && this.scene) {
             this.scene.remove(this.shieldMesh);
             this.shieldMesh = null;
         }
     }
     
+    
     // Create fade-out effect when powerup disappears
-    createPowerupFadeEffect(powerup); {
+    createPowerupFadeEffect(powerup) {
         if (!powerup || !powerup.position) {
             console.warn('Invalid powerup object for fade effect')
             return;
@@ -4262,7 +4263,7 @@ class Game {
     }
 
     // Create visual effect for powerup collection
-    createPowerupEffect(type); {
+    createPowerupEffect(type) {
         if (!this.truck || !this.scene) return;
         
         const powerupConfig = this.powerupTypes[type];
@@ -4317,7 +4318,7 @@ class Game {
     }
     
     // Create pooled particles for effects
-    createPooledParticles(options); {
+    createPooledParticles(options) {
         if (!this.particlePool || !Array.isArray(this.particlePool)) {
             console.warn('Particle pool not initialized properly')
             return [];
@@ -4391,7 +4392,7 @@ class Game {
     }
     
     // Create pooled light for effects
-    createPooledLight(options); {
+    createPooledLight(options) {
         const {
             position,
             color,
@@ -4457,7 +4458,7 @@ class Game {
     }
     
     // Add speed boost visual effect - simplified
-    createSpeedBoostEffect(); {
+    createSpeedBoostEffect() {
         if (!this.truck) return;
         
         const truckDirection = new THREE.Vector3(
@@ -4530,7 +4531,7 @@ class Game {
     }
     
     // Add damage boost visual effect - simplified
-    createDamageBoostEffect(); {
+    createDamageBoostEffect() {
         if (!this.truck) return;
         
         // Use particle pool for orbital particles
@@ -4589,7 +4590,7 @@ class Game {
     }
 
     // Update HUD to show active powerups
-    updatePowerupIndicators(); {
+    updatePowerupIndicators() {
         const container = document.getElementById('powerup-indicators')
         if (!container) {
             console.warn('Powerup indicators container not found')
@@ -4646,7 +4647,7 @@ class Game {
     }
     
     // Initialize weapons for the player
-    initializeWeapons(); {
+    initializeWeapons() {
         if (!this.scene) {
             console.error("Cannot initialize weapons: Scene is not available")
             return;
@@ -4708,7 +4709,7 @@ class Game {
     }
     
     // Get current weapon
-    getCurrentWeapon(); {
+    getCurrentWeapon() {
         if (!this.weapons || this.weapons.length === 0) {
             return null;
         }
@@ -4716,7 +4717,7 @@ class Game {
     }
     
     // Switch to a specific weapon
-    switchWeapon(index); {
+    switchWeapon(index) {
         if (index >= 0 && index < this.weapons.length) {
             this.currentWeaponIndex = index;
             
@@ -4728,19 +4729,19 @@ class Game {
     }
     
     // Switch to next weapon
-    nextWeapon(); {
+    nextWeapon() {
         this.currentWeaponIndex = (this.currentWeaponIndex + 1) % this.weapons.length;
         this.updateWeaponDisplay();
     }
     
     // Switch to previous weapon
-    prevWeapon(); {
+    prevWeapon() {
         this.currentWeaponIndex = (this.currentWeaponIndex - 1 + this.weapons.length) % this.weapons.length;
         this.updateWeaponDisplay();
     }
     
     // Update weapon HUD display
-    updateWeaponDisplay(); {
+    updateWeaponDisplay() {
         if (!this.weapons || this.weapons.length === 0) return;
         
         const currentWeaponElement = document.getElementById('currentWeapon')
@@ -4783,7 +4784,7 @@ class Game {
     }
     
     // Update weapon cooldown indicator
-    updateCooldownIndicator(); {
+    updateCooldownIndicator() {
         // Safety check for weapons
         if (!this.weapons || this.weapons.length === 0) return;
         
@@ -4830,7 +4831,7 @@ class Game {
     }
     
     // Create weapon pickup
-    createWeaponPickup(); {
+    createWeaponPickup() {
         if (!this.scene) return;
         
         // Choose a random weapon type (excluding the machine gun which is the default)
@@ -4859,7 +4860,7 @@ class Game {
     }
     
     // Update weapon pickups
-    updateWeaponPickups(); {
+    updateWeaponPickups() {
         if (!this.weaponPickups || !this.truck) return;
         
         const now = Date.now();
@@ -4919,7 +4920,7 @@ class Game {
     }
 
     // Initialize particle pools for effects
-    initializeParticlePools(); {
+    initializeParticlePools() {
         // Create pools for different types of particles
         this.particlePools = {
             explosionParticles: [],
@@ -5024,7 +5025,7 @@ class Game {
     }
     
     // Get particle from pool
-    getParticleFromPool(poolName); {
+    getParticleFromPool(poolName) {
         const pool = this.particlePools[poolName];
         if (!pool) return null;
         
@@ -5086,7 +5087,7 @@ class Game {
     }
     
     // Get shockwave from pool
-    getShockwaveFromPool(); {
+    getShockwaveFromPool() {
         for (let i = 0; i < this.shockwavePool.length; i++) {
             if (!this.shockwavePool[i].inUse) {
                 this.shockwavePool[i].inUse = true;
@@ -5119,7 +5120,7 @@ class Game {
     }
     
     // Get light from pool
-    getLightFromPool(); {
+    getLightFromPool() {
         for (let i = 0; i < this.explosionLightPool.length; i++) {
             if (!this.explosionLightPool[i].inUse) {
                 this.explosionLightPool[i].inUse = true;
@@ -5152,7 +5153,7 @@ class Game {
     }
     
     // Update all active explosions
-    updateExplosions(deltaTime = 1); {
+    updateExplosions(deltaTime = 1) {
         // Process each active explosion
         for (let i = this.activeExplosions.length - 1; i >= 0; i--) {
             const explosion = this.activeExplosions[i];
@@ -5280,7 +5281,7 @@ class Game {
 
     // Create explosion effect using object pooling
     // Simple direct sound player that works independently of SoundManager
-    playSimpleSound(soundName); {
+    playSimpleSound(soundName) {
         try {
             // Map sound names directly to known file paths
             let actualPath;
@@ -5369,7 +5370,7 @@ class Game {
     }
     
     // Add a temporary button for enabling sound after user interaction
-    showSoundEnableButton(callback); {
+    showSoundEnableButton(callback) {
         // Only show the button once
         if (document.getElementById('sound-enable-button')) return
         
@@ -5450,7 +5451,7 @@ class Game {
         document.body.appendChild(button);
     }
 
-    createExplosion(position, type = .standard., skipAreaDamage = false); {
+    createExplosion(position, type = 'standard', skipAreaDamage = false) {
         try {
             // ... existing explosion code ...
             
@@ -5465,7 +5466,7 @@ class Game {
         }
     }
 
-    dispose(); {
+    dispose() {
         if (this.soundManager) {
             this.soundManager.dispose();
         }
@@ -5473,7 +5474,7 @@ class Game {
     }
 
     // Create a new projectile
-    shoot(); {
+    shoot() {
         if (!this.truck) return;
         
         // Get camera position and direction
@@ -5531,7 +5532,7 @@ class Game {
     }
 
     // Handle projectile hit from a remote player
-    handleRemoteProjectileHit(sourcePlayerId, damage); {
+    handleRemoteProjectileHit(sourcePlayerId, damage) {
         console.log(`GOT HIT by player ${sourcePlayerId} for ${damage} damage`);
         
         // Visual feedback and notify server about the hit
@@ -5579,25 +5580,25 @@ class Game {
         }
     }
 
-    initializeSimpleSounds(); {
+    initializeSimpleSounds() {
         // No sound button is created - sounds are enabled by default
         console.log('Sound button creation skipped in Game - sounds are enabled by default')
     }
 
     // Auto-enable sounds
-    autoEnableSounds(); {
+    autoEnableSounds() {
         // No sound button is created - sounds are enabled by default
         console.log('Sound button creation skipped in Game - sounds are enabled by default')
     }
 
     // Create button for enabling sounds - now disabled as sounds auto-enable
-    createSoundButton(); {
+    createSoundButton() {
         // No sound button is created - sounds are now enabled by default
         console.log('Sound button creation skipped in Game - sounds are enabled by default')
     }
 
     // Create a sound enabler that starts sounds on user interaction
-    createSoundEnabler(); {
+    createSoundEnabler() {
         // Create an invisible overlay to capture first interaction
         const soundEnabler = document.createElement('div')
         soundEnabler.id = 'sound-enabler'
@@ -5667,13 +5668,13 @@ class Game {
         
         // Add to body
         document.body.appendChild(soundEnabler);
-        console.log('Sound enabler created - waiting for user interaction')
+        console.log('Sound enabler created - waiting for user interaction');
     }
 }
 
 // Initialize game when window is fully loaded
 window.addEventListener('load', () => {
-    console.log("Window loaded, creating game")
+    console.log("Window loaded, creating game");
     try {
         // Initialize SoundFX global utility
         window.SoundFX = {
