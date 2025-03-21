@@ -5087,6 +5087,37 @@ class Game {
             smokeParticles: []
         }
         
+        // IMPORTANT FIX: Initialize the singular particlePool that's used in createPooledParticles
+        this.particlePool = [];
+        this.particlePoolSize = 100; // Create a fixed pool
+        
+        // Create particle objects once for the singular pool
+        for (let i = 0; i < this.particlePoolSize; i++) {
+            try {
+                const particleGeometry = new THREE.SphereGeometry(0.1, 4, 4); // Simplified geometry
+                const particleMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.7
+                })
+                
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.visible = false; // Hide initially
+                
+                // Add to scene but hidden
+                this.scene.add(particle);
+                this.particlePool.push({
+                    mesh: particle,
+                    inUse: false
+                })
+            } catch (particleError) {
+                console.error('Error creating particle ' + i + ':', particleError)
+            }
+        }
+        
+        // Initialize next particle index
+        this.nextParticleIndex = 0;
+        
         // Pre-allocate explosion particles
         for (let i = 0; i < 200; i++) {
             // Fire particles
