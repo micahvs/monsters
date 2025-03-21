@@ -956,6 +956,81 @@ class Game {
         console.log("=======================");
     }
 
+    // Handle controls method for truck movement
+    handleControls() {
+        if (!this.truck) return;
+        
+        // Process keyboard input for movement
+        const accelerating = this.keys['ArrowUp'];
+        const braking = this.keys['ArrowDown'];
+        const turningLeft = this.keys['ArrowLeft'];
+        const turningRight = this.keys['ArrowRight'];
+        
+        // Apply controls directly to the truck
+        if (this.monsterTruck) {
+            // Use MonsterTruck's handleControls method if available
+            this.monsterTruck.handleControls(accelerating, braking, turningLeft, turningRight);
+        } else {
+            // Fallback behavior if monsterTruck is not initialized
+            // Acceleration and braking
+            if (accelerating) {
+                this.truck.velocity = Math.min(this.truck.velocity + 0.02, 1.0);
+            } else if (braking) {
+                this.truck.velocity = Math.max(this.truck.velocity - 0.03, -0.5);
+            } else {
+                // Natural deceleration
+                this.truck.velocity *= 0.95;
+            }
+            
+            // Turning (more effective at lower speeds)
+            const turnFactor = 1 - (Math.abs(this.truck.velocity) / 1.0) * 0.5;
+            if (turningLeft) {
+                this.truck.rotation.y += 0.03 * turnFactor * Math.sign(this.truck.velocity);
+            }
+            if (turningRight) {
+                this.truck.rotation.y -= 0.03 * turnFactor * Math.sign(this.truck.velocity);
+            }
+        }
+        
+        // Handle weapons/shooting with space bar
+        if (this.keys[' '] && this.weapon) {
+            this.shoot();
+        }
+    }
+    
+    // Update camera to follow the truck properly
+    updateCamera(deltaTime) {
+        if (!this.truck || !this.camera) return;
+        
+        // Calculate target position behind the truck
+        const truckDirection = new THREE.Vector3(
+            -Math.sin(this.truck.rotation.y),
+            0,
+            -Math.cos(this.truck.rotation.y)
+        );
+        
+        // Position camera BEHIND the truck (not between wheels)
+        const cameraOffset = new THREE.Vector3(
+            truckDirection.x * -10,  // 10 units behind
+            6,                       // 6 units above
+            truckDirection.z * -10   // 10 units behind
+        );
+        
+        // Target position
+        const targetPos = new THREE.Vector3().copy(this.truck.position).add(cameraOffset);
+        
+        // Smooth camera movement
+        this.camera.position.lerp(targetPos, 0.1 * deltaTime);
+        
+        // Look at the truck, slightly above it
+        const lookAtPos = new THREE.Vector3(
+            this.truck.position.x,
+            this.truck.position.y + 2,
+            this.truck.position.z
+        );
+        this.camera.lookAt(lookAtPos);
+    }
+    
     // Add collision detection and handling to the Game class
     // First, let's add a method to check for collisions with walls
     checkWallCollisions() {
