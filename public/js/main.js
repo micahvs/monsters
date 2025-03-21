@@ -1,9 +1,9 @@
-import * as THREE from 'three';
-import { MonsterTruck } from './MonsterTruck.js';
-import { World } from './World.js';
-import Multiplayer from './Multiplayer.js';
-import { Weapon, WeaponTypes, WeaponPickup } from './Weapons.js';
-import { SoundManager } from './SoundManager.js';
+import * as THREE from 'three'
+import { MonsterTruck } from './MonsterTruck.js'
+import { World } from './World.js'
+import Multiplayer from './Multiplayer.js'
+import { Weapon, WeaponTypes, WeaponPickup } from './Weapons.js'
+import { SoundManager } from './SoundManager.js'
 
 const TRUCK_SPECS = {
     'NEON CRUSHER': {
@@ -45,14 +45,14 @@ const TRUCK_SPECS = {
         health: 120,            // Higher health due to heavy armor
         armor: 1.4              // Higher damage resistance
     }
-};
+}
 
 class Projectile {
-    constructor(position, direction, speed, damage, source) {
-        const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
+    constructor(position, direction, speed, damage, source); {
+        const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8)
         geometry.rotateX(Math.PI / 2);
         
-        const projectileColor = source === 'player' ? 0xff00ff : 0xff0000;
+        const projectileColor = source === 'player' ? 0xff00ff : 0xff0000
         const material = new THREE.MeshPhongMaterial({
             color: new THREE.Color(projectileColor),
             emissive: new THREE.Color(projectileColor),
@@ -60,7 +60,7 @@ class Projectile {
             transparent: true,
             opacity: 0.8,
             shininess: 30
-        });
+        })
         
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.position.copy(position);
@@ -81,7 +81,7 @@ class Projectile {
         );
     }
 
-    update() {
+    update(); {
         // Update position with higher speed
         const movement = this.direction.clone().multiplyScalar(this.speed);
         this.mesh.position.add(movement);
@@ -94,15 +94,15 @@ class Projectile {
         this.createTrail();
     }
 
-    createTrail() {
+    createTrail(); {
         // Create particle trail
         const trailGeometry = new THREE.SphereGeometry(0.05, 4, 4);
         const trailMaterial = new THREE.MeshBasicMaterial({
             color: this.source === 'player' ? 0xff00ff : 0xff0000,
             transparent: true,
             opacity: 0.5
-        });
-        const trail = new THREE.Mesh(trailGeometry, trailMaterial);
+        })
+        const trail = new THREE.Mesh(trailGeometry, trailMaterial)
         trail.position.copy(this.mesh.position);
         
         // Fade out and remove trail particles
@@ -118,13 +118,13 @@ class Projectile {
 }
 
 class Turret {
-    constructor(position) {
+    constructor(position); {
         // Create turret base
         const baseGeometry = new THREE.CylinderGeometry(1, 1, 1, 8);
         const baseMaterial = new THREE.MeshPhongMaterial({ 
             color: new THREE.Color(0xff0000),
             shininess: 30
-        });
+        })
         this.base = new THREE.Mesh(baseGeometry, baseMaterial);
         this.base.position.copy(position);
 
@@ -133,7 +133,7 @@ class Turret {
         const gunMaterial = new THREE.MeshPhongMaterial({ 
             color: new THREE.Color(0x666666),
             shininess: 30
-        });
+        })
         this.gun = new THREE.Mesh(gunGeometry, gunMaterial);
         this.gun.position.y = 0.5;
         this.gun.position.z = 0.5;
@@ -144,7 +144,7 @@ class Turret {
         this.alive = true;
     }
 
-    update(playerPosition) {
+    update(playerPosition); {
         if (!this.alive) return;
 
         // Rotate to face player
@@ -157,7 +157,7 @@ class Turret {
         if (this.shootCooldown > 0) this.shootCooldown--;
     }
 
-    damage() {
+    damage(); {
         this.health--;
         if (this.health <= 0) {
             this.alive = false;
@@ -165,14 +165,14 @@ class Turret {
         }
     }
 
-    canShoot() {
+    canShoot(); {
         return this.alive && this.shootCooldown <= 0;
     }
 }
 
 class Game {
-    constructor() {
-        console.log("Game constructor called");
+    constructor(); {
+        console.log("Game constructor called")
         
         // Basic initialization
         this.scene = new THREE.Scene(); // Initialize scene immediately
@@ -205,16 +205,16 @@ class Game {
             '2': false,
             '3': false,
             '4': false
-        };
+        }
         
         // Initialize turn duration tracking
         this.turnDuration = {
             left: 0,
             right: 0
-        };
+        }
         
         // Initialize powerups and weapons-related data
-        this.score = 0;
+        this.score = 0
         this.activePowerups = new Map();
         this.weapons = [];
         this.projectiles = [];
@@ -262,10 +262,10 @@ class Game {
                 icon: '🔫',
                 duration: 1 // Instant effect
             }
-        };
+        }
         
         // Powerup spawn settings
-        this.maxPowerups = 5;
+        this.maxPowerups = 5
         this.powerupSpawnInterval = 15000; // 15 seconds between spawns
         this.weaponPickupSpawnInterval = 30000; // 30 seconds between weapon spawns
         
@@ -274,66 +274,66 @@ class Game {
         this.hasLoggedMultiplayerError = false;
         
         // Force enable multiplayer for development testing
-        localStorage.setItem('monsterTruckMultiplayer', 'true');
+        localStorage.setItem('monsterTruckMultiplayer', 'true')
         this.isMultiplayerEnabled = true;
         
-        console.log('🎮 [Multiplayer] Enabled flag set to:', this.isMultiplayerEnabled);
+        console.log('🎮 [Multiplayer] Enabled flag set to:', this.isMultiplayerEnabled)
         
         // Attempt to initialize the game
         this.init();
     }
 
-    init() {
+    init(); {
         try {
-            console.log('Initializing game...');
+            console.log('Initializing game...')
             
             // Setup sound enabler first - this will enable audio on first user interaction
             this.createSoundEnabler();
             
             // Debug mode output
             if (this.debugMode) {
-                console.log('Debug mode enabled');
+                console.log('Debug mode enabled')
             }
             
             // Ensure scene is initialized
             if (!this.scene) {
-                console.log("Creating new scene");
+                console.log("Creating new scene")
                 this.scene = new THREE.Scene();
             }
             
             // Setup three.js renderer first
-            console.log("Setting up WebGL renderer...");
-            this.renderer = new THREE.WebGLRenderer({ antialias: true });
+            console.log("Setting up WebGL renderer...")
+            this.renderer = new THREE.WebGLRenderer({ antialias: true })
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(this.renderer.domElement);
             
             // Add lights to scene
-            console.log("Adding lights to scene...");
+            console.log("Adding lights to scene...")
             this.addLights();
             
             // Create the arena
-            console.log("Creating arena...");
+            console.log("Creating arena...")
             this.createArena();
             
             // Create the truck
-            console.log("Creating truck...");
+            console.log("Creating truck...")
             this.createSimpleTruck();
             
             // Setup controls
-            console.log("Setting up controls...");
+            console.log("Setting up controls...")
             this.setupControls();
             
             // Initialize HUD
-            console.log("Initializing HUD...");
+            console.log("Initializing HUD...")
             this.initHUD();
             
             // Initialize weapons
-            console.log("Initializing weapons...");
+            console.log("Initializing weapons...")
             this.initializeWeapons();
             
             // Initialize particle pools
-            console.log("Initializing particle pools...");
+            console.log("Initializing particle pools...")
             this.initializeParticlePools();
             
             // Debug check for scene
@@ -342,68 +342,68 @@ class Game {
             console.log(`Camera set up: ${!!this.camera}`);
             
             // Initialize sound manager after WebGL context is set up
-            console.log("Initializing sound manager...");
+            console.log("Initializing sound manager...")
             this.soundManager = new SoundManager(this.camera);
             
             // Expose sound manager globally for UI controls
             window.soundManager = this.soundManager;
-            console.log("Sound manager initialized and exposed globally");
+            console.log("Sound manager initialized and exposed globally")
             
             // Start with a random music track
-            const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0');
+            const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0')
             console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
             this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
             
             // Initialize multiplayer if enabled
             if (localStorage.getItem('monsterTruckMultiplayer') === 'true') {
-                console.log("Initializing multiplayer...");
+                console.log("Initializing multiplayer...")
                 this.initMultiplayer();
             }
             
             // Set up window resize handler
             window.addEventListener('resize', () => {
-                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.aspect = window.innerWidth / window.innerHeight
                 this.camera.updateProjectionMatrix();
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-            });
+            })
             
             // Mark as initialized
             this.isInitialized = true;
             
-            console.log('Game initialization complete, removing loading screen...');
+            console.log('Game initialization complete, removing loading screen...')
             
             // Remove loading screen after everything is initialized
             this.removeLoadingScreen();
             
             // Start the game loop
-            console.log('Starting game loop...');
+            console.log('Starting game loop...')
             this.animate();
             
         } catch (error) {
-            console.error('Error during game initialization:', error);
+            console.error('Error during game initialization:', error)
             // Show error on loading screen
-            const loadingScreen = document.getElementById('loadingScreen');
+            const loadingScreen = document.getElementById('loadingScreen')
             if (loadingScreen) {
-                const loadingText = loadingScreen.querySelector('.loading-text');
+                const loadingText = loadingScreen.querySelector('.loading-text')
                 if (loadingText) {
-                    loadingText.textContent = 'Error loading game. Please refresh.';
-                    loadingText.style.color = '#ff0000';
+                    loadingText.textContent = 'Error loading game. Please refresh.'
+                    loadingText.style.color = '#ff0000'
                 }
             }
             throw error;
         }
     }
     
-    addLights() {
+    addLights(); {
         try {
             // Check if scene is initialized
             if (!this.scene) {
-                console.error("Cannot add lights: Scene is not initialized");
+                console.error("Cannot add lights: Scene is not initialized")
                 this.scene = new THREE.Scene(); // Create scene if missing
-                console.log("Created new scene for lights");
+                console.log("Created new scene for lights")
             }
             
-            console.log("Adding lights to scene");
+            console.log("Adding lights to scene")
             
             // Add ambient light
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -423,30 +423,30 @@ class Game {
                 this.addCoordinateAxes();
             }
             
-            console.log("Lights added successfully");
+            console.log("Lights added successfully")
         } catch (error) {
-            console.error("Error adding lights:", error);
+            console.error("Error adding lights:", error)
         }
     }
     
     // Add coordinate axes to help with debugging
-    addCoordinateAxes() {
+    addCoordinateAxes(); {
         if (!this.scene) return;
         
         // Create axes helper
         const axesHelper = new THREE.AxesHelper(10);
         this.scene.add(axesHelper);
-        console.log("Added coordinate axes for debugging");
+        console.log("Added coordinate axes for debugging")
         
         // Add axis labels
         const createLabel = (text, position, color) => {
             // Create canvas for text
-            const canvas = document.createElement('canvas');
+            const canvas = document.createElement('canvas')
             canvas.width = 128;
             canvas.height = 64;
-            const context = canvas.getContext('2d');
+            const context = canvas.getContext('2d')
             context.fillStyle = color;
-            context.font = '48px Arial';
+            context.font = '48px Arial'
             context.fillText(text, 10, 48);
             
             // Create texture from canvas
@@ -455,31 +455,31 @@ class Game {
                 map: texture, 
                 transparent: true,
                 depthTest: false
-            });
+            })
             
             // Create sprite
             const sprite = new THREE.Sprite(material);
             sprite.position.copy(position);
             sprite.scale.set(5, 2.5, 1);
             this.scene.add(sprite);
-        };
+        }
         
         // Create labels
-        createLabel('X', new THREE.Vector3(11, 0, 0), '#ff0000');
-        createLabel('Y', new THREE.Vector3(0, 11, 0), '#00ff00');
-        createLabel('Z', new THREE.Vector3(0, 0, 11), '#0000ff');
+        createLabel('X', new THREE.Vector3(11, 0, 0), '#ff0000')
+        createLabel('Y', new THREE.Vector3(0, 11, 0), '#00ff00')
+        createLabel('Z', new THREE.Vector3(0, 0, 11), '#0000ff')
     }
     
-    createArena() {
+    createArena(); {
         try {
             // Check if scene is initialized
             if (!this.scene) {
-                console.error("Cannot create arena: Scene is not initialized");
+                console.error("Cannot create arena: Scene is not initialized")
                 return;
             }
             
             const arenaSize = 400; // Reduced from 1600 to 400 for better performance
-            console.log("Creating arena with size:", arenaSize);
+            console.log("Creating arena with size:", arenaSize)
             
             // Add grid floor - increased spacing for better performance
             const gridHelper = new THREE.GridHelper(arenaSize, arenaSize / 8, 0xff00ff, 0x00ffff);
@@ -490,7 +490,7 @@ class Game {
             const groundMaterial = new THREE.MeshPhongMaterial({ 
                 color: 0x120023,
                 shininess: 10
-            });
+            })
             const ground = new THREE.Mesh(groundGeometry, groundMaterial);
             ground.rotation.x = -Math.PI / 2;
             this.scene.add(ground);
@@ -499,18 +499,18 @@ class Game {
             try {
                 this.createSimpleWalls(arenaSize);
             } catch (wallsError) {
-                console.error("Error creating walls:", wallsError);
+                console.error("Error creating walls:", wallsError)
             }
             
-            console.log("Arena created successfully");
+            console.log("Arena created successfully")
         } catch (error) {
-            console.error("Error creating arena:", error);
+            console.error("Error creating arena:", error)
         }
     }
 
-    createSimpleWalls(arenaSize) {
+    createSimpleWalls(arenaSize); {
         try {
-            console.log("Creating walls for arena");
+            console.log("Creating walls for arena")
             const halfSize = arenaSize / 2;
             const wallHeight = 20; // Reduced wall height
             
@@ -519,7 +519,7 @@ class Game {
                 color: 0xff00ff,
                 emissive: 0x330033,
                 shininess: 70
-            });
+            })
             
             // Create the main boundary walls
             const walls = [
@@ -551,7 +551,7 @@ class Game {
                     material: wallMaterial,
                     name: "West wall"
                 }
-            ];
+            ]
             
             // Create basic walls without decorative elements
             walls.forEach(wallData => {
@@ -560,14 +560,14 @@ class Game {
                 wall.name = wallData.name;
                 this.scene.add(wall);
                 console.log(`${wallData.name} added at`, wall.position);
-            });
+            })
             
             // Add simple corner towers
             const cornerMaterial = new THREE.MeshPhongMaterial({ 
                 color: 0x00ffff,
                 emissive: 0x003333,
                 shininess: 90
-            });
+            })
             
             const cornerPositions = [
                 [-halfSize, 0, -halfSize],
@@ -589,38 +589,38 @@ class Game {
                 const towerLight = new THREE.PointLight(0x00ffff, 1, 100);
                 towerLight.position.set(pos[0], wallHeight * 1.5 + 5, pos[2]);
                 this.scene.add(towerLight);
-            });
+            })
             
-            console.log("Walls and towers created");
+            console.log("Walls and towers created")
         } catch (error) {
-            console.error("Error creating walls:", error);
+            console.error("Error creating walls:", error)
         }
     }
     
-    createSimpleTruck() {
+    createSimpleTruck(); {
         try {
             // Get saved settings from localStorage
-            const truckType = localStorage.getItem('monsterTruckType') || 'neonCrusher';
+            const truckType = localStorage.getItem('monsterTruckType') || 'neonCrusher'
             let machineTypeId;
             
-            switch(truckType) {
+            switch(truckType); {
                 case 'gridRipper':
-                    machineTypeId = 'grid-ripper';
+                    machineTypeId = 'grid-ripper'
                     break;
                 case 'laserWheel':
-                    machineTypeId = 'cyber-beast';
+                    machineTypeId = 'cyber-beast'
                     break;
                 default:
-                    machineTypeId = 'neon-crusher';
+                    machineTypeId = 'neon-crusher'
             }
             
-            const color = localStorage.getItem('monsterTruckColor') || '#ff00ff';
+            const color = localStorage.getItem('monsterTruckColor') || '#ff00ff'
             
             // Create the monster truck with selected settings
             this.monsterTruck = new MonsterTruck(this.scene, new THREE.Vector3(0, 0.5, 0), {
                 machineType: machineTypeId,
                 color: color
-            });
+            })
             
             // For compatibility with existing code
             this.truck = this.monsterTruck.body;
@@ -632,64 +632,159 @@ class Game {
             this.health = this.monsterTruck.health;
             this.maxHealth = this.monsterTruck.maxHealth;
             
-            console.log("Truck created at", this.truck.position);
+            console.log("Truck created at", this.truck.position)
             console.log("Truck specs:", {
                 type: machineTypeId,
                 health: this.health,
                 armor: this.monsterTruck.armorRating
-            });
+            })
         } catch (error) {
-            console.error("Error creating truck:", error);
+            console.error("Error creating truck:", error)
         }
     }
     
-    setupControls() {
+    setupControls(); {
         try {
+            console.log("Setting up keyboard controls...")
+            
+            // Reset all key states to false
+            Object.keys(this.keys).forEach(key => {
+                this.keys[key] = false;
+            })
+            
+            // Add debug overlay to show key presses in the corner of the screen
+            if (this.debugMode) {
+                this.createKeyDebugOverlay();
+            }
+            
             // Set up keyboard controls
             window.addEventListener('keydown', (e) => {
+                // Debug output
+                if (this.debugMode) {
+                    console.log(`Key pressed: ${e.key}`)
+                    this.updateKeyDebugOverlay(e.key, true);
+                }
+                
                 if (this.keys.hasOwnProperty(e.key)) {
                     this.keys[e.key] = true;
                     
                     // Debug key to teleport to arena edge
                     if (e.key === 'd' && this.debugMode) {
-                        this.teleportToArenaEdge();
+                        this.teleportToArenaEdge()
                     }
                     
                     // Debug key to log movement data
                     if (e.key === 'm' && this.debugMode) {
-                        this.debugMovement();
+                        this.debugMovement()
                     }
                     
                     // Audio toggle with M key
                     if (e.key === 'M') {
-                        this.toggleAudio();
+                        this.toggleAudio()
                     }
                 }
-            });
+            })
             
             window.addEventListener('keyup', (e) => {
+                // Debug output
+                if (this.debugMode) {
+                    console.log(`Key released: ${e.key}`)
+                    this.updateKeyDebugOverlay(e.key, false);
+                }
+                
                 if (this.keys.hasOwnProperty(e.key)) {
                     this.keys[e.key] = false;
                 }
-            });
+            })
             
             // Handle window resize
             window.addEventListener('resize', () => {
                 if (this.camera && this.renderer) {
-                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.aspect = window.innerWidth / window.innerHeight
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
                 }
-            });
+                
+                // Reposition key debug overlay if it exists
+                if (this.keyDebugOverlay) {
+                    this.keyDebugOverlay.style.top = '10px'
+                    this.keyDebugOverlay.style.right = '10px'
+                }
+            })
             
-            console.log("Controls set up");
+            console.log("Controls set up successfully")
+            
+            // Test the controls
+            if (this.debugMode) {
+                console.log("Initial key states:", this.keys)
+            }
         } catch (error) {
-            console.error("Error setting up controls:", error);
+            console.error("Error setting up controls:", error)
+        }
+    }
+    
+    // Create an overlay to show key presses for debugging
+    createKeyDebugOverlay(); {
+        // Create overlay div
+        const overlay = document.createElement('div')
+        overlay.id = 'key-debug-overlay'
+        overlay.style.position = 'fixed'
+        overlay.style.top = '10px'
+        overlay.style.right = '10px'
+        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'
+        overlay.style.color = '#ff00ff'
+        overlay.style.padding = '10px'
+        overlay.style.borderRadius = '5px'
+        overlay.style.fontFamily = "'Orbitron', sans-serif"
+        overlay.style.fontSize = '12px'
+        overlay.style.zIndex = '9999'
+        overlay.style.maxWidth = '150px'
+        
+        // Add key indicators
+        const keyMap = {
+            'ArrowUp': '↑',
+            'ArrowDown': '↓',
+            'ArrowLeft': '←',
+            'ArrowRight': '→',
+            ' ': 'Space'
+        }
+        
+        // Create elements for each key
+        Object.entries(keyMap).forEach(([key, label]) => {
+            const keyElement = document.createElement('div')
+            keyElement.id = `key-${key}`;
+            keyElement.textContent = `${label}: OFF`;
+            keyElement.style.margin = '5px 0'
+            keyElement.style.transition = 'color 0.2s'
+            keyElement.style.color = '#777'
+            overlay.appendChild(keyElement);
+        })
+        
+        document.body.appendChild(overlay);
+        this.keyDebugOverlay = overlay;
+    }
+    
+    // Update the key debug overlay
+    updateKeyDebugOverlay(key, isPressed); {
+        if (!this.keyDebugOverlay) return;
+        
+        const keyElement = document.getElementById(`key-${key}`);
+        if (keyElement) {
+            const keyMap = {
+                'ArrowUp': '↑',
+                'ArrowDown': '↓',
+                'ArrowLeft': '←',
+                'ArrowRight': '→',
+                ' ': 'Space'
+            }
+            
+            keyElement.textContent = `${keyMap[key] || key}: ${isPressed ? 'ON' : 'OFF'}`
+            keyElement.style.color = isPressed ? '#ff00ff' : '#777'
         }
     }
     
     // Debug function to teleport to arena edge
-    teleportToArenaEdge() {
+    teleportToArenaEdge(); {
         if (!this.truck) return;
         
         const arenaSize = 1600;
@@ -699,7 +794,7 @@ class Game {
         this.truck.position.set(0, 0.5, -halfSize + 20);
         this.camera.position.set(0, 5, -halfSize + 40);
         
-        console.log("Teleported to arena edge at", this.truck.position);
+        console.log("Teleported to arena edge at", this.truck.position)
         
         // Send position update to server if in multiplayer mode
         if (this.multiplayer && this.multiplayer.isConnected) {
@@ -707,17 +802,17 @@ class Game {
         }
     }
     
-    removeLoadingScreen() {
+    removeLoadingScreen(); {
         try {
-            const loadingScreen = document.getElementById('loadingScreen');
+            const loadingScreen = document.getElementById('loadingScreen')
             if (loadingScreen) {
                 // Add transition CSS if not already present
                 if (!loadingScreen.style.transition) {
-                loadingScreen.style.transition = 'opacity 0.5s ease';
+                loadingScreen.style.transition = 'opacity 0.5s ease'
                 }
                 
                 // Fade out
-                loadingScreen.style.opacity = '0';
+                loadingScreen.style.opacity = '0'
                 
                 // Remove after fade
                 setTimeout(() => {
@@ -725,597 +820,99 @@ class Game {
                         if (loadingScreen.parentNode) {
                             loadingScreen.parentNode.removeChild(loadingScreen);
                         }
-                        console.log("Loading screen removed successfully");
+                        console.log("Loading screen removed successfully")
                     } catch (removeError) {
-                        console.error("Error removing loading screen element:", removeError);
+                        console.error("Error removing loading screen element:", removeError)
                     }
                 }, 500);
             } else {
-                console.warn("Loading screen element not found");
+                console.warn("Loading screen element not found")
             }
         } catch (error) {
-            console.error("Error in removeLoadingScreen:", error);
+            console.error("Error in removeLoadingScreen:", error)
         }
     }
     
-    update(deltaTime = 1) {
+    update(deltaTime = 1); {
         if (!this.isInitialized || this.isGameOver) return;
         
         try {
-            // Limit the number of heavy updates per frame
-            const thisFrame = this.frameCount;
-            
             // Handle controls - always needed for responsiveness
             this.handleControls();
             
             // Update truck position with delta time
             this.updateTruck(deltaTime);
             
-            // Sound listener position is automatically updated with camera
-            // No need to manually update it
+            // Update camera to follow truck - MUST be done every frame
+            this.updateCamera(deltaTime);
             
             // Update monster truck - essential for gameplay
             if (this.monsterTruck) {
                 this.monsterTruck.update(deltaTime);
-                
-                // Sync health from MonsterTruck to Game
                 this.health = this.monsterTruck.health;
                 
-                // Check for game over condition after health sync
                 if (this.health <= 0 && !this.isGameOver) {
-                    console.log("Game over condition detected in update loop!");
                     this.gameOver();
                 }
             }
             
-            // Check for wall collisions - essential for gameplay
-            if (typeof this.checkWallCollisions === 'function') {
-                this.checkWallCollisions();
-            }
+            // Distribute heavy updates across frames
+            const updateGroup = this.frameCount % 4; // 0, 1, 2, or 3
             
-            // PERFORMANCE OPTIMIZATION: Stagger heavy updates across frames
-            
-            // Update weapons every frame (essential for shooting)
-            if (this.weapons && Array.isArray(this.weapons) && this.weapons.length > 0) {
-                // Update all weapons
-                this.weapons.forEach(weapon => {
-                    if (weapon && typeof weapon.update === 'function') {
-                        weapon.update(deltaTime);
-                    }
-                });
-                
-                // Only update display and check hits if we have valid weapons
-                if (this.getCurrentWeapon()) {
-                    // Update weapon display (will update cooldown indicator)
-                    this.updateWeaponDisplay();
-                    
-                    // Check for projectile hits on enemies
-                    if (typeof this.checkProjectileHits === 'function') {
-                        this.checkProjectileHits();
-                    }
-                }
-            }
-            
-            // Update projectiles every frame (essential for gameplay)
-            this.updateProjectiles(deltaTime);
-            
-            // Update explosions every frame (for smooth animation)
-            if (this.activeExplosions && this.activeExplosions.length > 0) {
-                this.updateExplosions(deltaTime);
-            }
-            
-            // Distribute heavy updates across frames to prevent spikes
-            const updateGroup = thisFrame % 3; // 0, 1, or 2
-            
+            // Group 0: Essential updates every frame
             if (updateGroup === 0) {
-                // Group 1: Update powerups and weapon pickups
-                if (typeof this.updatePowerups === 'function') {
-                    this.updatePowerups(deltaTime);
-                }
-                
-                if (typeof this.updateWeaponPickups === 'function' && Array.isArray(this.weaponPickups)) {
-                    this.updateWeaponPickups(deltaTime);
-                }
-                
-                // Update particle effects - critical for performance
-                if (typeof this.updateTrails === 'function') {
-                    this.updateTrails();
-                }
-                
-                if (typeof this.updateImpacts === 'function') {
-                    this.updateImpacts();
-                }
-            } 
-            else if (updateGroup === 1) {
-                // Group 2: Update turrets and visual effects
-            if (typeof this.updateTurrets === 'function') {
-                    this.updateTurrets(deltaTime);
-            }
-            
-            if (typeof this.updateSparks === 'function' && this.sparks && this.sparks.length > 0) {
-                    this.updateSparks(deltaTime);
-                }
-                
-                if (this.specialEffects && this.specialEffects.length > 0) {
-                    this.updateSpecialEffects(deltaTime);
-                }
-            }
-            else if (updateGroup === 2) {
-                // Group 3: Update cosmetic elements
-                if (typeof this.updateSpectators === 'function' && this.spectators) {
-                    this.updateSpectators(deltaTime);
-                }
-                
-                // Update multiplayer (less critical)
-                if (this.multiplayer) {
-                    try {
-                        this.multiplayer.update();
-                    } catch (error) {
-                        console.error('Error updating multiplayer:', error);
-                        // Only log error once per session to avoid console spam
-                        if (!this.hasLoggedMultiplayerError) {
-                            this.hasLoggedMultiplayerError = true;
-                            this.showMessage('Multiplayer error occurred - check console for details');
+                // Update weapons and projectiles
+                if (this.weapons && Array.isArray(this.weapons)) {
+                    this.weapons.forEach(weapon => {
+                        if (weapon && typeof weapon.update === 'function') {
+                            weapon.update(deltaTime)
                         }
-                    }
+                    })
                 }
-                
-                // Debug info - update position display (not critical)
-            if (this.truck && window.updateDebugInfo) {
-                window.updateDebugInfo(this.truck.position);
+                this.updateProjectiles(deltaTime);
+            }
+            
+            // Group 1: Collision and physics
+            if (updateGroup === 1) {
+                this.checkWallCollisions();
+                if (this.activeExplosions && this.activeExplosions.length > 0) {
+                    this.updateExplosions(deltaTime);
                 }
             }
             
-            // Always update camera and HUD for smooth gameplay
-            if (typeof this.updateCamera === 'function' && this.camera && this.truck) {
-                this.updateCamera(deltaTime);
+            // Group 2: Powerups and pickups
+            if (updateGroup === 2) {
+                this.updatePowerups();
+                this.updateWeaponPickups();
             }
             
-            if (typeof this.updateHUD === 'function') {
-                // HUD updates only every other frame to reduce DOM operations
-                if (thisFrame % 2 === 0) {
-                    this.updateHUD();
-                }
+            // Group 3: Visual effects and cleanup
+            if (updateGroup === 3) {
+                this.updateTrails();
+                this.updateImpacts();
+                this.updateSparks();
+                this.updateSpectators(deltaTime);
             }
+            
+            // Update HUD less frequently
+            if (this.frameCount % 5 === 0) {
+                this.updateHUD();
+            }
+            
+            this.frameCount++;
+            
         } catch (error) {
-            console.error("Error in game update loop:", error);
-            console.error(error.stack); // Print stack trace for better debugging
+            console.error('Error in game update:', error)
         }
     }
     
     // Check for projectile hits
-    checkProjectileHits() {
-        if (!this.weapons || !this.turrets) return;
-        
-        // Loop through all weapons
-        this.weapons.forEach(weapon => {
-            // Loop through all turrets
-            this.turrets.forEach(turret => {
-                // Skip destroyed turrets
-                if (turret.destroyed) return;
-                
-                // Create a vector for turret position
-                const turretPos = new THREE.Vector3(
-                    turret.mesh.position.x,
-                    turret.mesh.position.y + 1.5, // Target center of turret
-                    turret.mesh.position.z
-                );
-                
-                // Check for collision
-                const hit = weapon.checkCollision(turretPos, 2);
-                
-                if (hit) {
-                    // Apply damage
-                    this.damageTurret(turret, hit.damage);
-                    
-                    // If hit was explosive, create bigger effect
-                    if (hit.explosive) {
-                        // Apply area damage to nearby turrets
-                        this.applyAreaDamage(turretPos, 10, hit.damage / 2);
-                    }
-                    
-                    // Add score based on damage
-                    this.score += Math.floor(hit.damage);
-                    
-                    // Update score display
-                    this.updateScoreDisplay();
-                }
-            });
-        });
-    }
-    
-    // Apply area damage to all turrets in radius
-    applyAreaDamage(position, radius, damage) {
-        if (!this.turrets) return;
-        
-        this.turrets.forEach(turret => {
-            // Skip destroyed turrets
-            if (turret.destroyed) return;
-            
-            // Calculate distance to turret
-            const distance = position.distanceTo(turret.mesh.position);
-            
-            // Apply damage if within radius
-            if (distance < radius) {
-                // Damage falls off with distance
-                const falloff = 1 - (distance / radius);
-                const actualDamage = damage * falloff;
-                
-                // Apply damage
-                this.damageTurret(turret, actualDamage);
-            }
-        });
-    }
-    
-    // Update the score display
-    updateScoreDisplay() {
-        const scoreDisplay = document.getElementById('score');
-        if (scoreDisplay) {
-            scoreDisplay.textContent = `SCORE: ${this.score}`;
+    checkProjectileHits(); {
+            console.error("Error in animate:", error)
         }
     }
-    
-    // Add method to update special effects
-    updateSpecialEffects() {
-        if (!this.specialEffects) return;
-        
-        for (let i = this.specialEffects.length - 1; i >= 0; i--) {
-            const effect = this.specialEffects[i];
-            
-            // Check if effect has an update method
-            if (effect.update && typeof effect.update === 'function') {
-                // Call update method, which returns true if the effect should be removed
-                const shouldRemove = effect.update();
-                
-                if (shouldRemove) {
-                    this.specialEffects.splice(i, 1);
-                }
-            } else if (effect.mesh && !effect.mesh.parent) {
-                // If the mesh has been removed from the scene, remove the effect
-                this.specialEffects.splice(i, 1);
-            }
-        }
-    }
-    
-    handleControls() {
-        if (!this.truck) return;
-        
-        // Reset acceleration and turning
-        this.truck.acceleration = 0;
-        this.truck.turning = 0;
-        
-        // Forward/Backward - FIXED
-        if (this.keys.ArrowUp) {
-            // Up arrow = forward
-            this.truck.acceleration = 0.02;
-            
-            // Play engine rev sound when accelerating
-            if (this.frameCount % 30 === 0) { // Play every half second
-                console.log("Playing engine rev sound");
-                if (this.soundManager) {
-                    console.log("Using sound manager to play 'engine_rev'");
-                    this.soundManager.playSound('engine_rev', this.truck.position);
-                } else if (window.SoundFX) {
-                    console.log("Using SoundFX to play 'engine_rev'");
-                    window.SoundFX.play('engine_rev');
-                }
-            }
-        } else if (this.keys.ArrowDown) {
-            // Down arrow = backward
-            this.truck.acceleration = -0.02;
-            
-            // Play engine deceleration sound when braking/reversing
-            if (this.frameCount % 30 === 0) {
-                console.log("Playing engine deceleration sound");
-                if (this.soundManager) {
-                    console.log("Using sound manager to play 'engine_deceleration'");
-                    this.soundManager.playSound('engine_deceleration', this.truck.position);
-                } else if (window.SoundFX) {
-                    console.log("Using SoundFX to play 'engine_deceleration'");
-                    window.SoundFX.play('engine_deceleration');
-                }
-            }
-        } else {
-            // Play idle sound when not accelerating or decelerating
-            if (this.frameCount % 60 === 0) { // Play less frequently
-                console.log("Playing engine idle sound");
-                if (this.soundManager) {
-                    console.log("Using sound manager to play 'engine_idle'");
-                    this.soundManager.playSound('engine_idle', this.truck.position);
-                } else if (window.SoundFX) {
-                    console.log("Using SoundFX to play 'engine_idle'");
-                    window.SoundFX.play('engine_idle');
-                }
-            }
-        }
-        
-        // Update turn duration tracking - reset durations if not turning
-        if (!this.keys.ArrowLeft) this.turnDuration.left = 0;
-        if (!this.keys.ArrowRight) this.turnDuration.right = 0;
-        
-        // Turning - FIXED
-        if (this.keys.ArrowLeft) {
-            // Left arrow = turn left (counter-clockwise)
-            this.truck.turning = 0.02;
-            
-            // Increment turn duration
-            this.turnDuration.left++;
-            
-            // Play tire screech only after turning for more than 1 second (60 frames)
-            // and only if moving at sufficient speed
-            if (Math.abs(this.truck.velocity) > 0.5 && 
-                this.turnDuration.left > 60 && 
-                this.frameCount % 20 === 0) {
-                
-                console.log("Playing tire screech sound (left turn) after", this.turnDuration.left, "frames");
-                if (this.soundManager) {
-                    this.soundManager.playSound('tire_screech', this.truck.position);
-                } else if (window.SoundFX) {
-                    window.SoundFX.play('tire_screech');
-                }
-            }
-        } else if (this.keys.ArrowRight) {
-            // Right arrow = turn right (clockwise)
-            this.truck.turning = -0.02;
-            
-            // Increment turn duration
-            this.turnDuration.right++;
-            
-            // Play tire screech only after turning for more than 1 second (60 frames)
-            // and only if moving at sufficient speed
-            if (Math.abs(this.truck.velocity) > 0.5 && 
-                this.turnDuration.right > 60 && 
-                this.frameCount % 20 === 0) {
-                
-                console.log("Playing tire screech sound (right turn) after", this.turnDuration.right, "frames");
-                if (this.soundManager) {
-                    this.soundManager.playSound('tire_screech', this.truck.position);
-                } else if (window.SoundFX) {
-                    window.SoundFX.play('tire_screech');
-                }
-            }
-        }
-        
-        // Shooting
-        if (this.keys[' ']) {
-            // Use old shooting system as fallback
-            if (typeof this.shoot === 'function') {
-                console.log("Using original shoot method");
-            this.shoot();
-            }
-            
-            // Also try new weapon system if available
-            if (this.weapons && this.weapons.length > 0) {
-                const currentWeapon = this.getCurrentWeapon();
-                
-                if (currentWeapon) {
-                    try {
-                        console.log("Attempting to shoot with weapon:", currentWeapon.type.name);
-                        
-                        // Calculate shooting position and direction
-                        const shootPos = new THREE.Vector3(
-                            this.truck.position.x,
-                            this.truck.position.y + 0.5,
-                            this.truck.position.z
-                        );
-                        
-                        // Calculate forward direction from truck rotation
-                        const direction = new THREE.Vector3(
-                            Math.sin(this.truck.rotation.y),
-                            0,
-                            Math.cos(this.truck.rotation.y)
-                        );
-                        
-                        // Handle mines differently - they're dropped behind the truck
-                        let result = false;
-                        if (currentWeapon.type.name === "Mines") {
-                            // Drop behind the truck
-                            const shootPosBehind = new THREE.Vector3(
-                                this.truck.position.x - direction.x * 2,
-                                this.truck.position.y,
-                                this.truck.position.z - direction.z * 2
-                            );
-                            
-                            // Direction is down
-                            const downDirection = new THREE.Vector3(0, -1, 0);
-                            
-                            // Shoot the mine
-                            result = currentWeapon.shoot(shootPosBehind, downDirection);
-                            console.log("Mine shot result:", result);
-                        } else {
-                            // Shoot regular weapon
-                            result = currentWeapon.shoot(shootPos, direction);
-                            console.log("Weapon shot result:", result);
-                        }
-                        
-                        // Play weapon sound if shot was successful
-                        if (result && window.SoundFX) {
-                            // Use our guaranteed sound system
-                            window.SoundFX.play('weapon_fire');
-                        }
-                        
-                        // Update weapon display
-                        this.updateWeaponDisplay();
-                    } catch (error) {
-                        console.error("Error while shooting:", error);
-                    }
-                } else {
-                    console.warn("No current weapon available");
-                }
-            }
-        }
-        
-        // Audio toggle with 'M' key
-        if (this.keys['M']) {
-            this.keys['M'] = false; // Reset key to prevent multiple toggles
-            this.toggleAudio();
-        }
-        
-    }
-    
-    updateTruck(deltaTime = 1) {
-        if (!this.truck) return;
-        
-        // Base values - these are the "60fps standard" values
-        const baseAcceleration = 0.02;
-        const baseMaxSpeed = 1.0;
-        const baseFriction = 0.02;
-        const baseTurning = 0.02;
-        
-        // Scale by deltaTime for frame rate independence
-        const scaledAcceleration = this.truck.acceleration * deltaTime;
-        const scaledFriction = baseFriction * deltaTime;
-        const scaledTurning = this.truck.turning * deltaTime;
-        
-        // Update velocity based on acceleration with delta time scaling
-        this.truck.velocity += scaledAcceleration;
-        
-        // Get max speed based on active powerups
-        let maxSpeed = baseMaxSpeed;
-        if (this.activePowerups && this.activePowerups.has('SPEED_BOOST')) {
-            maxSpeed = baseMaxSpeed * 2; // Double speed with powerup
-        }
-        
-        // Apply speed limits
-        if (Math.abs(this.truck.velocity) > maxSpeed) {
-            this.truck.velocity = Math.sign(this.truck.velocity) * maxSpeed;
-        }
-        
-        // Apply friction/drag with delta time scaling
-        this.truck.velocity *= (1 - scaledFriction);
-        
-        // Stop completely if very slow
-        if (Math.abs(this.truck.velocity) < 0.001) {
-            this.truck.velocity = 0;
-        }
-        
-        // Only update position if moving
-        if (Math.abs(this.truck.velocity) > 0) {
-            // Calculate movement direction based on truck's rotation
-            const moveX = Math.sin(this.truck.rotation.y) * this.truck.velocity;
-            const moveZ = Math.cos(this.truck.rotation.y) * this.truck.velocity;
-            
-            // Apply movement with delta time scaling
-            this.truck.position.x += moveX * deltaTime;
-            this.truck.position.z += moveZ * deltaTime;
-        }
-        
-        // Apply turning with delta time scaling
-        this.truck.rotation.y += scaledTurning;
-        
-        // Update speed display - less frequently to reduce DOM updates
-        if (this.frameCount % 5 === 0) {
-        this.updateSpeedDisplay();
-        }
-    }
-    
-    updateCamera() {
-        if (!this.camera || !this.truck) return;
-        
-        try {
-        // Follow camera with original settings
-        const cameraDistance = 5; // Original value
-        const cameraHeight = 3;   // Original value
-        
-            // Store original position to handle errors
-            const originalX = this.camera.position.x;
-            const originalZ = this.camera.position.z;
-            const originalY = this.camera.position.y;
-            
-            // Calculate new camera position
-            const newX = this.truck.position.x - Math.sin(this.truck.rotation.y) * cameraDistance;
-            const newZ = this.truck.position.z - Math.cos(this.truck.rotation.y) * cameraDistance;
-            
-            // Check if values are valid numbers
-            if (isNaN(newX) || isNaN(newZ)) {
-                console.error("Invalid camera position calculated. Using previous position.");
-                return;
-            }
-            
-            // Apply new position
-            this.camera.position.x = newX;
-            this.camera.position.z = newZ;
-        this.camera.position.y = cameraHeight;
-        
-            // Calculate look at point
-        const lookAtPoint = new THREE.Vector3(
-            this.truck.position.x + Math.sin(this.truck.rotation.y) * 2,
-            this.truck.position.y,
-            this.truck.position.z + Math.cos(this.truck.rotation.y) * 2
-        );
-        
-            // Check if values are valid
-            if (lookAtPoint.x === undefined || isNaN(lookAtPoint.x) || 
-                lookAtPoint.y === undefined || isNaN(lookAtPoint.y) || 
-                lookAtPoint.z === undefined || isNaN(lookAtPoint.z)) {
-                console.error("Invalid look at point. Skipping camera update.");
-                
-                // Restore original position
-                this.camera.position.x = originalX;
-                this.camera.position.z = originalZ;
-                this.camera.position.y = originalY;
-                return;
-            }
-            
-            // Apply look at
-        this.camera.lookAt(lookAtPoint);
-            
-        } catch (error) {
-            console.error("Error updating camera:", error);
-        }
-    }
-    
-    animate() {
-        if (!this.isInitialized) return;
-        
-        // DEBUG - Check scene and truck status
-        this.debugGameState();
-        
-        // Calculate delta time for frame-rate independent movement
-        const now = performance.now();
-        if (!this.lastFrameTime) this.lastFrameTime = now;
-        const deltaTime = Math.min((now - this.lastFrameTime) / 16.67, 2.0); // Cap at 2x normal delta to prevent large jumps
-        this.lastFrameTime = now;
-        
-        requestAnimationFrame(() => this.animate());
-        
-        try {
-            // Increment frame counter
-            this.frameCount++;
-            
-            // Force first powerup spawns when game starts, but stagger them
-            if (this.frameCount === 60) { // After 1 second
-                // Create initial powerup to ensure they appear
-                this.createPowerup();
-                
-                // Stagger powerup and weapon pickup creation
-                setTimeout(() => this.createPowerup(), 500);
-                setTimeout(() => this.createWeaponPickup(), 1000);
-                setTimeout(() => this.createPowerup(), 1500);
-                
-                console.log("Initial powerups and weapon pickup spawning staggered");
-            }
-            
-            // Update game state with delta time
-            this.update(deltaTime);
-            
-            // Render scene - only render at 30fps on slower devices
-            if (this.renderer && this.scene && this.camera) {
-                // Check if we should throttle rendering
-                const shouldRender = !this.lastRenderTime || now - this.lastRenderTime >= 33.33; // ~30fps
-                
-                if (shouldRender) {
-                    this.renderer.render(this.scene, this.camera);
-                    this.lastRenderTime = now;
-                }
-            }
-        } catch (error) {
-            console.error("Error in animate:", error);
-        }
-    }
-
     // Debug method to check the game state
-    debugGameState() {
+    debugGameState(); {
         // Only run this every 60 frames to avoid console spam
         if (this.frameCount % 60 !== 0) return;
         
@@ -1360,9 +957,8 @@ class Game {
     }
 
     // Add collision detection and handling to the Game class
-
     // First, let's add a method to check for collisions with walls
-    checkWallCollisions() {
+    checkWallCollisions(); {
         if (!this.truck) return false;
         
         const arenaSize = 1600; // Updated to match the larger arena
@@ -1376,10 +972,10 @@ class Game {
             const machineType = this.monsterTruck.config.machineType;
             
             if (machineType === 'neon-crusher') {
-                truckWidth = 3.5; // Wider for Crusher
+                truckWidth = 3.5 // Wider for Crusher
                 truckLength = 5;
             } else if (machineType === 'cyber-beast') {
-                truckWidth = 3;
+                truckWidth = 3
                 truckLength = 5.2;
             } else {
                 truckWidth = 2.5; // Grid Ripper
@@ -1391,59 +987,57 @@ class Game {
             truckLength = 3;
         }
         
-        // Calculate truck bounds with some buffer for collision detection
-        const truckBounds = {
-            minX: this.truck.position.x - truckWidth/2 - 0.2,
-            maxX: this.truck.position.x + truckWidth/2 + 0.2,
-            minZ: this.truck.position.z - truckLength/2 - 0.2,
-            maxZ: this.truck.position.z + truckLength/2 + 0.2
-        };
-        
         // Check collision with each wall
-        let collision = false;
-        let collisionNormal = { x: 0, z: 0 };
+        // We'll use a simple AABB collision check for each wall
+        // North wall (positive Z, top of arena)
+        const northWallZ = halfSize;
+        const truckZ = this.truck.position.z;
+        const truckX = this.truck.position.x;
         
-        // North wall (back)
-        if (truckBounds.minZ <= -halfSize + wallThickness) {
-            collision = true;
-            collisionNormal = { x: 0, z: 1 }; // Pointing south
-            this.truck.position.z = -halfSize + wallThickness + truckLength/2 + 0.2; // Push back
+        // Add half of truck length to account for truck dimensions
+        if (truckZ + truckLength/2 > northWallZ - wallThickness) {
+            return {
+                collision: true,
+                normal: new THREE.Vector3(0, 0, -1), // Normal points inward from wall
+                wall: 'north'
+            };
         }
         
-        // South wall (front)
-        else if (truckBounds.maxZ >= halfSize - wallThickness) {
-            collision = true;
-            collisionNormal = { x: 0, z: -1 }; // Pointing north
-            this.truck.position.z = halfSize - wallThickness - truckLength/2 - 0.2; // Push back
+        // South wall (negative Z, bottom of arena)
+        const southWallZ = -halfSize;
+        if (truckZ - truckLength/2 < southWallZ + wallThickness) {
+            return {
+                collision: true,
+                normal: new THREE.Vector3(0, 0, 1), // Normal points inward from wall
+                wall: 'south'
+            };
         }
         
-        // East wall (right)
-        else if (truckBounds.maxX >= halfSize - wallThickness) {
-            collision = true;
-            collisionNormal = { x: -1, z: 0 }; // Pointing west
-            this.truck.position.x = halfSize - wallThickness - truckWidth/2 - 0.2; // Push back
+        // East wall (positive X, right of arena)
+        const eastWallX = halfSize;
+        if (truckX + truckWidth/2 > eastWallX - wallThickness) {
+            return {
+                collision: true,
+                normal: new THREE.Vector3(-1, 0, 0), // Normal points inward from wall
+                wall: 'east'
+            };
         }
         
-        // West wall (left)
-        else if (truckBounds.minX <= -halfSize + wallThickness) {
-            collision = true;
-            collisionNormal = { x: 1, z: 0 }; // Pointing east
-            this.truck.position.x = -halfSize + wallThickness + truckWidth/2 + 0.2; // Push back
+        // West wall (negative X, left of arena)
+        const westWallX = -halfSize;
+        if (truckX - truckWidth/2 < westWallX + wallThickness) {
+            return {
+                collision: true,
+                normal: new THREE.Vector3(1, 0, 0), // Normal points inward from wall
+                wall: 'west'
+            };
         }
         
-        // Handle collision if detected
-        if (collision) {
-            this.handleWallCollision(collisionNormal);
-            
-            // Create more visual feedback for wall collisions in the larger arena
-            this.createWallCollisionEffect(this.truck.position, collisionNormal);
-        }
-        
-        return collision;
+        return false; // No collision
     }
     
     // Add enhanced wall collision effects for the larger arena
-    createWallCollisionEffect(position, normal) {
+    createWallCollisionEffect(position, normal); {
         // Create a burst of particles at the collision point
         const particleCount = 15;
         const particles = [];
@@ -1458,7 +1052,7 @@ class Game {
                 emissiveIntensity: 0.5,
                 transparent: true,
                 opacity: 0.8
-            });
+            })
             
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
             
@@ -1481,7 +1075,7 @@ class Game {
                     z: velocityZ
                 },
                 life: 1.0
-            };
+            }
             
             this.scene.add(particle);
             particles.push(particle);
@@ -1520,13 +1114,13 @@ class Game {
             if (!allDead) {
                 requestAnimationFrame(animateParticles);
             }
-        };
+        }
         
         animateParticles();
     }
 
     // Handle wall collision with damage and bounce effect
-    handleWallCollision(normal) {
+    handleWallCollision(normal); {
         // Calculate impact speed (how fast we're moving toward the wall)
         const impactSpeed = Math.abs(this.truck.velocity);
         
@@ -1556,46 +1150,46 @@ class Game {
                 
                 // Try to show collision effect, but don't crash if it fails
                 try {
-                    this.showCollisionEffect(impactSpeed);
+                    this.showCollisionEffect(impactSpeed)
                 } catch (collisionEffectError) {
-                    console.error('Error showing collision effect:', collisionEffectError);
+                    console.error('Error showing collision effect:', collisionEffectError)
                 }
             }
         } catch (error) {
-            console.error('Error in wall collision handling:', error);
+            console.error('Error in wall collision handling:', error)
         }
 
         // Play collision sound with proper fallback
         try {
             if (this.soundManager) {
-                this.soundManager.playSound('metal_impact', this.truck.position);
+                this.soundManager.playSound('metal_impact', this.truck.position)
             } else if (window.SoundFX) {
                 // Use fallback audio system
-                console.log("Using SoundFX for wall collision sound");
-                window.SoundFX.play('metal_impact');
+                console.log("Using SoundFX for wall collision sound")
+                window.SoundFX.play('metal_impact')
                 
                 // Also play suspension/bounce sound to enhance the effect
-                window.SoundFX.play('suspension_bounce');
+                window.SoundFX.play('suspension_bounce')
             }
         } catch (soundError) {
-            console.error('Error playing collision sound:', soundError);
+            console.error('Error playing collision sound:', soundError)
         }
     }
 
     // Take damage method
-    takeDamage(amount) {
+    takeDamage(amount); {
         // Add clear logging to debug damage
         console.log(`TAKING DAMAGE: ${amount}, current health: ${this.health}`);
         
         // Check if invincible
         if (this.truck && this.truck.isInvincible) {
-            console.log("Damage blocked by invincibility");
+            console.log("Damage blocked by invincibility")
             return 0;
         }
         
         // Check if shield is active
         if (this.hasShield) {
-            console.log("Damage blocked by shield");
+            console.log("Damage blocked by shield")
             this.showShieldHitEffect();
             
             // Remove shield
@@ -1611,7 +1205,7 @@ class Game {
         
         // Health is directly on the game object
         if (typeof this.health !== 'undefined') {
-            this.health -= amount;
+            this.health -= amount
             this.health = Math.max(0, this.health);
             
             // Also update MonsterTruck health if it exists
@@ -1627,7 +1221,7 @@ class Game {
             
             // Check for game over
             if (this.health <= 0) {
-                console.log("Player died from damage");
+                console.log("Player died from damage")
                 this.gameOver();
             }
             
@@ -1638,7 +1232,7 @@ class Game {
     }
     
     // Show shield hit effect
-    showShieldHitEffect() {
+    showShieldHitEffect(); {
         if (!this.shieldMesh) return;
         
         // Flash the shield
@@ -1658,7 +1252,7 @@ class Game {
                 emissiveIntensity: 0.5,
                 transparent: true,
                 opacity: 0.8
-            });
+            })
             
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
             
@@ -1686,7 +1280,7 @@ class Game {
                     z: direction.z * speed
                 },
                 life: 1.0
-            };
+            }
             
             this.scene.add(particle);
             this.sparks.push(particle);
@@ -1701,14 +1295,14 @@ class Game {
         
         // Play shield hit sound using our guaranteed sound system
         if (window.SoundFX) {
-            window.SoundFX.play('shield_hit');
+            window.SoundFX.play('shield_hit')
         }
     }
     
     // Add screen flash effect for damage
-    addDamageScreenEffect(amount) {
+    addDamageScreenEffect(amount); {
         // Create a red flash overlay that fades out
-        const overlay = document.createElement('div');
+        const overlay = document.createElement('div')
         const opacity = Math.min(0.8, amount / 50); // Scale opacity with damage
         
         overlay.style.cssText = `
@@ -1717,7 +1311,7 @@ class Game {
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(255, 0, 0, ${opacity});
+            background-color: rgba(255, 0, 0, ${opacity})
             pointer-events: none;
             z-index: 1000;
             transition: opacity 0.5s ease;
@@ -1727,7 +1321,7 @@ class Game {
         
         // Fade out and remove
         setTimeout(() => {
-            overlay.style.opacity = '0';
+            overlay.style.opacity = '0'
             setTimeout(() => {
                 overlay.remove();
             }, 500);
@@ -1738,7 +1332,7 @@ class Game {
     }
 
     // Show collision effect
-    showCollisionEffect(intensity) {
+    showCollisionEffect(intensity); {
         if (!this.truck) return;
         
         // Visual effects
@@ -1748,44 +1342,44 @@ class Game {
         this.shakeCamera(intensity * 0.3);
         
         // Sound effect
-        console.log("Adding engine rev sound for collision feedback");
+        console.log("Adding engine rev sound for collision feedback")
         if (this.soundManager) {
             // Play engine rev sound for more immersive collision feedback
-            this.soundManager.playSound('engine_rev', this.truck.position);
+            this.soundManager.playSound('engine_rev', this.truck.position)
             
             // Play suspension bounce for heavier collisions
             if (intensity > 0.5) {
-                this.soundManager.playSound('suspension_bounce', this.truck.position);
+                this.soundManager.playSound('suspension_bounce', this.truck.position)
             }
         } 
         // Fallback to SoundFX
         else if (window.SoundFX) {
             // Play engine rev sound for more immersive collision feedback
-            window.SoundFX.play('engine_rev');
+            window.SoundFX.play('engine_rev')
             
             // Play suspension bounce for heavier collisions
             if (intensity > 0.5) {
-                window.SoundFX.play('suspension_bounce');
+                window.SoundFX.play('suspension_bounce')
             }
         }
     }
 
     // Create spark particles at collision point
-    createCollisionSparks() {
+    createCollisionSparks(); {
         // Safe-guard against null scene or uninitalized particle system
         if (!this.scene || !this.truck) {
-            console.warn('Cannot create collision sparks: scene or truck not initialized');
+            console.warn('Cannot create collision sparks: scene or truck not initialized')
             return;
         }
         
         // Make sure particle pool is initialized
         if (!this.particlePool) {
-            console.log('Initializing particle pool for collision sparks');
+            console.log('Initializing particle pool for collision sparks')
             this.initializeParticlePool();
             
             // Double-check initialization worked
             if (!this.particlePool || !this.particlePool.length) {
-                console.warn('Failed to initialize particle pool, skipping collision sparks');
+                console.warn('Failed to initialize particle pool, skipping collision sparks')
                 return;
             }
         }
@@ -1807,7 +1401,7 @@ class Game {
             
             // Skip if we couldn't get a particle
             if (!spark) {
-                console.warn('Could not get particle for collision spark');
+                console.warn('Could not get particle for collision spark')
                 continue;
             }
             
@@ -1831,7 +1425,7 @@ class Game {
             );
             
             // Initialize userData if needed
-            spark.userData = spark.userData || {};
+            spark.userData = spark.userData || {}
             spark.userData.velocity = new THREE.Vector3(
                 dirX + forward.x * 0.5,
                 dirY + 0.2,
@@ -1839,7 +1433,7 @@ class Game {
             );
             spark.userData.velocity.multiplyScalar(0.2 + Math.random() * 0.3);
             spark.userData.lifetime = 20 + Math.random() * 30;
-            spark.userData.type = 'spark';
+            spark.userData.type = 'spark'
             
             // Add to active trails
             if (!this.activeTrails) {
@@ -1849,34 +1443,34 @@ class Game {
         }
         
         // Play collision sound effect
-        console.log("Playing collision sound effects");
+        console.log("Playing collision sound effects")
         
         // Try primary sound system
         if (this.soundManager) {
-            console.log("Using SoundManager for collision sounds");
-            this.soundManager.playSound('metal_impact', this.truck.position);
+            console.log("Using SoundManager for collision sounds")
+            this.soundManager.playSound('metal_impact', this.truck.position)
             
             // Add suspension bounce sound for extra effect
             if (Math.random() > 0.5) {
-                this.soundManager.playSound('suspension_bounce', this.truck.position);
+                this.soundManager.playSound('suspension_bounce', this.truck.position)
             }
         } 
         // Fall back to SoundFX
         else if (window.SoundFX) {
-            console.log("Using SoundFX for collision sounds");
-            window.SoundFX.play('metal_impact');
+            console.log("Using SoundFX for collision sounds")
+            window.SoundFX.play('metal_impact')
             
             // Add suspension bounce sound for extra effect
             if (Math.random() > 0.5) {
                 setTimeout(() => {
-                    window.SoundFX.play('suspension_bounce');
+                    window.SoundFX.play('suspension_bounce')
                 }, 150);
             }
         }
     }
 
     // Add camera shake effect
-    shakeCamera(intensity) {
+    shakeCamera(intensity); {
         if (!this.camera) return;
         
         // Store original camera position
@@ -1885,7 +1479,7 @@ class Game {
                 x: this.camera.position.x,
                 y: this.camera.position.y,
                 z: this.camera.position.z
-            };
+            }
         }
         
         // Set shake parameters
@@ -1901,7 +1495,7 @@ class Game {
     }
 
     // Update camera shake
-    updateCameraShake() {
+    updateCameraShake(); {
         if (!this.isShaking || !this.camera) return;
         
         const elapsed = Date.now() - this.shakeStartTime;
@@ -1925,15 +1519,15 @@ class Game {
     }
 
     // Game over method
-    gameOver() {
+    gameOver(); {
         // Prevent multiple game over screens
         if (this.isGameOver) {
-            console.log("Game already over, not showing another game over screen");
+            console.log("Game already over, not showing another game over screen")
             return;
         }
         
         this.isGameOver = true;
-        console.log("GAME OVER! Creating game over screen");
+        console.log("GAME OVER! Creating game over screen")
         
         try {
             // Make sure we have a score
@@ -1949,8 +1543,8 @@ class Game {
             }
         
         // Create game over overlay
-        const overlay = document.createElement('div');
-            overlay.id = "game-over-overlay"; // Add ID for easier targeting
+        const overlay = document.createElement('div')
+            overlay.id = "game-over-overlay" // Add ID for easier targeting
         overlay.style.cssText = `
             position: fixed;
             top: 0;
@@ -1963,15 +1557,15 @@ class Game {
             justify-content: center;
             align-items: center;
                 z-index: 9999;
-            font-family: 'Orbitron', sans-serif;
+            font-family: 'Orbitron', sans-serif
             color: #ff00ff;
         `;
 
         overlay.innerHTML = `
                 <h1 style="text-shadow: 0 0 10px #ff00ff; font-size: 48px; margin-bottom: 20px;">GAME OVER!</h1>
-                <h2 style="text-shadow: 0 0 10px #ff00ff; font-size: 32px; margin-bottom: 30px;">SCORE: ${this.score}</h2>
+                <h2 style="text-shadow: 0 0 10px #ff00ff font-size: 32px; margin-bottom: 30px;">SCORE: ${this.score}</h2>
                 <button id="try-again-button" style="
-                background: linear-gradient(45deg, #ff00ff, #aa00ff);
+                background: linear-gradient(45deg, #ff00ff, #aa00ff)
                 color: white;
                 border: none;
                 padding: 15px 30px;
@@ -1979,7 +1573,7 @@ class Game {
                     font-size: 24px;
                 border-radius: 5px;
                 cursor: pointer;
-                font-family: 'Orbitron', sans-serif;
+                font-family: 'Orbitron', sans-serif
                 text-transform: uppercase;
                 letter-spacing: 2px;
                 box-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
@@ -1989,46 +1583,46 @@ class Game {
         document.body.appendChild(overlay);
             
             // Add event listener to the try again button
-            const tryAgainButton = document.getElementById("try-again-button");
+            const tryAgainButton = document.getElementById("try-again-button")
             if (tryAgainButton) {
                 tryAgainButton.addEventListener("click", () => {
-                    console.log("Reloading game...");
+                    console.log("Reloading game...")
                     window.location.reload();
-                });
+                })
             }
             
             // Play a game over sound if available
             try {
                 const gameOverSound = new Audio();
-                gameOverSound.src = 'sounds/gameover.mp3';
+                gameOverSound.src = 'sounds/gameover.mp3'
                 gameOverSound.volume = 0.5;
-                gameOverSound.play().catch(e => console.log('Could not play game over sound:', e));
+                gameOverSound.play().catch(e => console.log('Could not play game over sound:', e))
             } catch (error) {
-                console.log("Could not play game over sound:", error);
+                console.log("Could not play game over sound:", error)
             }
         } catch (error) {
-            console.error("Error showing game over screen:", error);
+            console.error("Error showing game over screen:", error)
             
             // Fallback game over alert if there's an error
-            alert("GAME OVER! Score: " + this.score);
+            alert("GAME OVER! Score: " + this.score)
         }
     }
 
     // Update HUD method
-    updateHUD() {
+    updateHUD(); {
         // Update health display with color coding and bar
-        const healthElement = document.getElementById('health');
+        const healthElement = document.getElementById('health')
         if (healthElement) {
             const healthPercent = this.health;
-            let healthColor = '#00ff00'; // Green for good health
+            let healthColor = '#00ff00' // Green for good health
             
             if (healthPercent < 30) {
-                healthColor = '#ff0000'; // Red for low health
+                healthColor = '#ff0000' // Red for low health
             } else if (healthPercent < 70) {
-                healthColor = '#ffff00'; // Yellow for medium health
+                healthColor = '#ffff00' // Yellow for medium health
             }
             
-            healthElement.innerHTML = `HEALTH: <span style="color: ${healthColor};">${Math.floor(healthPercent)}%</span>`;
+            healthElement.innerHTML = `HEALTH: <span style="color: ${healthColor}">${Math.floor(healthPercent)}%</span>`
             
             // Update health bar
             if (window.updateStatBars) {
@@ -2047,7 +1641,7 @@ class Game {
         
         // Update powerup indicators
         if (typeof this.updatePowerupIndicators === 'function') {
-            this.updatePowerupIndicators();
+            this.updatePowerupIndicators()
         }
         
         // Update score display
@@ -2060,53 +1654,53 @@ class Game {
     }
     
     // Update weapon info display
-    updateWeaponInfo() {
-        const weaponNameElement = document.getElementById('currentWeapon');
-        const weaponStatsElement = document.getElementById('weaponStats');
+    updateWeaponInfo(); {
+        const weaponNameElement = document.getElementById('currentWeapon')
+        const weaponStatsElement = document.getElementById('weaponStats')
         
         if (weaponNameElement && weaponStatsElement && this.weapons && this.currentWeaponIndex !== undefined) {
             const currentWeapon = this.weapons[this.currentWeaponIndex];
             if (currentWeapon) {
                 // Update weapon name - use type.name instead of name
-                weaponNameElement.innerHTML = `<span style="color: #00ffff;">${currentWeapon.type.name || 'UNKNOWN WEAPON'}</span>`;
+                weaponNameElement.innerHTML = `<span style="color: #00ffff;">${currentWeapon.type.name || 'UNKNOWN WEAPON'}</span>`
                 
                 // Update weapon stats
                 let damageText = currentWeapon.type.damage || 20;
-                let fireRateText = currentWeapon.type.cooldown ? ((currentWeapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s';
+                let fireRateText = currentWeapon.type.cooldown ? ((currentWeapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s'
                 
-                weaponStatsElement.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
+                weaponStatsElement.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`
             }
         }
     }
     
     // Update speed display
-    updateSpeedDisplay() {
-        const speedElement = document.getElementById('speed');
+    updateSpeedDisplay(); {
+        const speedElement = document.getElementById('speed')
         if (speedElement && this.truck) {
             // Calculate speed in MPH (arbitrary conversion for game feel)
             const speed = Math.round(this.truckSpeed * 10);
             
             // Color coding based on speed
-            let speedColor = '#ffffff';
+            let speedColor = '#ffffff'
             if (speed > 80) {
-                speedColor = '#ff0000'; // Red for high speed
+                speedColor = '#ff0000' // Red for high speed
             } else if (speed > 50) {
-                speedColor = '#ffff00'; // Yellow for medium speed
+                speedColor = '#ffff00' // Yellow for medium speed
             } else if (speed > 20) {
-                speedColor = '#00ffff'; // Cyan for normal speed
+                speedColor = '#00ffff' // Cyan for normal speed
             }
             
-            speedElement.innerHTML = `SPEED: <span style="color: ${speedColor};">${speed} MPH</span>`;
+            speedElement.innerHTML = `SPEED: <span style="color: ${speedColor}">${speed} MPH</span>`
         }
     }
     
     // Update ammo display
-    updateAmmoDisplay() {
-        const ammoElement = document.getElementById('ammo');
+    updateAmmoDisplay(); {
+        const ammoElement = document.getElementById('ammo')
         if (ammoElement) {
             // Get current weapon if available
-            let ammoText = 'AMMO: ∞';
-            let ammoColor = '#ffffff';
+            let ammoText = 'AMMO: ∞'
+            let ammoColor = '#ffffff'
             let ammoValue = 0;
             let maxAmmoValue = 1;
             
@@ -2120,16 +1714,16 @@ class Game {
                         maxAmmoValue = weapon.maxAmmo;
                         
                         if (ammoPercent <= 25) {
-                            ammoColor = '#ff0000'; // Red for low ammo
+                            ammoColor = '#ff0000' // Red for low ammo
                         } else if (ammoPercent <= 50) {
-                            ammoColor = '#ffff00'; // Yellow for medium ammo
+                            ammoColor = '#ffff00' // Yellow for medium ammo
                         } else {
-                            ammoColor = '#00ffff'; // Cyan for good ammo
+                            ammoColor = '#00ffff' // Cyan for good ammo
                         }
                         
-                        ammoText = `AMMO: <span style="color: ${ammoColor};">${weapon.ammo}/${weapon.maxAmmo}</span>`;
+                        ammoText = `AMMO: <span style="color: ${ammoColor}">${weapon.ammo}/${weapon.maxAmmo}</span>`
                     } else {
-                        ammoText = `AMMO: <span style="color: #00ffff;">∞</span>`;
+                        ammoText = `AMMO: <span style="color: #00ffff;">∞</span>`
                         ammoValue = 100;
                         maxAmmoValue = 100;
                     }
@@ -2146,17 +1740,17 @@ class Game {
     }
     
     // Update score display
-    updateScoreDisplay() {
-        const scoreElement = document.getElementById('score');
+    updateScoreDisplay(); {
+        const scoreElement = document.getElementById('score')
         if (scoreElement && this.score !== undefined) {
-            scoreElement.innerHTML = `SCORE: <span style="color: #00ffff;">${this.score}</span>`;
+            scoreElement.innerHTML = `SCORE: <span style="color: #00ffff;">${this.score}</span>`
         }
     }
 
     // Add shooting mechanics to the Game class
 
     // Shoot method
-    shoot() {
+    shoot(); {
         if (this.weaponCooldown > 0) return;
         
         try {
@@ -2164,17 +1758,17 @@ class Game {
             
             // Play weapon fire sound with null check
             if (this.soundManager) {
-                this.soundManager.playSound('weapon_fire', this.truck.position);
+                this.soundManager.playSound('weapon_fire', this.truck.position)
             }
             
             // ... rest of shooting code ...
         } catch (error) {
-            console.error("Error in shoot:", error);
+            console.error("Error in shoot:", error)
         }
     }
 
     // Create muzzle flash effect
-    createMuzzleFlash(position, direction, isEnemyTurret = false) {
+    createMuzzleFlash(position, direction, isEnemyTurret = false); {
         // Determine color based on source (player vs. enemy)
         const flashColor = isEnemyTurret ? 0xff0000 : 0x00ffff;
         
@@ -2189,7 +1783,7 @@ class Game {
             color: flashColor,
             transparent: true,
             opacity: 1
-        });
+        })
         
         const flash = new THREE.Mesh(flashGeometry, flashMaterial);
         flash.position.copy(position);
@@ -2208,21 +1802,21 @@ class Game {
                 this.scene.remove(flashLight);
                 this.scene.remove(flash);
             }
-        };
+        }
         
         fadeFlash();
     }
 
     // Update projectiles
     // Pool of particles for reuse
-    initializeParticlePool() {
+    initializeParticlePool(); {
         try {
             if (this.particlePool && this.particlePool.length > 0) {
-                console.log('Particle pool already initialized with ' + this.particlePool.length + ' particles');
+                console.log('Particle pool already initialized with ' + this.particlePool.length + ' particles')
                 return;
             }
             
-            console.log('Initializing particle pool...');
+            console.log('Initializing particle pool...')
             this.particlePool = [];
             this.particlePoolSize = 100; // Create a fixed pool
             
@@ -2234,7 +1828,7 @@ class Game {
                         color: 0xffffff,
                         transparent: true,
                         opacity: 0.7
-                    });
+                    })
                     
                     const particle = new THREE.Mesh(particleGeometry, particleMaterial);
                     particle.visible = false; // Hide initially
@@ -2244,15 +1838,15 @@ class Game {
                     this.particlePool.push({
                         mesh: particle,
                         inUse: false
-                    });
+                    })
                 } catch (particleError) {
-                    console.error('Error creating particle ' + i + ':', particleError);
+                    console.error('Error creating particle ' + i + ':', particleError)
                 }
             }
             
             // Verify pool creation
             if (this.particlePool.length === 0) {
-                console.error('Failed to create any particles for the pool');
+                console.error('Failed to create any particles for the pool')
             } else {
                 console.log(`Created particle pool with ${this.particlePool.length}/${this.particlePoolSize} particles`);
             }
@@ -2260,7 +1854,7 @@ class Game {
             // Initialize next particle index
             this.nextParticleIndex = 0;
         } catch (error) {
-            console.error('Error initializing particle pool:', error);
+            console.error('Error initializing particle pool:', error)
             // Create a minimal emergency pool to prevent further errors
             this.particlePool = [];
             this.particlePoolSize = 10;
@@ -2272,33 +1866,33 @@ class Game {
                         color: 0xffffff,
                         transparent: true,
                         opacity: 0.7
-                    });
+                    })
                     const particle = new THREE.Mesh(geometry, material);
                     particle.visible = false;
                     if (this.scene) this.scene.add(particle);
                     this.particlePool.push({
                         mesh: particle,
                         inUse: false
-                    });
+                    })
                 } catch (e) {
-                    console.error('Failed to create emergency particle', e);
+                    console.error('Failed to create emergency particle', e)
                 }
             }
-            console.log('Created emergency particle pool with ' + this.particlePool.length + ' particles');
+            console.log('Created emergency particle pool with ' + this.particlePool.length + ' particles')
         }
     }
     
     // Get a particle from the pool
-    getParticle(color = 0xffffff) {
+    getParticle(color = 0xffffff); {
         try {
             // Make sure particle pool exists
             if (!this.particlePool || !Array.isArray(this.particlePool) || this.particlePool.length === 0) {
-                console.log('Particle pool not initialized, initializing now...');
+                console.log('Particle pool not initialized, initializing now...')
                 this.initializeParticlePool();
                 
                 // Double check that initialization worked
                 if (!this.particlePool || !Array.isArray(this.particlePool) || this.particlePool.length === 0) {
-                    console.error('Failed to initialize particle pool');
+                    console.error('Failed to initialize particle pool')
                     return null;
                 }
             }
@@ -2311,19 +1905,19 @@ class Game {
                 if (!particle.inUse) {
                     // Check if mesh property exists
                     if (!particle.mesh) {
-                        console.warn('Particle without mesh found in pool - skipping');
+                        console.warn('Particle without mesh found in pool - skipping')
                         continue;
                     }
                     
                     // Check if material exists
                     if (!particle.mesh.material) {
-                        console.warn('Particle without material found in pool - reinitializing particle');
+                        console.warn('Particle without material found in pool - reinitializing particle')
                         // Create a new material if missing
                         particle.mesh.material = new THREE.MeshBasicMaterial({
                             color: color,
                             transparent: true,
                             opacity: 0.7
-                        });
+                        })
                     } else {
                         // Set color on existing material
                         if (particle.mesh.material.color) {
@@ -2352,7 +1946,7 @@ class Game {
             
             const particle = this.particlePool[particleIndex];
             if (!particle || !particle.mesh) {
-                console.error('Cannot reuse particle at index', particleIndex, 'particlePool length:', this.particlePool.length);
+                console.error('Cannot reuse particle at index', particleIndex, 'particlePool length:', this.particlePool.length)
                 return null;
             }
             
@@ -2362,7 +1956,7 @@ class Game {
                     color: color,
                     transparent: true,
                     opacity: 0.7
-                });
+                })
             } else {
                 particle.mesh.material.color.set(color);
             }
@@ -2374,13 +1968,13 @@ class Game {
             
             return particle.mesh;
         } catch (error) {
-            console.error('Error in getParticle:', error);
+            console.error('Error in getParticle:', error)
             return null;
         }
     }
     
     // Release a particle back to the pool
-    releaseParticle(particle) {
+    releaseParticle(particle); {
         if (!particle) return;
         
         // Handle direct mesh
@@ -2403,7 +1997,7 @@ class Game {
     }
     
     // Optimized projectile update
-    updateProjectiles(deltaTime = 1) {
+    updateProjectiles(deltaTime = 1); {
         try {
             // First, ensure turret projectiles are merged into the main projectiles array
             if (this.turretProjectiles && this.turretProjectiles.length > 0) {
@@ -2418,7 +2012,7 @@ class Game {
                 for (const turretProjectile of this.turretProjectiles) {
                     if (turretProjectile && turretProjectile.mesh) {
                         // Ensure source is set correctly
-                        turretProjectile.source = 'turret';
+                        turretProjectile.source = 'turret'
                         this.projectiles.push(turretProjectile);
                     }
                 }
@@ -2457,7 +2051,7 @@ class Game {
                         if (this.lifetime !== undefined) {
                             this.lifetime -= deltaTime;
                         }
-                    };
+                    }
                     
                     // CRITICAL FIX: Special handling for remote projectiles
                     // This ensures remote projectiles move correctly
@@ -2465,7 +2059,7 @@ class Game {
                         // Make remote projectiles more visible and faster to ensure hits register
                         if (!projectile._remoteEnhanced) {
                             // Mark as enhanced to avoid repeating
-                            projectile._remoteEnhanced = true;
+                            projectile._remoteEnhanced = true
                             
                             // Ensure speed is appropriate
                             if (!projectile.speed || projectile.speed < 2.0) {
@@ -2490,20 +2084,20 @@ class Game {
                     
                     // Create trail for player projectiles
                     if (projectile.source === 'player' && Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
-                        this.createOptimizedProjectileTrail(projectile);
+                        this.createOptimizedProjectileTrail(projectile)
                         trailsCreatedThisFrame++;
                     }
                     
                     // Create trail for turret projectiles
                     if (projectile.source === 'turret' && Math.random() < 0.3 && trailsCreatedThisFrame < maxTrailsPerFrame) {
-                        this.createOptimizedProjectileTrail(projectile);
+                        this.createOptimizedProjectileTrail(projectile)
                         trailsCreatedThisFrame++;
                     }
                     
                     // CRITICAL FIX: Create more prominent trails for remote projectiles to make them more visible
                     if (projectile.source === 'remote' && Math.random() < 0.5 && trailsCreatedThisFrame < maxTrailsPerFrame) {
                         // Create extra-visible trail for remote projectiles (more frequent and larger)
-                        this.createOptimizedProjectileTrail(projectile);
+                        this.createOptimizedProjectileTrail(projectile)
                         trailsCreatedThisFrame++;
                         
                         // Sometimes add a second trail for even more visibility
@@ -2518,7 +2112,7 @@ class Game {
                         (projectile.source === 'player' && projectile.playerId && projectile.playerId !== this.multiplayer?.localPlayerId))) {
                         
                         // SUPER GENEROUS HITBOX: Create 20x20 space around player
-                        const playerX = this.truck.position.x;
+                        const playerX = this.truck.position.x
                         const playerY = this.truck.position.y + 1.0; 
                         const playerZ = this.truck.position.z;
                         
@@ -2533,7 +2127,7 @@ class Game {
                             maxY: playerY + hitboxSize, // High into the air
                             minZ: playerZ - hitboxSize,
                             maxZ: playerZ + hitboxSize
-                        };
+                        }
                         
                         // SIMPLE LARGE HITBOX CHECK
                         const isHit = (
@@ -2545,17 +2139,17 @@ class Game {
                             projectile.mesh.position.z <= playerBounds.maxZ
                         );
                         
-                        console.log(`Checking projectile collision: ${isHit ? 'HIT!' : 'miss'}`);
+                        console.log(`Checking projectile collision: ${isHit ? 'HIT!' : 'miss'}`)
                         
                         if (isHit) {
                             // Apply damage to player
                             if (typeof this.takeDamage === 'function') {
                                 // CRITICAL: Log the hit for debugging
-                                console.log(`🎯 DIRECT HIT: Player hit by ${projectile.source} projectile from ${projectile.playerId || 'unknown'} for ${projectile.damage} damage`);
+                                console.log(`🎯 DIRECT HIT: Player hit by ${projectile.source} projectile from ${projectile.playerId || 'unknown'} for ${projectile.damage} damage`)
                                 
                                 // For multiplayer projectiles, use handleRemoteProjectileHit method
                                 if (projectile.source === 'remote' && this.multiplayer && projectile.playerId) {
-                                    console.log(`Calling handleRemoteProjectileHit for hit from player ${projectile.playerId}`);
+                                    console.log(`Calling handleRemoteProjectileHit for hit from player ${projectile.playerId}`)
                                     this.handleRemoteProjectileHit(projectile.playerId, projectile.damage);
                                 } else {
                                     // IMMEDIATELY take damage - most reliable method
@@ -2563,9 +2157,9 @@ class Game {
                                     
                                     // Play hit sound
                                     if (window.soundManager) {
-                                        window.soundManager.playSound('vehicle_hit');
+                                        window.soundManager.playSound('vehicle_hit')
                                     } else if (window.SoundFX) {
-                                        window.SoundFX.play('vehicle_hit');
+                                        window.SoundFX.play('vehicle_hit')
                                     }
                                     
                                     // Create hit effect
@@ -2601,7 +2195,7 @@ class Game {
                         
                         // Play hit sound
                         if (window.soundManager) {
-                            window.soundManager.playSound('wall_hit');
+                            window.soundManager.playSound('wall_hit')
                         }
                         
                         // Remove projectile
@@ -2621,7 +2215,7 @@ class Game {
                         this.projectiles.splice(i, 1);
                     }
                 } catch (projectileError) {
-                    console.warn('Error updating projectile:', projectileError);
+                    console.warn('Error updating projectile:', projectileError)
                     // Remove problematic projectile
                     if (i >= 0 && i < this.projectiles.length) {
                         const badProjectile = this.projectiles[i];
@@ -2633,10 +2227,10 @@ class Game {
                 }
             }
         } catch (error) {
-            console.error("Error updating projectiles:", error);
+            console.error("Error updating projectiles:", error)
             // In case of catastrophic failure, clear all projectiles to recover
             if (this.projectiles && this.projectiles.length > 0) {
-                console.warn("Clearing all projectiles due to error");
+                console.warn("Clearing all projectiles due to error")
                 for (const projectile of this.projectiles) {
                     if (projectile && projectile.mesh && projectile.mesh.parent) {
                         projectile.mesh.parent.remove(projectile.mesh);
@@ -2648,17 +2242,17 @@ class Game {
     }
     
     // Optimized trail effect using particle pool
-    createOptimizedProjectileTrail(projectile) {
+    createOptimizedProjectileTrail(projectile); {
         if (!projectile || !projectile.mesh) return;
         
         try {
             // Get a particle from the pool
-            const trailColor = projectile.source === 'player' ? 0xff00ff : 0xff0000;
+            const trailColor = projectile.source === 'player' ? 0xff00ff : 0xff0000
             const trail = this.getParticle(trailColor);
             
             // Check if we got a valid particle
             if (!trail) {
-                console.warn('Failed to get particle for projectile trail');
+                console.warn('Failed to get particle for projectile trail')
                 return;
             }
             
@@ -2667,7 +2261,7 @@ class Game {
                 trail.position.copy(projectile.mesh.position);
                 
                 // Initialize userData if needed
-                trail.userData = trail.userData || {};
+                trail.userData = trail.userData || {}
                 trail.userData.lifetime = 10; // Shorter lifetime
                 trail.userData.fadeRate = 0.07; // Faster fade
                 trail.userData.shrinkRate = 0.03; // Gradually shrink
@@ -2678,17 +2272,17 @@ class Game {
                 }
                 this.activeTrails.push(trail);
             } else {
-                console.warn('Trail has no position property');
+                console.warn('Trail has no position property')
                 this.releaseParticle(trail);
             }
         } catch (error) {
-            console.error('Error creating projectile trail:', error);
+            console.error('Error creating projectile trail:', error)
             // Continue game execution - better to miss a trail than crash
         }
     }
     
     // Update all active trails in one pass
-    updateTrails() {
+    updateTrails(); {
         if (!this.activeTrails || this.activeTrails.length === 0) return;
         
         for (let i = this.activeTrails.length - 1; i >= 0; i--) {
@@ -2706,7 +2300,7 @@ class Game {
                 
                 // Update opacity based on lifetime
                 if (trail.material && typeof trail.material.opacity !== 'undefined') {
-                    trail.material.opacity -= trail.userData.fadeRate;
+                    trail.material.opacity -= trail.userData.fadeRate
                 }
                 
                 // Update scale to create shrinking effect
@@ -2729,7 +2323,7 @@ class Game {
                     this.activeTrails.splice(i, 1);
                 }
             } catch (error) {
-                console.warn('Error updating trail:', error);
+                console.warn('Error updating trail:', error)
                 // Remove problematic trail
                 if (i >= 0 && i < this.activeTrails.length) {
                     // Try to release the trail back to the pool if it exists
@@ -2746,7 +2340,7 @@ class Game {
     }
     
     // Check if projectile hit a wall
-    checkProjectileWallCollisions(projectile) {
+    checkProjectileWallCollisions(projectile); {
         if (!projectile || !projectile.mesh) return false;
         
         const arenaSize = 1600;
@@ -2768,7 +2362,7 @@ class Game {
     }
     
     // Create an optimized wall impact effect using particle pool
-    createOptimizedWallImpactEffect(position) {
+    createOptimizedWallImpactEffect(position); {
         if (!position) return;
         
         // Use a shared light for multiple impacts to reduce overhead
@@ -2782,7 +2376,7 @@ class Game {
                 this.impactLightPool.push({
                     light: light,
                     inUse: false
-                });
+                })
             }
         }
         
@@ -2823,7 +2417,7 @@ class Game {
                 x: Math.cos(angle) * speed,
                 y: Math.random() * 0.15,
                 z: Math.sin(angle) * speed
-            };
+            }
             
             // Store impact effect data
             particle.userData.impactEffect = true;
@@ -2840,7 +2434,7 @@ class Game {
     }
     
     // Update all active impact effects
-    updateImpacts() {
+    updateImpacts(); {
         // Update lights
         if (this.impactLightPool) {
             for (const lightData of this.impactLightPool) {
@@ -2895,20 +2489,20 @@ class Game {
     }
     
     // Create an optimized impact effect for projectile hits
-    createOptimizedImpactEffect(position, hitType) {
-        const color = hitType === 'wall' ? 0x00ffff : 0xff0000;
+    createOptimizedImpactEffect(position, hitType); {
+        const color = hitType === 'wall' ? 0x00ffff : 0xff0000
         this.createOptimizedWallImpactEffect(position);
     }
 
     // Create projectile trail effect
-    createProjectileTrail(projectile) {
+    createProjectileTrail(projectile); {
         // Create small trail particles
         const trailGeometry = new THREE.SphereGeometry(0.05, 8, 8);
         const trailMaterial = new THREE.MeshBasicMaterial({
             color: 0x00ffff,
             transparent: true,
             opacity: 0.7
-        });
+        })
         
         const trail = new THREE.Mesh(trailGeometry, trailMaterial);
         trail.position.copy(projectile.mesh.position);
@@ -2925,16 +2519,16 @@ class Game {
             } else {
                 this.scene.remove(trail);
             }
-        };
+        }
         
         fadeTrail();
     }
 
     // Check projectile collisions
-    checkProjectileCollisions(projectile) {
+    checkProjectileCollisions(projectile); {
         // Log debug info for projectile check
         if (this.debugMode) {
-            console.log(`DEBUG: Checking projectile collision: source=${projectile.source}, playerId=${projectile.playerId || 'unknown'}`);
+            console.log(`DEBUG: Checking projectile collision: source=${projectile.source}, playerId=${projectile.playerId || 'unknown'}`)
         }
         
         // Clearly distinguish between projectiles:
@@ -2946,7 +2540,7 @@ class Game {
         if (projectile.source === 'player' && (!projectile.playerId || projectile.playerId === this.multiplayer?.localPlayerId)) {
             // This is the local player's projectile - should NOT hit themselves
             if (this.debugMode) {
-                console.log("DEBUG: Local player projectile - skipping self-collision check");
+                console.log("DEBUG: Local player projectile - skipping self-collision check")
             }
         }
         
@@ -2965,7 +2559,7 @@ class Game {
             pos.z > halfSize - wallThickness || 
             pos.z < -halfSize + wallThickness
         ) {
-            return 'wall';
+            return 'wall'
         }
         
         // Check collision with truck (ONLY if projectile is not from local player)
@@ -2974,7 +2568,7 @@ class Game {
         // 2. Remote player projectiles (source="remote") - damage player
         // 3. Local player's projectiles (source="player" && playerId=localPlayerId) - NO damage to self
         const isLocalPlayerProjectile = projectile.source === 'player' && 
-            (!projectile.playerId || projectile.playerId === this.multiplayer?.localPlayerId);
+            (!projectile.playerId || projectile.playerId === this.multiplayer?.localPlayerId)
         
         // Only do truck collision if NOT local player's projectile
         if (!isLocalPlayerProjectile && this.truck) {
@@ -2984,22 +2578,22 @@ class Game {
             }
             
             // Get vehicle dimensions and height based on type
-            let truckDimensions = {width: 2, length: 3, height: 1};
+            let truckDimensions = {width: 2, length: 3, height: 1}
             
             if (this.monsterTruck) {
                 const machineType = this.monsterTruck.config.machineType;
                 
                 if (machineType === 'cyber-beast') {
-                    truckDimensions = {width: 3, length: 5, height: 2.2}; // Taller with spoiler
+                    truckDimensions = {width: 3, length: 5, height: 2.2} // Taller with spoiler
                 } else if (machineType === 'grid-ripper') {
-                    truckDimensions = {width: 3, length: 5, height: 1.6}; // Low-profile
+                    truckDimensions = {width: 3, length: 5, height: 1.6} // Low-profile
                 } else { // neon-crusher
-                    truckDimensions = {width: 3, length: 5, height: 2.0}; // Medium height
+                    truckDimensions = {width: 3, length: 5, height: 2.0} // Medium height
                 }
             }
             
             // Create collision box for the vehicle
-            const expansionFactor = 1.0;
+            const expansionFactor = 1.0
                 
             // Create a 3D bounding box for the vehicle with reasonable margins
             const truckBounds = {
@@ -3009,7 +2603,7 @@ class Game {
                 maxY: this.truck.position.y + truckDimensions.height + 1.0,
                 minZ: this.truck.position.z - (truckDimensions.length / 2) - expansionFactor,
                 maxZ: this.truck.position.z + (truckDimensions.length / 2) + expansionFactor
-            };
+            }
             
             // If in debug mode, log position data
             if (this.debugMode) {
@@ -3027,7 +2621,7 @@ class Game {
                 pos.y <= truckBounds.maxY
             ) {
                 // Hit registered!
-                console.log(`HIT REGISTERED: Vehicle hit by ${projectile.source} (${projectile.playerId || 'unknown'}) for ${projectile.damage} damage`);
+                console.log(`HIT REGISTERED: Vehicle hit by ${projectile.source} (${projectile.playerId || 'unknown'}) for ${projectile.damage} damage`)
                 
                 // Calculate impact point for visuals
                 const impactPoint = new THREE.Vector3(pos.x, pos.y, pos.z);
@@ -3040,15 +2634,15 @@ class Game {
                 
                 // Play sound effect
                 if (this.soundManager) {
-                    this.soundManager.playSound('vehicle_hit', this.truck.position);
+                    this.soundManager.playSound('vehicle_hit', this.truck.position)
                 } else if (window.SoundFX) {
-                    window.SoundFX.play('vehicle_hit');
+                    window.SoundFX.play('vehicle_hit')
                 }
                 
                 // Create impact effect at hit position
                 this.createProjectileImpactOnVehicle(impactPoint);
                 
-                return 'player';
+                return 'player'
             }
         }
         
@@ -3065,7 +2659,7 @@ class Game {
                     maxX: turret.mesh.position.x + 1.5,
                     minZ: turret.mesh.position.z - 1.5,
                     maxZ: turret.mesh.position.z + 1.5
-                };
+                }
                 
                 if (
                     pos.x >= turretBounds.minX && 
@@ -3077,7 +2671,7 @@ class Game {
                     // Turret hit by projectile
                     if (projectile.source === 'player') {
                         this.damageTurret(turret, projectile.damage);
-                        return 'turret';
+                        return 'turret'
                     }
                 }
             }
@@ -3086,7 +2680,7 @@ class Game {
         // Check for collisions with multiplayer players
         if (this.multiplayer && this.multiplayer.isConnected) {
             if (projectile.source === 'player' && this.multiplayer.checkProjectileHits(projectile)) {
-                return 'remote-player';
+                return 'remote-player'
             }
         }
         
@@ -3094,13 +2688,13 @@ class Game {
     }
 
     // Create impact effect
-    createImpactEffect(position, targetType) {
+    createImpactEffect(position, targetType); {
         // Create flash
         const impactLight = new THREE.PointLight(
             targetType === 'wall' ? 0x00ffff : 0xff0000, 
             1, 
             5
-        );
+        )
         impactLight.position.copy(position);
         this.scene.add(impactLight);
         
@@ -3114,9 +2708,9 @@ class Game {
                 color: targetType === 'wall' ? 0x00ffff : 0xff0000,
                 transparent: true,
                 opacity: 1
-            });
+            })
             
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial)
             particle.position.copy(position);
             
             // Random velocity
@@ -3124,7 +2718,7 @@ class Game {
                 x: (Math.random() - 0.5) * 0.2,
                 y: Math.random() * 0.2,
                 z: (Math.random() - 0.5) * 0.2
-            };
+            }
             
             this.scene.add(particle);
             particles.push(particle);
@@ -3160,13 +2754,13 @@ class Game {
                     this.scene.remove(particle);
                 }
             }
-        };
+        }
         
         animateImpact();
     }
     
     // Create impact effect specifically for vehicle hits
-    createProjectileImpactOnVehicle(position) {
+    createProjectileImpactOnVehicle(position); {
         if (!this.scene) return;
         
         // Create a more intense impact for vehicle hits
@@ -3195,7 +2789,7 @@ class Game {
                 color: particleColor,
                 transparent: true,
                 opacity: 0.8
-            });
+            })
             
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
             particle.position.copy(position);
@@ -3206,7 +2800,7 @@ class Game {
                 x: (Math.random() - 0.5) * speed,
                 y: Math.random() * 0.2 + (isSpark ? 0.15 : 0.05),
                 z: (Math.random() - 0.5) * speed
-            };
+            }
             
             // Add unique properties
             particle.isFire = isFire;
@@ -3226,7 +2820,7 @@ class Game {
             const debrisMaterial = new THREE.MeshPhongMaterial({
                 color: 0x777777,
                 shininess: 80
-            });
+            })
             
             const debris = new THREE.Mesh(debrisGeometry, debrisMaterial);
             debris.position.copy(position);
@@ -3236,14 +2830,14 @@ class Game {
                 x: (Math.random() - 0.5) * 0.4,
                 y: Math.random() * 0.3 + 0.2,
                 z: (Math.random() - 0.5) * 0.4
-            };
+            }
             
             // Add rotation
             debris.rotationSpeed = {
                 x: (Math.random() - 0.5) * 0.2,
                 y: (Math.random() - 0.5) * 0.2,
                 z: (Math.random() - 0.5) * 0.2
-            };
+            }
             
             this.scene.add(debris);
             particles.push(debris);
@@ -3302,7 +2896,7 @@ class Game {
                     this.scene.remove(particle);
                 }
             }
-        };
+        }
         
         animateVehicleImpact();
     }
@@ -3310,10 +2904,10 @@ class Game {
     // Add turret-related methods to the Game class
 
     // Create turrets
-    createTurrets() {
+    createTurrets(); {
         if (!this.scene) return;
         
-        console.log("Creating turrets");
+        console.log("Creating turrets")
         
         // Reset turrets array
         this.turrets = [];
@@ -3351,24 +2945,24 @@ class Game {
         
         turretPositions.forEach(pos => {
             this.createTurret(pos.x, pos.z);
-        });
+        })
         
         // Debug - log total turrets created
         console.log(`Created ${this.turrets.length} turrets`);
     }
 
     // Create a single turret
-    createTurret(x, z) {
+    createTurret(x, z); {
         // Create base
         const baseGeometry = new THREE.CylinderGeometry(2, 2.5, 1, 16);
         const baseMaterial = new THREE.MeshPhongMaterial({
             color: 0x333333,
             shininess: 30
-        });
+        })
         
         const base = new THREE.Mesh(baseGeometry, baseMaterial);
         base.position.set(x, 0.5, z);
-        base.name = "turret_base"; // Explicitly name it to avoid confusion with walls
+        base.name = "turret_base" // Explicitly name it to avoid confusion with walls
         this.scene.add(base);
         
         // Create turret body
@@ -3376,7 +2970,7 @@ class Game {
         const bodyMaterial = new THREE.MeshPhongMaterial({
             color: 0x666666,
             shininess: 30
-        });
+        })
         
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
         body.position.set(0, 1.25, 0);
@@ -3389,7 +2983,7 @@ class Game {
         const barrelMaterial = new THREE.MeshPhongMaterial({
             color: 0x444444,
             shininess: 50
-        });
+        })
         
         const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
         barrel.position.set(0, 0.4, 1.5); // Raised position to better hit all vehicle types
@@ -3411,13 +3005,13 @@ class Game {
             shootCooldown: Math.floor(Math.random() * 60), // Random initial cooldown
             destroyed: false,
             lastShotTime: 0
-        });
+        })
     }
 
     // Update turrets
-    updateTurrets() {
+    updateTurrets(); {
         if (!this.turrets || !this.truck) {
-            console.log("No turrets or truck found in updateTurrets");
+            console.log("No turrets or truck found in updateTurrets")
             return;
         }
         
@@ -3491,7 +3085,7 @@ class Game {
     }
 
     // Check if turret has line of sight to player
-    canTurretSeePlayer(turret) {
+    canTurretSeePlayer(turret); {
         if (!this.truck) return false;
         
         // Create ray from turret to player
@@ -3514,13 +3108,13 @@ class Game {
     }
 
     // Turret shoot method
-    turretShoot(turret) {
+    turretShoot(turret); {
         try {
             if (!turret || !turret.mesh || !this.scene || !this.truck) return;
             
             // Play turret fire sound with our guaranteed sound system
             if (window.SoundFX) {
-                window.SoundFX.play('weapon_fire');
+                window.SoundFX.play('weapon_fire')
             }
             
             // Create projectile
@@ -3549,7 +3143,7 @@ class Game {
                 color: 0xff0000, // Red for enemy projectiles
                 emissive: 0xff0000,
                 emissiveIntensity: 0.5
-            });
+            })
             
             // Create projectile mesh
             const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
@@ -3576,11 +3170,11 @@ class Game {
                 damage: 10, // Less damage than player weapons for balance
                 lifetime: 90, // ~1.5 seconds at 60fps
                 source: 'turret'
-            };
+            }
             
             // Add to active projectiles list if available
             if (!this.turretProjectiles) {
-                this.turretProjectiles = [];
+                this.turretProjectiles = []
             }
             this.turretProjectiles.push(projectileData);
             
@@ -3595,22 +3189,22 @@ class Game {
                 }
             }, 100);
         } catch (error) {
-            console.error("Error in turretShoot:", error);
+            console.error("Error in turretShoot:", error)
         }
     }
     
     // Helper method to determine which barrel to use based on vehicle type
-    shouldUseUpperBarrel() {
+    shouldUseUpperBarrel(); {
         if (!this.monsterTruck) return false;
         
         const machineType = this.monsterTruck.config.machineType;
         
         // Use upper barrel for taller vehicles
-        return machineType === 'cyber-beast';
+        return machineType === 'cyber-beast'
     }
 
     // Damage turret method
-    damageTurret(turret, amount) {
+    damageTurret(turret, amount); {
         // Reduce health
         turret.health -= amount;
         
@@ -3625,7 +3219,7 @@ class Game {
                 emissiveIntensity: 0.3,
                 transparent: true,
                 opacity: 1
-            });
+            })
             
             // Fade back to normal
             setTimeout(() => {
@@ -3633,14 +3227,14 @@ class Game {
                     turret.mesh.material = new THREE.MeshPhongMaterial({
                         color: 0x333333,
                         shininess: 30
-                    });
+                    })
                 }
             }, 200);
         }
     }
 
     // Destroy turret method
-    destroyTurret(turret) {
+    destroyTurret(turret); {
         if (!turret || !turret.mesh) return;
         
         // Mark as destroyed to prevent further processing
@@ -3651,13 +3245,13 @@ class Game {
         this.updateScoreDisplay();
         
         // Create explosion at turret position with skipAreaDamage=true to prevent recursion
-        this.createExplosion(turret.mesh.position, 'large', true);
+        this.createExplosion(turret.mesh.position, 'large', true)
         
         // Store the turret's position for respawning
         const turretPosition = {
             x: turret.mesh.position.x,
             z: turret.mesh.position.z
-        };
+        }
         
         // Remove turret from scene
         this.scene.remove(turret.mesh);
@@ -3680,7 +3274,7 @@ class Game {
     }
     
     // Create a visual indicator for turret respawn
-    createRespawnIndicator(position) {
+    createRespawnIndicator(position); {
         // Create a pulsing light to indicate where the turret will respawn
         const respawnLight = new THREE.PointLight(0x00ffff, 1, 20);
         respawnLight.position.set(position.x, 1, position.z);
@@ -3694,7 +3288,7 @@ class Game {
             emissiveIntensity: 0.5,
             transparent: true,
             opacity: 0.7
-        });
+        })
         
         const marker = new THREE.Mesh(markerGeometry, markerMaterial);
         marker.position.set(position.x, 0.05, position.z);
@@ -3735,27 +3329,27 @@ class Game {
                 return false; // Keep updating
             },
             mesh: marker // Reference to the mesh for cleanup
-        });
+        })
     }
 
     // Initialize with weapon and ammo display
-    initHUD() {
-        const playerName = document.getElementById('playerName');
-        const health = document.getElementById('health');
-        const score = document.getElementById('score');
-        const ammo = document.getElementById('ammo');
-        const currentWeapon = document.getElementById('currentWeapon');
-        const weaponStats = document.getElementById('weaponStats');
+    initHUD(); {
+        const playerName = document.getElementById('playerName')
+        const health = document.getElementById('health')
+        const score = document.getElementById('score')
+        const ammo = document.getElementById('ammo')
+        const currentWeapon = document.getElementById('currentWeapon')
+        const weaponStats = document.getElementById('weaponStats')
         
         // Remove old weapon display if it exists
-        const oldWeaponDisplay = document.getElementById('weapon');
+        const oldWeaponDisplay = document.getElementById('weapon')
         if (oldWeaponDisplay) {
             oldWeaponDisplay.remove();
         }
         
         // Set initial values
-        if (playerName) playerName.textContent = localStorage.getItem('monsterTruckNickname') || 'PLAYER';
-        if (health) health.innerHTML = `HEALTH: <span style="color:#00ff00">${this.health}%</span>`;
+        if (playerName) playerName.textContent = localStorage.getItem('monsterTruckNickname') || 'PLAYER'
+        if (health) health.innerHTML = `HEALTH: <span style="color:#00ff00">${this.health}%</span>`
         if (score) score.textContent = `SCORE: ${this.score}`;
         
         // Set weapon and ammo display if weapons are initialized
@@ -3763,17 +3357,17 @@ class Game {
             const weapon = this.getCurrentWeapon();
             
             if (currentWeapon && weapon) {
-                currentWeapon.innerHTML = `<span style="color: #00ffff;">${weapon.type.name || 'MACHINE GUN'}</span>`;
+                currentWeapon.innerHTML = `<span style="color: #00ffff;">${weapon.type.name || 'MACHINE GUN'}</span>`
             }
             
             if (weaponStats && weapon) {
                 const damageText = weapon.type.damage || 20;
-                const fireRateText = weapon.type.cooldown ? ((weapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s';
-                weaponStats.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
+                const fireRateText = weapon.type.cooldown ? ((weapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s'
+                weaponStats.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`
             }
             
             if (ammo && weapon) {
-                ammo.innerHTML = `AMMO: <span style="color: #00ffff;">${weapon.ammo}/${weapon.maxAmmo}</span>`;
+                ammo.innerHTML = `AMMO: <span style="color: #00ffff;">${weapon.ammo}/${weapon.maxAmmo}</span>`
                 
                 // Update ammo bar
                 if (window.updateStatBars) {
@@ -3787,24 +3381,24 @@ class Game {
     }
     
     // Create weapon key bindings legend
-    createWeaponLegend() {
+    createWeaponLegend(); {
         // No need to create the element as it's now part of the HTML
-        const legend = document.getElementById('weapon-legend');
+        const legend = document.getElementById('weapon-legend')
         if (!legend) return;
         
         // Update the weapon name in the legend
         const currentWeapon = this.getCurrentWeapon();
-        const weaponName = currentWeapon ? currentWeapon.type.name : 'UNKNOWN WEAPON';
+        const weaponName = currentWeapon ? currentWeapon.type.name : 'UNKNOWN WEAPON'
         
         // Find the first div (the weapon name) and update it
-        const firstDiv = legend.querySelector('div:first-child');
+        const firstDiv = legend.querySelector('div:first-child')
         if (firstDiv) {
             firstDiv.innerHTML = `⇒ ${weaponName}`;
         }
     }
 
     // Debug method to help diagnose movement issues
-    debugMovement() {
+    debugMovement(); {
         if (!this.truck) return;
         
         console.log({
@@ -3825,12 +3419,12 @@ class Game {
                 left: this.keys.ArrowLeft,
                 right: this.keys.ArrowRight
             }
-        });
+        })
     }
 
     // Update speed display
-    updateSpeedDisplay() {
-        const speedDisplay = document.getElementById('speed');
+    updateSpeedDisplay(); {
+        const speedDisplay = document.getElementById('speed')
         if (speedDisplay && this.truck) {
             const speedMPH = Math.abs(Math.round(this.truck.velocity * 100));
             speedDisplay.textContent = `SPEED: ${speedMPH} MPH`;
@@ -3838,7 +3432,7 @@ class Game {
     }
 
     // Add the missing updateSparks function
-    updateSparks() {
+    updateSparks(); {
         if (!this.sparks || !this.scene || this.sparks.length === 0) return;
         
         for (let i = this.sparks.length - 1; i >= 0; i--) {
@@ -3896,7 +3490,7 @@ class Game {
                 }
             } else {
                 // Unknown spark structure, remove it
-                console.warn('Unknown spark structure:', spark);
+                console.warn('Unknown spark structure:', spark)
                 if (spark.isObject3D) {
                     this.scene.remove(spark);
                 }
@@ -3906,7 +3500,7 @@ class Game {
     }
     
     // Animate stadium spectators
-    updateSpectators() {
+    updateSpectators(); {
         if (!this.spectators || this.spectators.length === 0) return;
         
         const time = performance.now() * 0.001;
@@ -3921,13 +3515,13 @@ class Game {
             spectator.position.y = initialY + Math.sin(time * 2 + offset) * 0.3;
             spectator.rotation.x = Math.sin(time * 2 + offset) * 0.1;
             spectator.rotation.z = Math.cos(time * 3 + offset) * 0.1;
-        });
+        })
     }
 
-    createStadium() {
+    createStadium(); {
         // Check if scene exists
         if (!this.scene) {
-            console.error("Cannot create stadium: Scene is not initialized");
+            console.error("Cannot create stadium: Scene is not initialized")
             return;
         }
         
@@ -3949,7 +3543,7 @@ class Game {
                 color: 0x444444,
                 side: THREE.DoubleSide,
                 flatShading: true
-            });
+            })
             
             const stadium = new THREE.Mesh(bleacherGeometry, bleacherMaterial);
             stadium.position.y = 15;
@@ -3990,7 +3584,7 @@ class Game {
                 spectator.userData = {
                     animationOffset: Math.random() * Math.PI * 2,
                     initialY: height
-                };
+                }
                 
                 this.spectators.push(spectator);
                 this.scene.add(spectator);
@@ -4004,7 +3598,7 @@ class Game {
                 { x: -80, z: -80 }
             ];
 
-            console.log("Adding stadium lights");
+            console.log("Adding stadium lights")
             
             lightPositions.forEach(pos => {
                 try {
@@ -4026,15 +3620,15 @@ class Game {
                 } catch (lightError) {
                     console.error(`Error creating stadium light at position ${pos.x},${pos.z}:`, lightError);
                 }
-            });
+            })
             
-            console.log("Stadium creation completed successfully");
+            console.log("Stadium creation completed successfully")
         } catch (error) {
-            console.error("Error creating stadium:", error);
+            console.error("Error creating stadium:", error)
         }
     }
 
-    updateSpectators(deltaTime) {
+    updateSpectators(deltaTime); {
         try {
             // Check if spectators array exists and is not empty
             if (!this.spectators || !Array.isArray(this.spectators) || this.spectators.length === 0) {
@@ -4060,136 +3654,136 @@ class Game {
                     spectator.rotation.z = Math.cos(time * 3 + offset) * 0.1;
                 } catch (specError) {
                     // Just skip this spectator on error, don't crash the whole animation
-                    console.warn("Error updating individual spectator:", specError);
+                    console.warn("Error updating individual spectator:", specError)
                 }
-            });
+            })
         } catch (error) {
-            console.error("Error updating spectators:", error);
+            console.error("Error updating spectators:", error)
         }
     }
 
     // Redirect the initStadium method to createStadium for backward compatibility
-    initStadium() {
-        console.log("initStadium called - redirecting to createStadium");
+    initStadium(); {
+        console.log("initStadium called - redirecting to createStadium")
         this.createStadium();
     }
     
     // Initialize multiplayer functionality
-    initMultiplayer() {
+    initMultiplayer(); {
         // Set global multiplayer status flag
         window.isMultiplayerInitialized = false;
         
         if (!this.isMultiplayerEnabled) {
-            console.log('Multiplayer disabled - running in single player mode');
+            console.log('Multiplayer disabled - running in single player mode')
             // Notify chat system that multiplayer is disabled
             if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                window.addChatMessage('System', 'Multiplayer disabled - running in single player mode');
+                window.addChatMessage('System', 'Multiplayer disabled - running in single player mode')
             }
             return;
         }
 
         try {
-            console.log('Initializing multiplayer...');
+            console.log('Initializing multiplayer...')
             
             // Check if socket.io is loaded
             if (typeof io === 'undefined') {
-                console.error('Socket.io is not loaded! Cannot initialize multiplayer without socket.io.');
-                throw new Error('Socket.io not found - make sure socket.io is loaded before initializing multiplayer');
+                console.error('Socket.io is not loaded! Cannot initialize multiplayer without socket.io.')
+                throw new Error('Socket.io not found - make sure socket.io is loaded before initializing multiplayer')
             }
             
             // Direct initialization
             this.multiplayer = new Multiplayer(this);
-            console.log('Multiplayer instance created successfully');
+            console.log('Multiplayer instance created successfully')
             
             // Set player name and color for chat
-            this.playerName = localStorage.getItem('monsterTruckNickname') || 'Player';
-            this.playerColor = localStorage.getItem('monsterTruckColor') || '#ff00ff';
-            console.log('Player info set for chat:', this.playerName, this.playerColor);
+            this.playerName = localStorage.getItem('monsterTruckNickname') || 'Player'
+            this.playerColor = localStorage.getItem('monsterTruckColor') || '#ff00ff'
+            console.log('Player info set for chat:', this.playerName, this.playerColor)
             
             // Verify socket connection
             if (!this.multiplayer.socket) {
-                console.error('Socket not initialized in multiplayer instance');
+                console.error('Socket not initialized in multiplayer instance')
                 if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                    window.addChatMessage('System', 'Error: Socket not initialized. Chat may not work properly.');
+                    window.addChatMessage('System', 'Error: Socket not initialized. Chat may not work properly.')
                 }
             } else if (!this.multiplayer.socket.connected) {
-                console.warn('Socket not connected yet - waiting for connection');
+                console.warn('Socket not connected yet - waiting for connection')
                 if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                    window.addChatMessage('System', 'Connecting to multiplayer server...');
+                    window.addChatMessage('System', 'Connecting to multiplayer server...')
                 }
                 
                 // Add a connection event listener to initialize chat when connected
                 this.multiplayer.socket.on('connect', () => {
-                    console.log('Socket connected - initializing chat listeners');
+                    console.log('Socket connected - initializing chat listeners')
                     window.isMultiplayerInitialized = true;
                     if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                        window.addChatMessage('System', 'Connected to multiplayer server!');
+                        window.addChatMessage('System', 'Connected to multiplayer server!')
                     }
                     this.initChatListeners();
-                });
+                })
             } else {
-                console.log('Socket already connected - initializing chat listeners');
+                console.log('Socket already connected - initializing chat listeners')
                 window.isMultiplayerInitialized = true;
                 if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                    window.addChatMessage('System', 'Connected to multiplayer server!');
+                    window.addChatMessage('System', 'Connected to multiplayer server!')
                 }
                 this.initChatListeners();
             }
         } catch (error) {
-            console.error('Failed to initialize multiplayer:', error);
-            this.showMessage('Multiplayer initialization failed - playing in single player mode');
+            console.error('Failed to initialize multiplayer:', error)
+            this.showMessage('Multiplayer initialization failed - playing in single player mode')
             if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                window.addChatMessage('System', 'Error: ' + error.message);
+                window.addChatMessage('System', 'Error: ' + error.message)
             }
         }
     }
     
     // Separate method to initialize chat listeners
-    initChatListeners() {
+    initChatListeners(); {
         // Initialize chat socket listeners if the function exists
         if (typeof window.initChatSocketListeners === 'function') {
-            console.log('Calling initChatSocketListeners from main.js');
+            console.log('Calling initChatSocketListeners from main.js')
             window.initChatSocketListeners();
         } else {
-            console.error('initChatSocketListeners function not found');
+            console.error('initChatSocketListeners function not found')
         }
         
         // Force a direct connection to ensure chat works
         if (this.multiplayer && this.multiplayer.socket) {
-            console.log('Setting up direct chat listener in main.js');
+            console.log('Setting up direct chat listener in main.js')
             
             // Remove any existing listeners to prevent duplicates
-            this.multiplayer.socket.off('chat');
+            this.multiplayer.socket.off('chat')
             
             this.multiplayer.socket.on('chat', (chatData) => {
-                console.log('Direct chat message received in main.js:', chatData);
+                console.log('Direct chat message received in main.js:', chatData)
                 
                 if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                    const sender = chatData.playerId === this.multiplayer.localPlayerId ? 'You' : chatData.nickname;
+                    const sender = chatData.playerId === this.multiplayer.localPlayerId ? 'You' : chatData.nickname
                     window.addChatMessage(sender, chatData.message);
                 } else {
-                    console.error('addChatMessage function not available in window');
+                    console.error('addChatMessage function not available in window')
                 }
-            });
+            })
             
             // Test the chat system
-            console.log('Sending test message to server');
+            console.log('Sending test message to server')
             setTimeout(() => {
                 if (this.multiplayer.socket.connected) {
                     this.multiplayer.socket.emit('chat', {
                         message: 'System test message',
                         nickname: 'System'
-                    });
+                    })
                 }
-            }, 3000);
+            }, 3000)
         } else {
-            console.error('Cannot set up chat listener: multiplayer or socket not available');
+            console.error('Cannot set up chat listener: multiplayer or socket not available')
         }
     }
 
-    createPowerup() {
+    createPowerup(); {
         if (!this.scene) {
-            console.error("Cannot create powerup: Scene is not available");
+            console.error("Cannot create powerup: Scene is not available")
             return null;
         }
         
@@ -4216,24 +3810,24 @@ class Game {
             // Add text or icon to each face of the cube to identify the powerup type
             let iconText;
             
-            switch(powerupConfig.model) {
+            switch(powerupConfig.model); {
                 case 'lightning':
-                    iconText = "⚡"; // Lightning bolt for speed
+                    iconText = "⚡" // Lightning bolt for speed
                     break;
                 case 'star':
-                    iconText = "★"; // Star for invincibility
+                    iconText = "★" // Star for invincibility
                     break;
                 case 'heart':
-                    iconText = "❤"; // Heart for health
+                    iconText = "❤" // Heart for health
                     break;
                 case 'ammo':
-                    iconText = "🔫"; // Gun for ammo
+                    iconText = "🔫" // Gun for ammo
                     break;
                 case 'shield':
-                    iconText = "🛡️"; // Shield for shield
+                    iconText = "🛡️" // Shield for shield
                     break;
                 default:
-                    iconText = "?"; // Question mark for unknown
+                    iconText = "?" // Question mark for unknown
             }
             
             // Create material with stronger glow effect - use PhongMaterial which supports emissive
@@ -4244,7 +3838,7 @@ class Game {
                 shininess: 100,
                 transparent: true,
                 opacity: 0.9
-            });
+            })
             
             const powerupMesh = new THREE.Mesh(geometry, material);
             container.add(powerupMesh);
@@ -4283,7 +3877,7 @@ class Game {
                 floatHeight: 1.0, // Larger float height
                 floatOffset: Math.random() * Math.PI * 2, // Random starting phase
                 creationTime: Date.now()
-            };
+            }
             
             // Add to powerups array
             if (!this.powerups) {
@@ -4306,24 +3900,24 @@ class Game {
             
             return container;
         } catch (error) {
-            console.error("Error creating powerup:", error);
+            console.error("Error creating powerup:", error)
             return null;
         }
     }
 
-    applyPowerup(type) {
+    applyPowerup(type); {
         try {
             // ... existing powerup code ...
             
             // Play powerup sound using our guaranteed sound system
             if (window.SoundFX) {
                 // Determine the correct sound to play
-                let soundName = 'powerup_pickup';
+                let soundName = 'powerup_pickup'
                 
                 // Try to use the specific sound if available
                 if (type === 'speed' || type === 'health' || type === 'shield' || 
                     type === 'damage' || type === 'ammo') {
-                    soundName = 'powerup_' + type;
+                    soundName = 'powerup_' + type
                 }
                 
                 window.SoundFX.play(soundName);
@@ -4331,25 +3925,25 @@ class Game {
             
             // ... rest of powerup code ...
         } catch (error) {
-            console.error("Error in applyPowerup:", error);
+            console.error("Error in applyPowerup:", error)
         }
     }
 
     // Update any multiplayer-related methods to check if enabled
-    updateMultiplayer() {
+    updateMultiplayer(); {
         if (!this.isMultiplayerEnabled) return;
         // ... existing multiplayer update code ...
     }
 
     // Do the same for other multiplayer methods
-    handleMultiplayerEvents() {
+    handleMultiplayerEvents(); {
         if (!this.isMultiplayerEnabled) return;
         // ... existing multiplayer event code ...
     }
 
-    showMessage(message) {
+    showMessage(message); {
         // Get existing messages
-        const existingMessages = document.querySelectorAll('.game-message');
+        const existingMessages = document.querySelectorAll('.game-message')
         
         // If we already have 3 messages, remove the oldest one
         if (existingMessages.length >= 3) {
@@ -4357,69 +3951,69 @@ class Game {
         }
         
         // Recount after potential removal
-        const messageCount = document.querySelectorAll('.game-message').length;
+        const messageCount = document.querySelectorAll('.game-message').length
         
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'game-message';
-        messageDiv.style.position = 'fixed';
-        messageDiv.style.left = '20px'; // Position on left side
+        const messageDiv = document.createElement('div')
+        messageDiv.className = 'game-message'
+        messageDiv.style.position = 'fixed'
+        messageDiv.style.left = '20px' // Position on left side
         messageDiv.style.top = `${window.innerHeight/2 - 75 + (messageCount * 60)}px`; // Middle of screen height with offset
-        messageDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        messageDiv.style.color = '#ff00ff';
-        messageDiv.style.padding = '10px 20px';
-        messageDiv.style.borderRadius = '0';
-        messageDiv.style.fontFamily = "'Orbitron', sans-serif";
-        messageDiv.style.zIndex = '1001';
-        messageDiv.style.border = '1px solid #ff00ff';
-        messageDiv.style.boxShadow = '0 0 10px rgba(255, 0, 255, 0.5)';
-        messageDiv.style.maxWidth = '300px';
-        messageDiv.style.textAlign = 'left';
-        messageDiv.style.borderLeft = '3px solid #ff00ff';
+        messageDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'
+        messageDiv.style.color = '#ff00ff'
+        messageDiv.style.padding = '10px 20px'
+        messageDiv.style.borderRadius = '0'
+        messageDiv.style.fontFamily = "'Orbitron', sans-serif"
+        messageDiv.style.zIndex = '1001'
+        messageDiv.style.border = '1px solid #ff00ff'
+        messageDiv.style.boxShadow = '0 0 10px rgba(255, 0, 255, 0.5)'
+        messageDiv.style.maxWidth = '300px'
+        messageDiv.style.textAlign = 'left'
+        messageDiv.style.borderLeft = '3px solid #ff00ff'
         messageDiv.textContent = message;
         
         document.body.appendChild(messageDiv);
         
         // Set up animation for smooth appearance and removal
-        messageDiv.style.transition = 'opacity 0.5s, transform 0.5s';
-        messageDiv.style.opacity = '0';
-        messageDiv.style.transform = 'translateX(-20px)';
+        messageDiv.style.transition = 'opacity 0.5s, transform 0.5s'
+        messageDiv.style.opacity = '0'
+        messageDiv.style.transform = 'translateX(-20px)'
         
         // Animate in
         setTimeout(() => {
-            messageDiv.style.opacity = '1';
-            messageDiv.style.transform = 'translateX(0)';
+            messageDiv.style.opacity = '1'
+            messageDiv.style.transform = 'translateX(0)'
         }, 10);
         
         // Set up removal
         setTimeout(() => {
-            messageDiv.style.opacity = '0';
-            messageDiv.style.transform = 'translateX(-20px)';
+            messageDiv.style.opacity = '0'
+            messageDiv.style.transform = 'translateX(-20px)'
             
             setTimeout(() => {
                 messageDiv.remove();
                 
                 // Reposition remaining messages to fill the gap
-                const remainingMessages = document.querySelectorAll('.game-message');
+                const remainingMessages = document.querySelectorAll('.game-message')
                 remainingMessages.forEach((msg, index) => {
                     msg.style.top = `${window.innerHeight/2 - 75 + (index * 60)}px`;
-                });
+                })
             }, 500);
         }, 5000);
     }
 
     // Toggle audio (will use the unified audio panel)
-    toggleAudio() {
+    toggleAudio(); {
         // This is now handled by the unified audio panel
         // We'll keep this method for backward compatibility with keyboard shortcuts
         if (window.musicPlayer && typeof window.musicPlayer.toggleMasterMute === 'function') {
-            window.musicPlayer.toggleMasterMute();
+            window.musicPlayer.toggleMasterMute()
         }
     }
 
     // Show sound enable button - modified to use the unified audio panel
-    showSoundEnableButton(callback) {
+    showSoundEnableButton(callback); {
         // The button is already in the UI as part of the unified audio panel
-        console.log('Sound enable available through the unified audio panel');
+        console.log('Sound enable available through the unified audio panel')
         
         // If there's a callback, we'll ensure the audio context is running
         if (callback && typeof callback === 'function') {
@@ -4429,9 +4023,9 @@ class Game {
                 this.soundManager.listener.context.state === 'suspended') {
                 
                 this.soundManager.listener.context.resume().then(() => {
-                    console.log('Audio context resumed by user interaction');
+                    console.log('Audio context resumed by user interaction')
                     callback();
-                });
+                })
             } else {
                 // Audio context is already running
                 callback();
@@ -4440,7 +4034,7 @@ class Game {
     }
 
     // Update powerups - animations and collision detection
-    updatePowerups() {
+    updatePowerups(); {
         if (!this.scene || !this.truck) {
             return;
         }
@@ -4511,7 +4105,7 @@ class Game {
                     this.powerups.splice(i, 1);
                 }
             } catch (error) {
-                console.error("Error updating powerup:", error);
+                console.error("Error updating powerup:", error)
                 // Remove problematic powerup
                 if (powerup && this.scene) {
                     this.scene.remove(powerup);
@@ -4527,7 +4121,7 @@ class Game {
     }
     
     // Create the shield effect
-    createShieldEffect() {
+    createShieldEffect(); {
         if (!this.truck || !this.scene) return;
         
         // Clean up any existing shield mesh
@@ -4545,7 +4139,7 @@ class Game {
             transparent: true,
             opacity: 0.4,
             side: THREE.DoubleSide
-        });
+        })
         
         this.shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
         this.scene.add(this.shieldMesh);
@@ -4559,11 +4153,11 @@ class Game {
             this.shieldMesh.position.y += 1.5; // Raise slightly to center on truck
         }
         
-        console.log("Shield effect created");
+        console.log("Shield effect created")
     }
     
     // Add this method for updating the shield effect
-    updateShieldEffect() {
+    updateShieldEffect(); {
         if (!this.truck) return;
         
         // Create shield mesh if it doesn't exist
@@ -4582,7 +4176,7 @@ class Game {
     }
     
     // Add this method for removing the shield effect
-    removeShieldEffect() {
+    removeShieldEffect(); {
         if (this.shieldMesh && this.scene) {
             this.scene.remove(this.shieldMesh);
             this.shieldMesh = null;
@@ -4590,9 +4184,9 @@ class Game {
     }
     
     // Create fade-out effect when powerup disappears
-    createPowerupFadeEffect(powerup) {
+    createPowerupFadeEffect(powerup); {
         if (!powerup || !powerup.position) {
-            console.warn('Invalid powerup object for fade effect');
+            console.warn('Invalid powerup object for fade effect')
             return;
         }
 
@@ -4624,7 +4218,7 @@ class Game {
             life: 1.0,
             opacity: 0.8,
             radius: 1.5
-        });
+        })
 
         // Add particles to the active effects
         if (particles && particles.length > 0) {
@@ -4656,9 +4250,9 @@ class Game {
                             }
                             return false;
                         }
-                    });
+                    })
                 }
-            });
+            })
         }
 
         // Remove the powerup
@@ -4668,7 +4262,7 @@ class Game {
     }
 
     // Create visual effect for powerup collection
-    createPowerupEffect(type) {
+    createPowerupEffect(type); {
         if (!this.truck || !this.scene) return;
         
         const powerupConfig = this.powerupTypes[type];
@@ -4689,7 +4283,7 @@ class Game {
             opacity: 0.8,
             radius: 3,
             yOffset: 1.5
-        });
+        })
         
         // Add a flash of light from the light pool
         this.createPooledLight({
@@ -4698,34 +4292,34 @@ class Game {
             intensity: 2,
             distance: 10,
             decay: 0.2
-        });
+        })
         
         // Create custom effect based on powerup type
-        switch(type) {
+        switch(type); {
             case 'SHIELD':
                 // Shield effect is handled in updateShieldEffect method
-                this.hasShield = true;
+                this.hasShield = true
                 break;
             case 'SPEED_BOOST':
                 // Add speed trail effect
-                this.createSpeedBoostEffect();
+                this.createSpeedBoostEffect()
                 break;
             case 'DAMAGE_BOOST':
                 // Add damage boost effect
-                this.createDamageBoostEffect();
+                this.createDamageBoostEffect()
                 break;
         }
         
         // Play powerup pickup sound
         if (this.soundManager) {
-            this.soundManager.playSound('powerup_pickup', this.truck.position);
+            this.soundManager.playSound('powerup_pickup', this.truck.position)
         }
     }
     
     // Create pooled particles for effects
-    createPooledParticles(options) {
+    createPooledParticles(options); {
         if (!this.particlePool || !Array.isArray(this.particlePool)) {
-            console.warn('Particle pool not initialized properly');
+            console.warn('Particle pool not initialized properly')
             return [];
         }
 
@@ -4749,14 +4343,14 @@ class Game {
             // Find an available particle
             const particleObj = this.particlePool.find(p => !p.inUse);
             if (!particleObj) {
-                console.log('Particle pool exhausted');
+                console.log('Particle pool exhausted')
                 break;
             }
             
             try {
                 const particle = particleObj.mesh;
                 if (!particle) {
-                    console.warn('Invalid particle in pool');
+                    console.warn('Invalid particle in pool')
                     continue;
                 }
                 
@@ -4788,7 +4382,7 @@ class Game {
                 
                 usedParticles.push(particleObj);
             } catch (error) {
-                console.warn('Error setting up particle:', error);
+                console.warn('Error setting up particle:', error)
                 continue;
             }
         }
@@ -4797,7 +4391,7 @@ class Game {
     }
     
     // Create pooled light for effects
-    createPooledLight(options) {
+    createPooledLight(options); {
         const {
             position,
             color,
@@ -4819,14 +4413,14 @@ class Game {
                 this.lightPool.push({
                     light: light,
                     inUse: false
-                });
+                })
             }
         }
         
         // Find an available light
         const lightObj = this.lightPool.find(l => !l.inUse);
         if (!lightObj) {
-            console.log('Light pool exhausted');
+            console.log('Light pool exhausted')
             return;
         }
         
@@ -4859,11 +4453,11 @@ class Game {
                 }
                 return false;
             }
-        });
+        })
     }
     
     // Add speed boost visual effect - simplified
-    createSpeedBoostEffect() {
+    createSpeedBoostEffect(); {
         if (!this.truck) return;
         
         const truckDirection = new THREE.Vector3(
@@ -4876,7 +4470,7 @@ class Game {
         for (let i = 0; i < 10; i++) {
             // Find an available particle
             if (!this.particlePool) {
-                this.createPooledParticles({count: 0}); // Initialize pool
+                this.createPooledParticles({count: 0}) // Initialize pool
             }
             
             const particleObj = this.particlePool.find(p => !p.inUse);
@@ -4931,12 +4525,12 @@ class Game {
                     }
                     return false;
                 }
-            });
+            })
         }
     }
     
     // Add damage boost visual effect - simplified
-    createDamageBoostEffect() {
+    createDamageBoostEffect(); {
         if (!this.truck) return;
         
         // Use particle pool for orbital particles
@@ -4950,7 +4544,7 @@ class Game {
             opacity: 0.8,
             radius: 2,
             yOffset: 1
-        });
+        })
         
         // Add orbital behavior to the last 15 particles
         const startIndex = Math.max(0, this.sparks.length - 15);
@@ -4987,7 +4581,7 @@ class Game {
                     return true; // Signal removal
                 }
                 return false;
-            };
+            }
             
             // Store reference to truck position
             spark.truckPos = this.truck.position;
@@ -4995,15 +4589,15 @@ class Game {
     }
 
     // Update HUD to show active powerups
-    updatePowerupIndicators() {
-        const container = document.getElementById('powerup-indicators');
+    updatePowerupIndicators(); {
+        const container = document.getElementById('powerup-indicators')
         if (!container) {
-            console.warn('Powerup indicators container not found');
+            console.warn('Powerup indicators container not found')
             return;
         }
         
         // Clear existing indicators
-        container.innerHTML = '';
+        container.innerHTML = ''
         
         // Track if we have any active powerups
         let hasActivePowerups = false;
@@ -5015,25 +4609,25 @@ class Game {
                 const powerupConfig = this.powerupTypes[type];
                 
                 // Create indicator element
-                const indicator = document.createElement('div');
-                indicator.className = 'powerup-indicator';
+                const indicator = document.createElement('div')
+                indicator.className = 'powerup-indicator'
                 
                 // Set color to match powerup
                 if (powerupConfig.color) {
-                    const colorHex = powerupConfig.color.toString(16).padStart(6, '0');
+                    const colorHex = powerupConfig.color.toString(16).padStart(6, '0')
                     indicator.style.backgroundColor = `rgba(${parseInt(colorHex.substr(0, 2), 16)}, ${parseInt(colorHex.substr(2, 2), 16)}, ${parseInt(colorHex.substr(4, 2), 16)}, 0.3)`;
                     indicator.style.borderColor = `#${colorHex}`;
                 }
                 
                 // Create icon
-                const icon = document.createElement('span');
-                icon.textContent = powerupConfig.icon || '✦';
-                icon.className = 'powerup-icon';
+                const icon = document.createElement('span')
+                icon.textContent = powerupConfig.icon || '✦'
+                icon.className = 'powerup-icon'
                 
                 // Create timer
-                const timer = document.createElement('span');
+                const timer = document.createElement('span')
                 timer.textContent = Math.ceil(data.timeRemaining / 60); // Convert to seconds
-                timer.className = 'powerup-timer';
+                timer.className = 'powerup-timer'
                 
                 indicator.appendChild(icon);
                 indicator.appendChild(timer);
@@ -5042,23 +4636,23 @@ class Game {
                 
                 // Pulse effect for indicators about to expire
                 if (data.timeRemaining < 180) { // Less than 3 seconds
-                    indicator.classList.add('pulse');
+                    indicator.classList.add('pulse')
                 }
             }
         }
         
         // Show/hide the container based on active powerups
-        container.style.display = hasActivePowerups ? 'flex' : 'none';
+        container.style.display = hasActivePowerups ? 'flex' : 'none'
     }
     
     // Initialize weapons for the player
-    initializeWeapons() {
+    initializeWeapons(); {
         if (!this.scene) {
-            console.error("Cannot initialize weapons: Scene is not available");
+            console.error("Cannot initialize weapons: Scene is not available")
             return;
         }
         
-        console.log("Initializing weapons system...");
+        console.log("Initializing weapons system...")
         
         try {
             // Create all weapon types
@@ -5074,17 +4668,17 @@ class Game {
             this.weaponPickups = []; // Ensure array exists
             this.lastWeaponPickupSpawn = Date.now(); // Initialize spawn timer
             
-            console.log("Weapons initialized successfully");
+            console.log("Weapons initialized successfully")
             
             // Set keyboard bindings for weapon switching
             window.addEventListener('keydown', (e) => {
                 if (!this.weapons || !Array.isArray(this.weapons) || this.weapons.length === 0) {
-                    return; // Skip if weapons not initialized
+                    return // Skip if weapons not initialized
                 }
                 
                 // Number keys 1-4 for weapon selection
                 if (e.key >= '1' && e.key <= '4') {
-                    const index = parseInt(e.key) - 1;
+                    const index = parseInt(e.key) - 1
                     if (index >= 0 && index < this.weapons.length) {
                         this.switchWeapon(index);
                     }
@@ -5092,29 +4686,29 @@ class Game {
                 
                 // Q key for previous weapon
                 if (e.key === 'q' || e.key === 'Q') {
-                    this.prevWeapon();
+                    this.prevWeapon()
                 }
                 
                 // E key for next weapon
                 if (e.key === 'e' || e.key === 'E') {
-                    this.nextWeapon();
+                    this.nextWeapon()
                 }
                 
                 // R key for manual reload
                 if (e.key === 'r' || e.key === 'R') {
-                    const weapon = this.getCurrentWeapon();
+                    const weapon = this.getCurrentWeapon()
                     if (weapon && typeof weapon.startReload === 'function') {
-                        weapon.startReload();
+                        weapon.startReload()
                     }
                 }
-            });
+            })
         } catch (error) {
-            console.error("Error initializing weapons:", error);
+            console.error("Error initializing weapons:", error)
         }
     }
     
     // Get current weapon
-    getCurrentWeapon() {
+    getCurrentWeapon(); {
         if (!this.weapons || this.weapons.length === 0) {
             return null;
         }
@@ -5122,7 +4716,7 @@ class Game {
     }
     
     // Switch to a specific weapon
-    switchWeapon(index) {
+    switchWeapon(index); {
         if (index >= 0 && index < this.weapons.length) {
             this.currentWeaponIndex = index;
             
@@ -5134,24 +4728,24 @@ class Game {
     }
     
     // Switch to next weapon
-    nextWeapon() {
+    nextWeapon(); {
         this.currentWeaponIndex = (this.currentWeaponIndex + 1) % this.weapons.length;
         this.updateWeaponDisplay();
     }
     
     // Switch to previous weapon
-    prevWeapon() {
+    prevWeapon(); {
         this.currentWeaponIndex = (this.currentWeaponIndex - 1 + this.weapons.length) % this.weapons.length;
         this.updateWeaponDisplay();
     }
     
     // Update weapon HUD display
-    updateWeaponDisplay() {
+    updateWeaponDisplay(); {
         if (!this.weapons || this.weapons.length === 0) return;
         
-        const currentWeaponElement = document.getElementById('currentWeapon');
-        const weaponStatsElement = document.getElementById('weaponStats');
-        const ammoElement = document.getElementById('ammo');
+        const currentWeaponElement = document.getElementById('currentWeapon')
+        const weaponStatsElement = document.getElementById('weaponStats')
+        const ammoElement = document.getElementById('ammo')
         
         // Get current weapon safely
         const weapon = this.getCurrentWeapon();
@@ -5159,23 +4753,23 @@ class Game {
         
         // Update weapon name
         if (currentWeaponElement) {
-            currentWeaponElement.innerHTML = `<span style="color: #00ffff;">${weapon.type.name || 'UNKNOWN WEAPON'}</span>`;
+            currentWeaponElement.innerHTML = `<span style="color: #00ffff;">${weapon.type.name || 'UNKNOWN WEAPON'}</span>`
         }
         
         // Update weapon stats
         if (weaponStatsElement) {
             const damageText = weapon.type.damage || 20;
-            const fireRateText = weapon.type.cooldown ? ((weapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s';
-            weaponStatsElement.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`;
+            const fireRateText = weapon.type.cooldown ? ((weapon.type.cooldown / 60).toFixed(1) + 's') : '0.1s'
+            weaponStatsElement.textContent = `DMG: ${damageText} | FIRE RATE: ${fireRateText}`
         }
         
         // Update ammo display
         if (ammoElement) {
             // Add reload indicator if reloading
             if (weapon.isReloading) {
-                ammoElement.innerHTML = `AMMO: <span style="color: #ff0000;">RELOADING...</span>`;
+                ammoElement.innerHTML = `AMMO: <span style="color: #ff0000;">RELOADING...</span>`
             } else {
-                ammoElement.innerHTML = `AMMO: <span style="color: #00ffff;">${weapon.ammo}/${weapon.maxAmmo}</span>`;
+                ammoElement.innerHTML = `AMMO: <span style="color: #00ffff;">${weapon.ammo}/${weapon.maxAmmo}</span>`
             }
             
             // Update ammo bar
@@ -5189,7 +4783,7 @@ class Game {
     }
     
     // Update weapon cooldown indicator
-    updateCooldownIndicator() {
+    updateCooldownIndicator(); {
         // Safety check for weapons
         if (!this.weapons || this.weapons.length === 0) return;
         
@@ -5197,14 +4791,14 @@ class Game {
         if (!currentWeapon) return;
         
         // Get cooldown container and bar
-        const container = document.getElementById('cooldown-container');
+        const container = document.getElementById('cooldown-container')
         if (!container) return;
         
         // Get or create cooldown bar
-        let cooldownBar = document.getElementById('cooldown-bar');
+        let cooldownBar = document.getElementById('cooldown-bar')
         if (!cooldownBar) {
-            cooldownBar = document.createElement('div');
-            cooldownBar.id = 'cooldown-bar';
+            cooldownBar = document.createElement('div')
+            cooldownBar.id = 'cooldown-bar'
             container.appendChild(cooldownBar);
         }
         
@@ -5216,27 +4810,27 @@ class Game {
             
             // Update cooldown bar color based on weapon type
             if (currentWeapon.type && currentWeapon.type.color) {
-                const colorHex = currentWeapon.type.color.toString(16).padStart(6, '0');
-                cooldownBar.style.backgroundColor = '#' + colorHex;
+                const colorHex = currentWeapon.type.color.toString(16).padStart(6, '0')
+                cooldownBar.style.backgroundColor = '#' + colorHex
                 cooldownBar.style.boxShadow = `0 0 10px #${colorHex}`;
             } else {
-                cooldownBar.style.backgroundColor = '#00ffff';
-                cooldownBar.style.boxShadow = '0 0 10px #00ffff';
+                cooldownBar.style.backgroundColor = '#00ffff'
+                cooldownBar.style.boxShadow = '0 0 10px #00ffff'
             }
             
             // Show/hide container based on cooldown status
-            container.style.opacity = progress < 1 ? '1' : '0.3';
+            container.style.opacity = progress < 1 ? '1' : '0.3'
         } catch (error) {
-            console.log("Error updating cooldown indicator:", error);
-            cooldownBar.style.width = '100%';
-            cooldownBar.style.backgroundColor = '#00ffff';
-            cooldownBar.style.boxShadow = '0 0 10px #00ffff';
-            container.style.opacity = '0.3';
+            console.log("Error updating cooldown indicator:", error)
+            cooldownBar.style.width = '100%'
+            cooldownBar.style.backgroundColor = '#00ffff'
+            cooldownBar.style.boxShadow = '0 0 10px #00ffff'
+            container.style.opacity = '0.3'
         }
     }
     
     // Create weapon pickup
-    createWeaponPickup() {
+    createWeaponPickup(); {
         if (!this.scene) return;
         
         // Choose a random weapon type (excluding the machine gun which is the default)
@@ -5265,7 +4859,7 @@ class Game {
     }
     
     // Update weapon pickups
-    updateWeaponPickups() {
+    updateWeaponPickups(); {
         if (!this.weaponPickups || !this.truck) return;
         
         const now = Date.now();
@@ -5325,13 +4919,13 @@ class Game {
     }
 
     // Initialize particle pools for effects
-    initializeParticlePools() {
+    initializeParticlePools(); {
         // Create pools for different types of particles
         this.particlePools = {
             explosionParticles: [],
             explosionDebris: [],
             smokeParticles: []
-        };
+        }
         
         // Pre-allocate explosion particles
         for (let i = 0; i < 200; i++) {
@@ -5342,7 +4936,7 @@ class Game {
                 color: i % 2 === 0 ? 0xff5500 : 0xffff00,
                 transparent: true,
                 opacity: 0
-            });
+            })
             
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
             particle.visible = false;
@@ -5351,7 +4945,7 @@ class Game {
             this.particlePools.explosionParticles.push({
                 mesh: particle,
                 inUse: false
-            });
+            })
             
             // Smoke particles
             if (i < 100) {
@@ -5360,7 +4954,7 @@ class Game {
                     color: 0x555555,
                     transparent: true,
                     opacity: 0
-                });
+                })
                 
                 const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial);
                 smoke.visible = false;
@@ -5368,7 +4962,7 @@ class Game {
                 this.particlePools.smokeParticles.push({
                     mesh: smoke,
                     inUse: false
-                });
+                })
             }
             
             // Debris pieces
@@ -5380,7 +4974,7 @@ class Game {
                     metalness: 0.2,
                     transparent: true,
                     opacity: 0
-                });
+                })
                 
                 const debris = new THREE.Mesh(debrisGeometry, debrisMaterial);
                 debris.visible = false;
@@ -5388,7 +4982,7 @@ class Game {
                 this.particlePools.explosionDebris.push({
                     mesh: debris,
                     inUse: false
-                });
+                })
             }
         }
         
@@ -5399,7 +4993,7 @@ class Game {
             transparent: true,
             opacity: 0,
             side: THREE.DoubleSide
-        });
+        })
         
         this.shockwavePool = [];
         for (let i = 0; i < 10; i++) {
@@ -5410,7 +5004,7 @@ class Game {
             this.shockwavePool.push({
                 mesh: shockwave,
                 inUse: false
-            });
+            })
         }
         
         // Create explosion light pool
@@ -5422,7 +5016,7 @@ class Game {
             this.explosionLightPool.push({
                 light: light,
                 inUse: false
-            });
+            })
         }
         
         // Track active effects for updating
@@ -5430,7 +5024,7 @@ class Game {
     }
     
     // Get particle from pool
-    getParticleFromPool(poolName) {
+    getParticleFromPool(poolName); {
         const pool = this.particlePools[poolName];
         if (!pool) return null;
         
@@ -5468,7 +5062,7 @@ class Game {
                 if (!found && poolName === 'explosionDebris') {
                     for (const debris of explosion.debris) {
                         if (debris.mesh === pool[i].mesh) {
-                            found = true;
+                            found = true
                             lifetime = explosion.life;
                             break;
                         }
@@ -5492,7 +5086,7 @@ class Game {
     }
     
     // Get shockwave from pool
-    getShockwaveFromPool() {
+    getShockwaveFromPool(); {
         for (let i = 0; i < this.shockwavePool.length; i++) {
             if (!this.shockwavePool[i].inUse) {
                 this.shockwavePool[i].inUse = true;
@@ -5502,7 +5096,7 @@ class Game {
         }
         
         // If no shockwaves available, find the one that's been in use the longest
-        let oldestShockwaveIndex = 0;
+        let oldestShockwaveIndex = 0
         let oldestLifetime = Infinity;
         
         // Find shockwaves in active explosions
@@ -5525,7 +5119,7 @@ class Game {
     }
     
     // Get light from pool
-    getLightFromPool() {
+    getLightFromPool(); {
         for (let i = 0; i < this.explosionLightPool.length; i++) {
             if (!this.explosionLightPool[i].inUse) {
                 this.explosionLightPool[i].inUse = true;
@@ -5558,7 +5152,7 @@ class Game {
     }
     
     // Update all active explosions
-    updateExplosions(deltaTime = 1) {
+    updateExplosions(deltaTime = 1); {
         // Process each active explosion
         for (let i = this.activeExplosions.length - 1; i >= 0; i--) {
             const explosion = this.activeExplosions[i];
@@ -5686,36 +5280,36 @@ class Game {
 
     // Create explosion effect using object pooling
     // Simple direct sound player that works independently of SoundManager
-    playSimpleSound(soundName) {
+    playSimpleSound(soundName); {
         try {
             // Map sound names directly to known file paths
             let actualPath;
             
             // Check for specific sounds that might be causing issues
-            switch(soundName) {
+            switch(soundName); {
                 case 'weapon_fire':
-                    actualPath = '/sounds/weapon_fire.mp3';
+                    actualPath = '/sounds/weapon_fire.mp3'
                     break;
                 case 'explosion':
-                    actualPath = '/sounds/vehicle_explosion.mp3';
+                    actualPath = '/sounds/vehicle_explosion.mp3'
                     break;
                 case 'powerup_speed':
-                    actualPath = '/sounds/powerup_speed.mp3';
+                    actualPath = '/sounds/powerup_speed.mp3'
                     break;
                 case 'powerup_health':
-                    actualPath = '/sounds/powerup_health.mp3';
+                    actualPath = '/sounds/powerup_health.mp3'
                     break;
                 case 'powerup_shield':
-                    actualPath = '/sounds/powerup_shield.mp3';
+                    actualPath = '/sounds/powerup_shield.mp3'
                     break;
                 case 'powerup_damage':
-                    actualPath = '/sounds/powerup_damage.mp3';
+                    actualPath = '/sounds/powerup_damage.mp3'
                     break;
                 case 'powerup_ammo':
-                    actualPath = '/sounds/powerup_ammo.mp3';
+                    actualPath = '/sounds/powerup_ammo.mp3'
                     break;
                 case 'menu_select':
-                    actualPath = '/sounds/menu_select.mp3';
+                    actualPath = '/sounds/menu_select.mp3'
                     break;
                 default:
                     actualPath = `/sounds/${soundName}.mp3`;
@@ -5730,16 +5324,16 @@ class Game {
             // IMPORTANT: Call play() AND add an event handler to play again if loading
             audio.addEventListener('canplaythrough', () => {
                 try {
-                    const actualPlay = audio.play();
+                    const actualPlay = audio.play()
                     if (actualPlay) {
                         actualPlay.catch(innerError => {
-                            console.error(`Canplaythrough error: ${innerError}`);
-                        });
+                            console.error(`Canplaythrough error: ${innerError}`)
+                        })
                     }
                 } catch (playError) {
-                    console.error('Play error:', playError);
+                    console.error('Play error:', playError)
                 }
-            });
+            })
             
             // Try playing right away too
             try {
@@ -5756,43 +5350,43 @@ class Game {
                                 // Try playing again after user interaction
                                 setTimeout(() => {
                                     try {
-                                        new Audio(actualPath).play();
+                                        new Audio(actualPath).play()
                                     } catch (e) {}
                                 }, 100);
-                            });
+                            })
                         }
-                    });
+                    })
                 }
             } catch (initialPlayError) {
-                console.warn('Initial play attempt failed:', initialPlayError);
+                console.warn('Initial play attempt failed:', initialPlayError)
             }
             
             return true;
         } catch (e) {
-            console.error('Error in playSimpleSound:', e);
+            console.error('Error in playSimpleSound:', e)
             return false;
         }
     }
     
     // Add a temporary button for enabling sound after user interaction
-    showSoundEnableButton(callback) {
+    showSoundEnableButton(callback); {
         // Only show the button once
-        if (document.getElementById('sound-enable-button')) return;
+        if (document.getElementById('sound-enable-button')) return
         
-        const button = document.createElement('button');
-        button.id = 'sound-enable-button';
-        button.textContent = 'Enable Sound';
-        button.style.position = 'fixed';
-        button.style.top = '10px';
-        button.style.left = '10px';
-        button.style.zIndex = '9999';
-        button.style.background = '#ff00ff';
-        button.style.color = 'white';
-        button.style.border = 'none';
-        button.style.padding = '10px 20px';
-        button.style.cursor = 'pointer';
-        button.style.fontFamily = 'Arial, sans-serif';
-        button.style.boxShadow = '0 0 10px rgba(255, 0, 255, 0.7)';
+        const button = document.createElement('button')
+        button.id = 'sound-enable-button'
+        button.textContent = 'Enable Sound'
+        button.style.position = 'fixed'
+        button.style.top = '10px'
+        button.style.left = '10px'
+        button.style.zIndex = '9999'
+        button.style.background = '#ff00ff'
+        button.style.color = 'white'
+        button.style.border = 'none'
+        button.style.padding = '10px 20px'
+        button.style.cursor = 'pointer'
+        button.style.fontFamily = 'Arial, sans-serif'
+        button.style.boxShadow = '0 0 10px rgba(255, 0, 255, 0.7)'
         
         button.onclick = () => {
             // Play multiple sounds at once to unlock audio
@@ -5804,22 +5398,22 @@ class Game {
                     new Audio('/sounds/menu_select.mp3'),
                     new Audio('/sounds/powerup_pickup.mp3'),
                     new Audio('/sounds/shield_hit.mp3')
-                ];
+                ]
                 
                 // Set volume to 0 and play them all
                 sounds.forEach(sound => {
                     sound.volume = 0;
                     const promise = sound.play();
-                    if (promise) promise.catch(() => {});
-                });
+                    if (promise) promise.catch(() => {}))
+                })
                 
                 // Then try an audible sound
-                const testSound = new Audio('/sounds/menu_confirm.mp3');
-                testSound.volume = 0.5 * this.getVolumeMultiplier('menu_confirm');
+                const testSound = new Audio('/sounds/menu_confirm.mp3')
+                testSound.volume = 0.5 * this.getVolumeMultiplier('menu_confirm')
                 testSound.currentTime = 0;
-                testSound.play().catch(() => {});
+                testSound.play().catch(() => {}))
             } catch (e) {
-                console.error('Error unlocking audio:', e);
+                console.error('Error unlocking audio:', e)
             }
             
             // Run callback
@@ -5831,17 +5425,17 @@ class Game {
             }
             
             // Show a success message
-            const message = document.createElement('div');
-            message.textContent = 'Sound Enabled!';
-            message.style.position = 'fixed';
-            message.style.top = '10px';
-            message.style.left = '10px';
-            message.style.zIndex = '9999';
-            message.style.background = '#00ff00';
-            message.style.color = 'black';
-            message.style.padding = '10px 20px';
-            message.style.fontFamily = 'Arial, sans-serif';
-            message.style.borderRadius = '5px';
+            const message = document.createElement('div')
+            message.textContent = 'Sound Enabled!'
+            message.style.position = 'fixed'
+            message.style.top = '10px'
+            message.style.left = '10px'
+            message.style.zIndex = '9999'
+            message.style.background = '#00ff00'
+            message.style.color = 'black'
+            message.style.padding = '10px 20px'
+            message.style.fontFamily = 'Arial, sans-serif'
+            message.style.borderRadius = '5px'
             
             // Remove the button
             button.remove();
@@ -5851,27 +5445,27 @@ class Game {
             
             // Remove the message after 2 seconds
             setTimeout(() => message.remove(), 2000);
-        };
+        }
         
         document.body.appendChild(button);
     }
 
-    createExplosion(position, type = 'standard', skipAreaDamage = false) {
+    createExplosion(position, type = 'standard', skipAreaDamage = false); {
         try {
             // ... existing explosion code ...
             
             // Play explosion sound using our guaranteed sound system
             if (window.SoundFX) {
-                window.SoundFX.play('vehicle_explosion');
+                window.SoundFX.play('vehicle_explosion')
             }
             
             // ... rest of explosion code ...
         } catch (error) {
-            console.error("Error in createExplosion:", error);
+            console.error("Error in createExplosion:", error)
         }
     }
 
-    dispose() {
+    dispose(); {
         if (this.soundManager) {
             this.soundManager.dispose();
         }
@@ -5879,7 +5473,7 @@ class Game {
     }
 
     // Create a new projectile
-    shoot() {
+    shoot(); {
         if (!this.truck) return;
         
         // Get camera position and direction
@@ -5895,7 +5489,7 @@ class Game {
         
         // Create projectile mesh
         const projectileGeometry = new THREE.SphereGeometry(0.2, 8, 8);
-        const projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+        const projectileMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff })
         const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
         
         // Position the projectile at the muzzle
@@ -5912,11 +5506,11 @@ class Game {
             damage: 20,
             lifetime: 100,
             source: 'player'
-        };
+        }
         
         // If multiplayer is active, add the player ID to the projectile
         if (this.multiplayer && this.multiplayer.isConnected) {
-            projectile.playerId = this.multiplayer.localPlayerId;
+            projectile.playerId = this.multiplayer.localPlayerId
             
             // Send the projectile info to the server
             this.multiplayer.sendProjectileCreated(projectile);
@@ -5930,14 +5524,14 @@ class Game {
         
         // Play sound
         if (this.soundManager) {
-            this.soundManager.playSound('weapon_fire', this.truck.position);
+            this.soundManager.playSound('weapon_fire', this.truck.position)
         } else if (window.SoundFX) {
-            window.SoundFX.play('weapon_fire');
+            window.SoundFX.play('weapon_fire')
         }
     }
 
     // Handle projectile hit from a remote player
-    handleRemoteProjectileHit(sourcePlayerId, damage) {
+    handleRemoteProjectileHit(sourcePlayerId, damage); {
         console.log(`GOT HIT by player ${sourcePlayerId} for ${damage} damage`);
         
         // Visual feedback and notify server about the hit
@@ -5945,9 +5539,9 @@ class Game {
         
         // Play hit sound
         if (this.soundManager) {
-            this.soundManager.playSound('vehicle_hit', this.truck.position);
+            this.soundManager.playSound('vehicle_hit', this.truck.position)
         } else if (window.SoundFX) {
-            window.SoundFX.play('vehicle_hit');
+            window.SoundFX.play('vehicle_hit')
         }
         
         // Create hit effect
@@ -5970,67 +5564,67 @@ class Game {
                 playerId: this.multiplayer.localPlayerId,
                 damage: damage,
                 sourceId: sourcePlayerId
-            });
+            })
             
             // Also use the method as backup
             try {
-                this.multiplayer.sendPlayerHit(this.multiplayer.localPlayerId, damage, sourcePlayerId);
+                this.multiplayer.sendPlayerHit(this.multiplayer.localPlayerId, damage, sourcePlayerId)
             } catch (err) {
-                console.error("Error using sendPlayerHit method:", err);
+                console.error("Error using sendPlayerHit method:", err)
             }
         } else {
             // If not in multiplayer mode, apply damage directly
-            console.log("Not in multiplayer mode, applying damage directly");
+            console.log("Not in multiplayer mode, applying damage directly")
             this.takeDamage(damage);
         }
     }
 
-    initializeSimpleSounds() {
+    initializeSimpleSounds(); {
         // No sound button is created - sounds are enabled by default
-        console.log('Sound button creation skipped in Game - sounds are enabled by default');
+        console.log('Sound button creation skipped in Game - sounds are enabled by default')
     }
 
     // Auto-enable sounds
-    autoEnableSounds() {
+    autoEnableSounds(); {
         // No sound button is created - sounds are enabled by default
-        console.log('Sound button creation skipped in Game - sounds are enabled by default');
+        console.log('Sound button creation skipped in Game - sounds are enabled by default')
     }
 
     // Create button for enabling sounds - now disabled as sounds auto-enable
-    createSoundButton() {
+    createSoundButton(); {
         // No sound button is created - sounds are now enabled by default
-        console.log('Sound button creation skipped in Game - sounds are enabled by default');
+        console.log('Sound button creation skipped in Game - sounds are enabled by default')
     }
 
     // Create a sound enabler that starts sounds on user interaction
-    createSoundEnabler() {
+    createSoundEnabler(); {
         // Create an invisible overlay to capture first interaction
-        const soundEnabler = document.createElement('div');
-        soundEnabler.id = 'sound-enabler';
-        soundEnabler.style.position = 'fixed';
-        soundEnabler.style.top = '0';
-        soundEnabler.style.left = '0';
-        soundEnabler.style.width = '100%';
-        soundEnabler.style.height = '100%';
-        soundEnabler.style.background = 'rgba(0,0,0,0.01)';
-        soundEnabler.style.zIndex = '9999';
-        soundEnabler.style.cursor = 'pointer';
-        soundEnabler.style.display = 'flex';
-        soundEnabler.style.justifyContent = 'center';
-        soundEnabler.style.alignItems = 'center';
+        const soundEnabler = document.createElement('div')
+        soundEnabler.id = 'sound-enabler'
+        soundEnabler.style.position = 'fixed'
+        soundEnabler.style.top = '0'
+        soundEnabler.style.left = '0'
+        soundEnabler.style.width = '100%'
+        soundEnabler.style.height = '100%'
+        soundEnabler.style.background = 'rgba(0,0,0,0.01)'
+        soundEnabler.style.zIndex = '9999'
+        soundEnabler.style.cursor = 'pointer'
+        soundEnabler.style.display = 'flex'
+        soundEnabler.style.justifyContent = 'center'
+        soundEnabler.style.alignItems = 'center'
         
         // Add text prompt
-        const soundText = document.createElement('div');
-        soundText.textContent = 'CLICK TO ENABLE SOUNDS';
-        soundText.style.color = '#ff00ff';
-        soundText.style.fontSize = '24px';
-        soundText.style.fontFamily = "'Orbitron', sans-serif";
-        soundText.style.textShadow = '0 0 10px #ff00ff';
+        const soundText = document.createElement('div')
+        soundText.textContent = 'CLICK TO ENABLE SOUNDS'
+        soundText.style.color = '#ff00ff'
+        soundText.style.fontSize = '24px'
+        soundText.style.fontFamily = "'Orbitron', sans-serif"
+        soundText.style.textShadow = '0 0 10px #ff00ff'
         soundEnabler.appendChild(soundText);
         
         // Add event listener to enable sounds and remove overlay
         soundEnabler.addEventListener('click', () => {
-            console.log('User interaction detected, enabling sounds');
+            console.log('User interaction detected, enabling sounds')
             
             // Create and play a silent sound to unlock audio
             try {
@@ -6045,7 +5639,7 @@ class Game {
                 
                 // Method 2: Using HTML5 Audio
                 const audio = new Audio();
-                audio.play().catch(e => console.log('Audio unlock attempt:', e));
+                audio.play().catch(e => console.log('Audio unlock attempt:', e))
                 
                 // Method 3: Try direct sound calls
                 if (window.SoundFX) {
@@ -6058,29 +5652,29 @@ class Game {
                 // Play a test sound after a short delay
                 setTimeout(() => {
                     if (window.SoundFX) {
-                        window.SoundFX.play('menu_select');
+                        window.SoundFX.play('menu_select')
                     }
                     if (this.soundManager) {
-                        this.soundManager.playSound('menu_select');
+                        this.soundManager.playSound('menu_select')
                     }
                 }, 500);
             } catch (error) {
-                console.error('Error unlocking audio:', error);
+                console.error('Error unlocking audio:', error)
                 // Remove the overlay anyway
                 document.body.removeChild(soundEnabler);
             }
-        });
+        })
         
         // Add to body
         document.body.appendChild(soundEnabler);
-        console.log('Sound enabler created - waiting for user interaction');
+        console.log('Sound enabler created - waiting for user interaction')
     }
 }
 
 // Initialize game when window is fully loaded
 window.addEventListener('load', () => {
-    console.log("Window loaded, creating game");
-    try {
+    console.log("Window loaded, creating game")
+    try; {
         // Initialize SoundFX global utility
         window.SoundFX = {
             // Keep track of whether audio is unlocked
@@ -6092,7 +5686,7 @@ window.addEventListener('load', () => {
                 
                 try {
                     // Create a sound path
-                    const soundPath = '/sounds/' + soundName + '.mp3';
+                    const soundPath = '/sounds/' + soundName + '.mp3'
                     
                     // Create a new audio element
                     const audio = new Audio(soundPath);
@@ -6106,9 +5700,9 @@ window.addEventListener('load', () => {
                             
                             // If not allowed, queue for next user interaction
                             if (error.name === 'NotAllowedError' && !this.audioUnlocked) {
-                                this.setupUnlockHandlers();
+                                this.setupUnlockHandlers()
                             }
-                        });
+                        })
                     }
                     return audio;
                 } catch (error) {
@@ -6121,7 +5715,7 @@ window.addEventListener('load', () => {
             unlockAudio: function() {
                 if (this.audioUnlocked) return;
                 
-                console.log('SoundFX: Unlocking audio context');
+                console.log('SoundFX: Unlocking audio context')
                 
                 try {
                     // Try to play a silent sound
@@ -6131,18 +5725,18 @@ window.addEventListener('load', () => {
                     
                     if (promise) {
                         promise.then(() => {
-                            console.log('SoundFX: Audio unlocked successfully');
+                            console.log('SoundFX: Audio unlocked successfully')
                             this.audioUnlocked = true;
                         }).catch(error => {
-                            console.error('SoundFX: Could not unlock audio:', error);
-                        });
+                            console.error('SoundFX: Could not unlock audio:', error)
+                        })
                     }
                     
                     // Also try to unlock AudioContext if available
                     if (window.AudioContext || window.webkitAudioContext) {
                         const ctx = new (window.AudioContext || window.webkitAudioContext)();
                         if (ctx.state === 'suspended') {
-                            ctx.resume();
+                            ctx.resume()
                         }
                         
                         // Create and play a silent buffer
@@ -6152,7 +5746,7 @@ window.addEventListener('load', () => {
                         source.start(0);
                     }
                 } catch (e) {
-                    console.error('SoundFX: Error in audio unlock:', e);
+                    console.error('SoundFX: Error in audio unlock:', e)
                 }
             },
             
@@ -6160,21 +5754,21 @@ window.addEventListener('load', () => {
             setupUnlockHandlers: function() {
                 if (this.handlersSet) return;
                 
-                console.log('SoundFX: Setting up unlock handlers');
+                console.log('SoundFX: Setting up unlock handlers')
                 this.handlersSet = true;
                 
                 const unlockFn = () => {
                     this.unlockAudio();
-                    document.removeEventListener('click', unlockFn);
-                    document.removeEventListener('touchstart', unlockFn);
-                    document.removeEventListener('keydown', unlockFn);
-                };
+                    document.removeEventListener('click', unlockFn)
+                    document.removeEventListener('touchstart', unlockFn)
+                    document.removeEventListener('keydown', unlockFn)
+                }
                 
-                document.addEventListener('click', unlockFn);
-                document.addEventListener('touchstart', unlockFn);
-                document.addEventListener('keydown', unlockFn);
+                document.addEventListener('click', unlockFn)
+                document.addEventListener('touchstart', unlockFn)
+                document.addEventListener('keydown', unlockFn)
             }
-        };
+        }
         
         // Initialize unlock handlers
         window.SoundFX.setupUnlockHandlers();
@@ -6185,10 +5779,10 @@ window.addEventListener('load', () => {
         // Initialize the game
         window.game.init();
         
-        console.log("Game instance created and initialized");
+        console.log("Game instance created and initialized")
     } catch (error) {
         console.error("Error creating game instance:", error);
     }
-});
+})
 
-export { Game };
+export { Game }
