@@ -12,12 +12,34 @@ export class SoundManager {
             // Create audio context
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             
-            // Create Three.js audio listener and attach to camera
+            // Create Three.js audio listener
             this.listener = new THREE.AudioListener();
+            
+            // Store camera reference but don't attach listener immediately
+            // This avoids issues during initialization
             if (camera) {
                 this.camera = camera;
-                camera.add(this.listener);
-                console.log('Audio listener attached to camera');
+                console.log('Camera reference stored - will attach listener later');
+                
+                // Use a setTimeout to delay attaching the listener
+                // This gives the camera time to initialize properly
+                setTimeout(() => {
+                    try {
+                        if (this.camera && this.listener) {
+                            // Check if camera is properly initialized
+                            if (this.camera.matrixWorld && !isNaN(this.camera.matrixWorld.elements[0])) {
+                                this.camera.add(this.listener);
+                                console.log('Audio listener attached to camera');
+                            } else {
+                                console.warn('Camera not fully initialized, falling back to HTML5 Audio');
+                                this.useFallbackAudio = true;
+                            }
+                        }
+                    } catch (attachError) {
+                        console.error('Error attaching listener to camera:', attachError);
+                        this.useFallbackAudio = true;
+                    }
+                }, 500); // 500ms delay
             } else {
                 console.warn('No camera provided to SoundManager');
                 // Without a camera, we should use fallback audio
@@ -305,6 +327,21 @@ export class SoundManager {
             return;
         }
         
+        // If we're in fallback mode, don't even try to create three.js audio
+        if (this.useFallbackAudio) {
+            console.log(`Using fallback audio - skipping THREE.js sound pool creation for ${name}`);
+            
+            // Still register the sound name so getSoundFilePath works correctly
+            const placeholder = {
+                path: path,
+                name: name,
+                isFallback: true
+            };
+            
+            this.soundPools.set(name, [placeholder]);
+            return;
+        }
+        
         // Prefix the path with a slash if it doesn't have one
         // This ensures we're loading from the root of the domain
         if (!path.startsWith('/') && !path.startsWith('http')) {
@@ -316,31 +353,65 @@ export class SoundManager {
         const pool = [];
         for (let i = 0; i < poolSize; i++) {
             try {
+                // Verify that the listener exists and is ready before creating sounds
+                if (!this.listener) {
+                    console.warn(`Cannot create sound pool for ${name} - listener not initialized`);
+                    this.useFallbackAudio = true;
+                    break;
+                }
+                
+                // Create the sound with a try/catch and additional validation
                 const sound = new THREE.Audio(this.listener);
+                
+                // Validate the created sound
+                if (!sound || typeof sound.setBuffer !== 'function') {
+                    console.warn(`Created invalid sound object for ${name}`);
+                    continue;
+                }
+                
                 // Mark this as a sound effect (not music)
                 sound.isSFX = true;
                 sound.baseVolume = 1.0;
                 
-                const loader = new THREE.AudioLoader();
+                // Create loader with error handling
+                let loader;
+                try {
+                    loader = new THREE.AudioLoader();
+                } catch (loaderError) {
+                    console.error(`Error creating AudioLoader for ${name}:`, loaderError);
+                    continue;
+                }
                 
                 loader.load(
                     path, 
                     (buffer) => {
-                        console.log(`Successfully loaded sound: ${name} (instance ${i + 1}/${poolSize})`);
-                        sound.setBuffer(buffer);
-                        // Apply correct volume based on current settings
-                        const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume;
-                        sound.setVolume(effectiveVolume);
-                        if (options.pitch) {
-                            sound.setPlaybackRate(options.pitch);
+                        // Additional validation on the buffer
+                        if (!buffer || !buffer.duration) {
+                            console.warn(`Invalid buffer loaded for sound: ${name}`);
+                            return;
                         }
                         
-                        // Log successful loading without trying to clone
-                        // which seems to be causing issues
-                        console.log(`Sound ${name} loaded successfully with buffer size: ${buffer.length} bytes, duration: ${buffer.duration}s`);
+                        console.log(`Successfully loaded sound: ${name} (instance ${i + 1}/${poolSize})`);
                         
-                        // Flag that this sound is ready to be played
-                        sound.isReady = true;
+                        try {
+                            sound.setBuffer(buffer);
+                            
+                            // Apply correct volume based on current settings
+                            const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume;
+                            sound.setVolume(effectiveVolume);
+                            
+                            if (options.pitch) {
+                                sound.setPlaybackRate(options.pitch);
+                            }
+                            
+                            // Log successful loading
+                            console.log(`Sound ${name} loaded successfully with buffer size: ${buffer.length} bytes, duration: ${buffer.duration}s`);
+                            
+                            // Flag that this sound is ready to be played
+                            sound.isReady = true;
+                        } catch (bufferError) {
+                            console.error(`Error setting buffer for sound ${name}:`, bufferError);
+                        }
                     },
                     (progress) => {
                         const percent = (progress.loaded / progress.total * 100).toFixed(2);
@@ -366,34 +437,171 @@ export class SoundManager {
     }
     
     loadMusicTrack(name, path) {
-        const music = new THREE.Audio(this.listener);
-        const loader = new THREE.AudioLoader();
+        // Skip normal loading if in fallback mode
+        if (this.useFallbackAudio || !this.listener) {
+            console.log(`Using fallback mode - registering music track path: ${name}`);
+            
+            // Register the music track info but don't try to load via THREE.js
+            this.musicTracks.set(name, {
+                path: path,
+                name: name,
+                isPlaying: false,
+                isFallback: true,
+                play: () => this.playFallbackMusic(name, path),
+                stop: () => this.stopFallbackMusic(name),
+                setVolume: () => {}
+            });
+            return;
+        }
         
-        // Prefix the path with a slash if it doesn't have one
-        // This ensures we're loading from the root of the domain
+        // Normal THREE.js loading path
+        try {
+            const music = new THREE.Audio(this.listener);
+            
+            // Verify that the music object was created properly
+            if (!music || typeof music.setBuffer !== 'function') {
+                console.warn(`Failed to create valid Audio object for music: ${name}`);
+                this.useFallbackAudio = true;
+                return this.loadMusicTrack(name, path); // Retry with fallback
+            }
+            
+            // Create loader with error handling
+            let loader;
+            try {
+                loader = new THREE.AudioLoader();
+            } catch (loaderError) {
+                console.error(`Error creating AudioLoader for music ${name}:`, loaderError);
+                this.useFallbackAudio = true;
+                return this.loadMusicTrack(name, path); // Retry with fallback
+            }
+            
+            // Prefix the path with a slash if it doesn't have one
+            // This ensures we're loading from the root of the domain
+            if (!path.startsWith('/') && !path.startsWith('http')) {
+                path = '/' + path;
+            }
+            
+            console.log(`Loading music track: ${name} from path: ${window.location.origin}${path}`);
+            
+            loader.load(path, 
+                (buffer) => {
+                    // Validate buffer
+                    if (!buffer || !buffer.duration) {
+                        console.warn(`Invalid buffer loaded for music: ${name}`);
+                        return;
+                    }
+                    
+                    try {
+                        console.log(`Successfully loaded music track: ${name}`);
+                        music.setBuffer(buffer);
+                        music.setVolume(this.musicVolume * this.masterVolume);
+                        music.setLoop(true);
+                        
+                        // If this music was supposed to be playing, start it now
+                        if (music.shouldPlay) {
+                            music.play();
+                        }
+                    } catch (bufferError) {
+                        console.error(`Error setting buffer for music ${name}:`, bufferError);
+                    }
+                },
+                (progress) => {
+                    const percent = (progress.loaded / progress.total * 100).toFixed(2);
+                    console.log(`Loading music ${name}: ${percent}%`);
+                },
+                (error) => {
+                    console.error(`Error loading music ${name} from ${path}:`, error);
+                    
+                    // If loading fails, register as a fallback track
+                    this.musicTracks.set(name, {
+                        path: path,
+                        name: name,
+                        isPlaying: false,
+                        isFallback: true,
+                        play: () => this.playFallbackMusic(name, path),
+                        stop: () => this.stopFallbackMusic(name),
+                        setVolume: () => {}
+                    });
+                }
+            );
+            
+            this.musicTracks.set(name, music);
+        } catch (error) {
+            console.error(`Error setting up music ${name}:`, error);
+            
+            // Register fallback version
+            this.musicTracks.set(name, {
+                path: path,
+                name: name,
+                isPlaying: false,
+                isFallback: true,
+                play: () => this.playFallbackMusic(name, path),
+                stop: () => this.stopFallbackMusic(name),
+                setVolume: () => {}
+            });
+        }
+    }
+    
+    // Fallback methods for music playback
+    playFallbackMusic(name, path) {
+        console.log(`Playing fallback music: ${name}`);
+        
+        // Stop any existing fallback music
+        this.stopFallbackMusic();
+        
+        // Create a new audio element for the fallback music
         if (!path.startsWith('/') && !path.startsWith('http')) {
             path = '/' + path;
         }
         
-        console.log(`Loading music track: ${name} from path: ${window.location.origin}${path}`);
-        
-        loader.load(path, 
-            (buffer) => {
-                console.log(`Successfully loaded music track: ${name}`);
-                music.setBuffer(buffer);
-                music.setVolume(this.musicVolume * this.masterVolume);
-                music.setLoop(true);
-            },
-            (progress) => {
-                const percent = (progress.loaded / progress.total * 100).toFixed(2);
-                console.log(`Loading music ${name}: ${percent}%`);
-            },
-            (error) => {
-                console.error(`Error loading music ${name} from ${path}:`, error);
+        try {
+            const audio = new Audio(path);
+            audio.loop = true;
+            audio.volume = this.isMuted ? 0 : this.musicVolume * this.masterVolume;
+            
+            // Store reference to the current fallback audio
+            this.fallbackAudio = audio;
+            
+            // Play with error handling
+            const playPromise = audio.play();
+            if (playPromise) {
+                playPromise.catch(error => {
+                    console.warn(`Error playing fallback music ${name}:`, error);
+                });
             }
-        );
+            
+            // Update the track object
+            const trackObj = this.musicTracks.get(name);
+            if (trackObj) {
+                trackObj.isPlaying = true;
+                trackObj.audio = audio;
+            }
+            
+            this.currentMusic = trackObj || { name, isPlaying: true, audio };
+            
+            return audio;
+        } catch (error) {
+            console.error(`Error creating fallback music for ${name}:`, error);
+            return null;
+        }
+    }
+    
+    stopFallbackMusic() {
+        // Stop any existing fallback music
+        if (this.fallbackAudio) {
+            try {
+                this.fallbackAudio.pause();
+                this.fallbackAudio.currentTime = 0;
+            } catch (error) {
+                console.warn('Error stopping fallback music:', error);
+            }
+            this.fallbackAudio = null;
+        }
         
-        this.musicTracks.set(name, music);
+        // Update isPlaying status on current music
+        if (this.currentMusic) {
+            this.currentMusic.isPlaying = false;
+        }
     }
     
     playSound(name, position = null) {
@@ -639,7 +847,12 @@ export class SoundManager {
     playMusic(name) {
         // Stop current music if playing
         if (this.currentMusic && this.currentMusic.isPlaying) {
-            this.currentMusic.stop();
+            try {
+                this.currentMusic.stop();
+            } catch (error) {
+                console.warn(`Error stopping current music:`, error);
+                this.stopFallbackMusic(); // Try fallback stop method
+            }
         }
         
         const music = this.musicTracks.get(name);
@@ -648,8 +861,34 @@ export class SoundManager {
             return;
         }
         
-        music.play();
-        this.currentMusic = music;
+        try {
+            // Check if this is a fallback object
+            if (music.isFallback) {
+                // Call the play function we attached to the fallback object
+                music.play();
+            } else if (typeof music.play === 'function') {
+                // Mark that this track should be playing 
+                // (in case the buffer is still loading)
+                music.shouldPlay = true;
+                
+                // Only try to play if buffer is loaded
+                if (music.buffer) {
+                    music.play();
+                } else {
+                    console.log(`Music ${name} buffer not yet loaded, will play when ready`);
+                }
+            } else {
+                console.warn(`Music track ${name} is not playable`);
+                return;
+            }
+            
+            this.currentMusic = music;
+        } catch (error) {
+            console.error(`Error playing music ${name}:`, error);
+            
+            // Try fallback method if THREE.js fails
+            this.playFallbackMusic(name, this.getSoundFilePath(name) || `/music/${name}.mp3`);
+        }
     }
     
     stopMusic() {

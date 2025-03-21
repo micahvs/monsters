@@ -343,16 +343,38 @@ class Game {
             
             // Initialize sound manager after WebGL context is set up
             console.log("Initializing sound manager...")
-            this.soundManager = new SoundManager(this.camera);
-            
-            // Expose sound manager globally for UI controls
-            window.soundManager = this.soundManager;
-            console.log("Sound manager initialized and exposed globally")
-            
-            // Start with a random music track
-            const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0')
-            console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
-            this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
+            try {
+                this.soundManager = new SoundManager(this.camera);
+                
+                // Expose sound manager globally for UI controls
+                window.soundManager = this.soundManager;
+                console.log("Sound manager initialized and exposed globally")
+                
+                // Start with a random music track - but don't crash if it fails
+                try {
+                    const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0')
+                    console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
+                    this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
+                } catch (musicError) {
+                    console.error("Error playing initial music track:", musicError);
+                    // Game can continue without music
+                }
+            } catch (soundError) {
+                console.error("Error initializing sound manager:", soundError);
+                // Create a minimal placeholder sound manager that won't crash the game
+                this.soundManager = {
+                    playSound: () => {},
+                    playMusic: () => {},
+                    stopMusic: () => {},
+                    setMasterVolume: () => {},
+                    setSFXVolume: () => {},
+                    setMusicVolume: () => {},
+                    setMuted: () => {},
+                    dispose: () => {},
+                    updateListenerPosition: () => {}
+                };
+                window.soundManager = this.soundManager;
+            }
             
             // Initialize multiplayer if enabled
             if (localStorage.getItem('monsterTruckMultiplayer') === 'true') {
