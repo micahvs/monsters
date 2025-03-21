@@ -998,6 +998,60 @@ class Game {
         }
     }
     
+    // Update truck position and handle collisions
+    updateTruck(deltaTime = 1) {
+        if (!this.truck) return;
+        
+        try {
+            // Get truck dimensions - can be dynamic based on type
+            let truckWidth, truckLength;
+            
+            if (this.monsterTruck) {
+                const machineType = this.monsterTruck.config.machineType;
+                
+                if (machineType === 'neon-crusher') {
+                    truckWidth = 3.5; // Wider for Crusher
+                    truckLength = 5;
+                } else if (machineType === 'cyber-beast') {
+                    truckWidth = 3;
+                    truckLength = 5.2;
+                } else {
+                    truckWidth = 2.5; // Grid Ripper
+                    truckLength = 5;
+                }
+            } else {
+                // Fallback dimensions
+                truckWidth = 2;
+                truckLength = 3;
+            }
+            
+            // Update truck position and orientation
+            if (this.truck) {
+                // Create a collision result
+                const collisionResult = this.checkWallCollisions();
+                
+                if (collisionResult && collisionResult.collision) {
+                    // Handle the collision with the wall
+                    this.handleWallCollision(collisionResult.normal);
+                } else {
+                    // No collision, update position normally
+                    // Direction vector based on truck's rotation
+                    const direction = new THREE.Vector3(
+                        -Math.sin(this.truck.rotation.y),
+                        0,
+                        -Math.cos(this.truck.rotation.y)
+                    );
+                    
+                    // Apply velocity to position
+                    this.truck.position.x += direction.x * this.truck.velocity * deltaTime;
+                    this.truck.position.z += direction.z * this.truck.velocity * deltaTime;
+                }
+            }
+        } catch (error) {
+            console.error('Error updating truck:', error);
+        }
+    }
+    
     // Update camera to follow the truck properly
     updateCamera(deltaTime) {
         if (!this.truck || !this.camera) return;
