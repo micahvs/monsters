@@ -356,15 +356,9 @@ class Game {
                 window.soundManager = this.soundManager;
                 console.log("Sound manager initialized and exposed globally")
                 
-                // Start with a random music track - but don't crash if it fails
-                try {
-                    const trackNum = Math.floor(Math.random() * 19).toString().padStart(2, '0')
-                    console.log(`Playing initial music track: pattern_bar_live_part${trackNum}`);
-                    this.soundManager.playMusic(`pattern_bar_live_part${trackNum}`);
-                } catch (musicError) {
-                    console.error("Error playing initial music track:", musicError);
-                    // Game can continue without music
-                }
+                // Don't start music here - let the music-player.js handle it
+                // This prevents two songs from playing at the same time
+                console.log("Music will be handled by music-player.js");
             } catch (soundError) {
                 console.error("Error initializing sound manager:", soundError);
                 // Create a minimal placeholder sound manager that won't crash the game
