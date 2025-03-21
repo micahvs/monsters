@@ -48,7 +48,7 @@ const TRUCK_SPECS = {
 }
 
 class Projectile {
-    constructor(position, direction, speed, damage, source); {
+    constructor(position, direction, speed, damage, source) {
         const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8)
         geometry.rotateX(Math.PI / 2);
         
@@ -81,7 +81,7 @@ class Projectile {
         );
     }
 
-    update(); {
+    update() {
         // Update position with higher speed
         const movement = this.direction.clone().multiplyScalar(this.speed);
         this.mesh.position.add(movement);
@@ -94,7 +94,7 @@ class Projectile {
         this.createTrail();
     }
 
-    createTrail(); {
+    createTrail() {
         // Create particle trail
         const trailGeometry = new THREE.SphereGeometry(0.05, 4, 4);
         const trailMaterial = new THREE.MeshBasicMaterial({
@@ -118,7 +118,7 @@ class Projectile {
 }
 
 class Turret {
-    constructor(position); {
+    constructor(position) {
         // Create turret base
         const baseGeometry = new THREE.CylinderGeometry(1, 1, 1, 8);
         const baseMaterial = new THREE.MeshPhongMaterial({ 
@@ -144,7 +144,7 @@ class Turret {
         this.alive = true;
     }
 
-    update(playerPosition); {
+    update(playerPosition) {
         if (!this.alive) return;
 
         // Rotate to face player
@@ -157,7 +157,7 @@ class Turret {
         if (this.shootCooldown > 0) this.shootCooldown--;
     }
 
-    damage(); {
+    damage() {
         this.health--;
         if (this.health <= 0) {
             this.alive = false;
@@ -165,13 +165,13 @@ class Turret {
         }
     }
 
-    canShoot(); {
+    canShoot() {
         return this.alive && this.shootCooldown <= 0;
     }
 }
 
 class Game {
-    constructor(); {
+    constructor() {
         console.log("Game constructor called")
         
         // Basic initialization
@@ -283,7 +283,7 @@ class Game {
         this.init();
     }
 
-    init(); {
+    init() {
         try {
             console.log('Initializing game...')
             
@@ -394,7 +394,7 @@ class Game {
         }
     }
     
-    addLights(); {
+    addLights() {
         try {
             // Check if scene is initialized
             if (!this.scene) {
@@ -430,7 +430,7 @@ class Game {
     }
     
     // Add coordinate axes to help with debugging
-    addCoordinateAxes(); {
+    addCoordinateAxes() {
         if (!this.scene) return;
         
         // Create axes helper
@@ -470,7 +470,7 @@ class Game {
         createLabel('Z', new THREE.Vector3(0, 0, 11), '#0000ff')
     }
     
-    createArena(); {
+    createArena() {
         try {
             // Check if scene is initialized
             if (!this.scene) {
@@ -508,7 +508,7 @@ class Game {
         }
     }
 
-    createSimpleWalls(arenaSize); {
+    createSimpleWalls(arenaSize) {
         try {
             console.log("Creating walls for arena")
             const halfSize = arenaSize / 2;
@@ -597,13 +597,13 @@ class Game {
         }
     }
     
-    createSimpleTruck(); {
+    createSimpleTruck() {
         try {
             // Get saved settings from localStorage
             const truckType = localStorage.getItem('monsterTruckType') || 'neonCrusher'
             let machineTypeId;
             
-            switch(truckType); {
+            switch(truckType) {
                 case 'gridRipper':
                     machineTypeId = 'grid-ripper'
                     break;
@@ -643,7 +643,7 @@ class Game {
         }
     }
     
-    setupControls(); {
+    setupControls() {
         try {
             console.log("Setting up keyboard controls...")
             
@@ -724,7 +724,7 @@ class Game {
     }
     
     // Create an overlay to show key presses for debugging
-    createKeyDebugOverlay(); {
+    createKeyDebugOverlay() {
         // Create overlay div
         const overlay = document.createElement('div')
         overlay.id = 'key-debug-overlay'
@@ -765,7 +765,7 @@ class Game {
     }
     
     // Update the key debug overlay
-    updateKeyDebugOverlay(key, isPressed); {
+    updateKeyDebugOverlay(key, isPressed) {
         if (!this.keyDebugOverlay) return;
         
         const keyElement = document.getElementById(`key-${key}`);
@@ -784,7 +784,7 @@ class Game {
     }
     
     // Debug function to teleport to arena edge
-    teleportToArenaEdge(); {
+    teleportToArenaEdge() {
         if (!this.truck) return;
         
         const arenaSize = 1600;
@@ -802,7 +802,7 @@ class Game {
         }
     }
     
-    removeLoadingScreen(); {
+    removeLoadingScreen() {
         try {
             const loadingScreen = document.getElementById('loadingScreen')
             if (loadingScreen) {
@@ -833,7 +833,7 @@ class Game {
         }
     }
     
-    update(deltaTime = 1); {
+    update(deltaTime = 1) {
         if (!this.isInitialized || this.isGameOver) return;
         
         try {
@@ -907,12 +907,12 @@ class Game {
     }
     
     // Check for projectile hits
-    checkProjectileHits(); {
+    checkProjectileHits() {
             console.error("Error in animate:", error)
         }
     }
     // Debug method to check the game state
-    debugGameState(); {
+    debugGameState() ;
         // Only run this every 60 frames to avoid console spam
         if (this.frameCount % 60 !== 0) return;
         
@@ -954,7 +954,7 @@ class Game {
         }
         
         console.log("=======================");
-    }
+    ;
 
     // Add collision detection and handling to the Game class
     // First, let's add a method to check for collisions with walls
@@ -3810,7 +3810,7 @@ class Game {
             // Add text or icon to each face of the cube to identify the powerup type
             let iconText;
             
-            switch(powerupConfig.model); {
+            switch(powerupConfig.model) {
                 case 'lightning':
                     iconText = "⚡" // Lightning bolt for speed
                     break;
@@ -4295,7 +4295,7 @@ class Game {
         })
         
         // Create custom effect based on powerup type
-        switch(type); {
+        switch(type) {
             case 'SHIELD':
                 // Shield effect is handled in updateShieldEffect method
                 this.hasShield = true
@@ -5286,7 +5286,7 @@ class Game {
             let actualPath;
             
             // Check for specific sounds that might be causing issues
-            switch(soundName); {
+            switch(soundName) {
                 case 'weapon_fire':
                     actualPath = '/sounds/weapon_fire.mp3'
                     break;
@@ -5404,14 +5404,14 @@ class Game {
                 sounds.forEach(sound => {
                     sound.volume = 0;
                     const promise = sound.play();
-                    if (promise) promise.catch(() => {}))
+                    if (promise) promise.catch(() => {});
                 })
                 
                 // Then try an audible sound
                 const testSound = new Audio('/sounds/menu_confirm.mp3')
                 testSound.volume = 0.5 * this.getVolumeMultiplier('menu_confirm')
                 testSound.currentTime = 0;
-                testSound.play().catch(() => {}))
+                testSound.play().catch(() => {});
             } catch (e) {
                 console.error('Error unlocking audio:', e)
             }
@@ -5450,7 +5450,7 @@ class Game {
         document.body.appendChild(button);
     }
 
-    createExplosion(position, type = 'standard', skipAreaDamage = false); {
+    createExplosion(position, type = .standard., skipAreaDamage = false); {
         try {
             // ... existing explosion code ...
             
@@ -5674,7 +5674,7 @@ class Game {
 // Initialize game when window is fully loaded
 window.addEventListener('load', () => {
     console.log("Window loaded, creating game")
-    try; {
+    try {
         // Initialize SoundFX global utility
         window.SoundFX = {
             // Keep track of whether audio is unlocked
