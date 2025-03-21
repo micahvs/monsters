@@ -309,8 +309,13 @@ class Game {
             }
             this.renderer = new THREE.WebGLRenderer({ 
                 canvas: canvas,
-                antialias: true 
+                antialias: true,
+                alpha: true,
+                powerPreference: 'high-performance'
             });
+            
+            // Prevent texture flip issues that can cause WebGL errors
+            this.renderer.outputEncoding = THREE.sRGBEncoding;
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.setPixelRatio(window.devicePixelRatio);
             
@@ -473,6 +478,9 @@ class Game {
             
             // Create texture from canvas
             const texture = new THREE.CanvasTexture(canvas);
+            // Disable flipY and premultiplyAlpha to prevent WebGL errors
+            texture.flipY = false;
+            texture.premultiplyAlpha = false;
             const material = new THREE.SpriteMaterial({ 
                 map: texture, 
                 transparent: true,
