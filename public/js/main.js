@@ -5670,6 +5670,29 @@ class Game {
         document.body.appendChild(soundEnabler);
         console.log('Sound enabler created - waiting for user interaction');
     }
+    
+    // Main animation loop
+    animate() {
+        if (this.isInitialized) {
+            // Call update with a fixed delta time for consistent physics
+            this.update(1);
+            
+            // Render the scene
+            if (this.renderer && this.scene && this.camera) {
+                this.renderer.render(this.scene, this.camera);
+            } else {
+                console.error("Cannot render: missing renderer, scene, or camera");
+            }
+            
+            // Debug mode logs - limit frequency to avoid console spam
+            if (this.debugMode && this.frameCount % 100 === 0) {
+                this.debugGameState();
+            }
+        }
+        
+        // Continue the animation loop
+        requestAnimationFrame(() => this.animate());
+    }
 }
 
 // Initialize game when window is fully loaded
