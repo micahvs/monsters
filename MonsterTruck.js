@@ -15,6 +15,28 @@ function handleControls(accelerating, braking, turningLeft, turningRight) {
         this.rotation = 0;
     }
     
+    // Add validation for maxSpeed and other critical values
+    if (!Number.isFinite(this.maxSpeed)) {
+        console.warn("Invalid maxSpeed detected, resetting to default");
+        this.maxSpeed = 1.0; // Set to default value
+    }
+
+    if (!Number.isFinite(this.acceleration)) {
+        console.warn("Invalid acceleration detected, resetting to default");
+        this.acceleration = 0.02; // Set to default value
+    }
+
+    if (!Number.isFinite(this.deceleration)) {
+        console.warn("Invalid deceleration detected, resetting to default");
+        this.deceleration = 0.01; // Set to default value
+    }
+
+    // Add validation for turnSpeed
+    if (!Number.isFinite(this.turnSpeed)) {
+        console.warn("Invalid turnSpeed detected, resetting to default");
+        this.turnSpeed = 0.03; // Set to default value
+    }
+    
     // Acceleration and braking with validation
     if (accelerating) {
         this.speed = Math.min(this.speed + this.acceleration, this.maxSpeed);

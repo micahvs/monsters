@@ -93,12 +93,24 @@ class Game {
             // Validate camera matrix before rendering
             if (this.camera && this.camera.matrixWorld) {
                 const elements = this.camera.matrixWorld.elements;
+                let hasInvalidElements = false;
+
+                // Check if matrix elements are valid
                 for (let i = 0; i < elements.length; i++) {
                     if (!Number.isFinite(elements[i])) {
-                        elements[i] = 0;
+                        hasInvalidElements = true;
+                        break;
                     }
                 }
-                this.camera.matrixWorldNeedsUpdate = true;
+
+                // Reset matrix if invalid
+                if (hasInvalidElements) {
+                    console.warn("Invalid camera matrix detected, resetting to identity");
+                    this.camera.matrixWorld.identity();
+                    this.camera.position.set(0, 10, 20); // Reset to default position
+                    this.camera.lookAt(0, 0, 0); // Reset look target
+                    this.camera.updateMatrixWorld(true);
+                }
             }
 
             // ... rest of animate code ...
@@ -106,4 +118,5 @@ class Game {
             console.error("Error in animation loop:", error);
         }
     }
+} 
 } 
