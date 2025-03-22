@@ -710,7 +710,7 @@ class Game {
         if (!this.truck) return;
         
         // Process keyboard input for more realistic driving
-        const acceleration = 0.01;
+        const acceleration = 0.006; // Reduced from 0.01
         const deceleration = 0.98; // Friction
         const maxSpeed = 0.5;
         const turnSpeed = 0.03;
@@ -776,19 +776,25 @@ class Game {
         }
         
         // Apply steering - turning effect is proportional to velocity
-        // Note: We use the absolute velocity for turning amount, but preserve
-        // turning direction regardless of forward/backward motion
+        // Note: When in reverse, we need to invert the steering effect
         if (Math.abs(this.truck.velocity) > 0.01) {
             // Rotation amount is influenced by:
-            // 1. Steering angle
+            // 1. Steering angle (with direction inverted when in reverse)
             // 2. Velocity (faster = more turning)
             // 3. TurnFactor (slower = more responsive steering)
             const turnFactor = 1 - (Math.abs(this.truck.velocity) / maxSpeed) * 0.5;
-            this.truck.rotation.y -= this.truck.steeringAngle * Math.abs(this.truck.velocity) * turnFactor * 0.5;
+            
+            // Get direction of travel (positive = forward, negative = reverse)
+            const directionMultiplier = (this.truck.velocity > 0) ? 1 : -1;
+            
+            // Apply steering angle with proper direction adjustment
+            this.truck.rotation.y -= this.truck.steeringAngle * Math.abs(this.truck.velocity) * 
+                                    turnFactor * 0.5 * directionMultiplier;
         }
         
         // Visualize wheel steering
         if (this.truck.steeringAngle !== 0) {
+            // The steering angle direction is already correct, so we pass it directly
             this.animateWheelTurn(-this.truck.steeringAngle / maxSteeringAngle);
         } else {
             this.resetWheels();
