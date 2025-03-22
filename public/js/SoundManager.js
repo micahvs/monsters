@@ -8,6 +8,9 @@ export class SoundManager {
         // Flag to prevent circular updates between SoundManager and MusicPlayer
         this.isUpdatingVolume = false;
         
+        // Debug mode flag - set to false to reduce logging
+        this.debugMode = false;
+        
         try {
             // Create audio context
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -19,7 +22,7 @@ export class SoundManager {
             // This avoids issues during initialization
             if (camera) {
                 this.camera = camera;
-                console.log('Camera reference stored - will attach listener later');
+                this.debugLog('Camera reference stored - will attach listener later');
                 
                 // Use a setTimeout to delay attaching the listener
                 // This gives the camera time to initialize properly
@@ -33,7 +36,7 @@ export class SoundManager {
                             
                             if (isValidMatrix) {
                                 this.camera.add(this.listener);
-                                console.log('Audio listener successfully attached to camera');
+                                this.debugLog('Audio listener successfully attached to camera');
                             } else {
                                 console.warn('Camera matrix not valid yet - falling back to HTML5 Audio. This is normal during initialization and is handled automatically.');
                                 this.useFallbackAudio = true;
@@ -70,22 +73,22 @@ export class SoundManager {
         this.sfxMuted = false;
         
         // Diagnostic info
-        console.log('Audio initialization:');
+        this.debugLog('Audio initialization:');
         if (this.useFallbackAudio) {
-            console.log('  - Using HTML5 Audio fallback mode');
+            this.debugLog('  - Using HTML5 Audio fallback mode');
         } else if (this.listener && this.listener.context) {
-            console.log('  - Context state:', this.listener.context.state);
-            console.log('  - Sample rate:', this.listener.context.sampleRate);
-            console.log('  - Output channels:', this.listener.context.destination.channelCount);
+            this.debugLog('  - Context state:', this.listener.context.state);
+            this.debugLog('  - Sample rate:', this.listener.context.sampleRate);
+            this.debugLog('  - Output channels:', this.listener.context.destination.channelCount);
         }
-        console.log('  - Browser audio support:', this.detectAudioSupport());
-        console.log('  - Fallback mode active:', this.useFallbackAudio);
+        this.debugLog('  - Browser audio support:', this.detectAudioSupport());
+        this.debugLog('  - Fallback mode active:', this.useFallbackAudio);
         
-        console.log('Initializing sound pools...');
+        this.debugLog('Initializing sound pools...');
         this.initializeSoundPools();
         
         // Load music tracks
-        console.log('Loading music tracks...');
+        this.debugLog('Loading music tracks...');
         this.initializeMusicTracks();
         
         // Check audio context state
@@ -95,34 +98,30 @@ export class SoundManager {
         this.setupGlobalAudioUnlock();
     }
     
+    // Helper method for conditional logging
+    debugLog(...args) {
+        if (this.debugMode) {
+            console.log(...args);
+        }
+    }
+    
     detectAudioSupport() {
-        // Check basic Web Audio API support
-        const hasAudioContext = !!(window.AudioContext || window.webkitAudioContext);
-        const hasAudioElement = !!window.Audio;
-        
-        // Check for various audio formats support
-        const audio = new Audio();
-        const formats = {
-            mp3: typeof audio.canPlayType === 'function' ? audio.canPlayType('audio/mpeg') : 'unknown',
-            wav: typeof audio.canPlayType === 'function' ? audio.canPlayType('audio/wav') : 'unknown',
-            ogg: typeof audio.canPlayType === 'function' ? audio.canPlayType('audio/ogg') : 'unknown'
-        };
-        
+        const audioContext = window.AudioContext || window.webkitAudioContext;
         return {
-            hasAudioContext,
-            hasAudioElement,
-            formats
+            audioContext: !!audioContext,
+            webAudio: typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined',
+            audioElement: typeof Audio !== 'undefined'
         };
     }
     
     setupGlobalAudioUnlock() {
         // Functions to attempt unlocking audio
         const unlockAudio = () => {
-            console.log('User interaction detected, attempting to unlock audio');
+            this.debugLog('User interaction detected, attempting to unlock audio');
             
             // Check if listener and context exist first
             if (!this.listener || !this.listener.context) {
-                console.log('No valid audio listener or context found - using fallback audio');
+                this.debugLog('No valid audio listener or context found - using fallback audio');
                 this.useFallbackAudio = true;
                 
                 // Remove event listeners since we can't use the audio context
@@ -144,7 +143,7 @@ export class SoundManager {
                 // Resume audio context
                 if (this.listener.context.state === 'suspended') {
                     this.listener.context.resume().then(() => {
-                        console.log('Audio context successfully resumed by user interaction');
+                        this.debugLog('Audio context successfully resumed by user interaction');
                         
                         // Try playing a test sound to verify everything is working
                         setTimeout(() => {
@@ -172,15 +171,15 @@ export class SoundManager {
         document.addEventListener('touchend', unlockAudio);
         document.addEventListener('keydown', unlockAudio);
         
-        console.log('Global audio unlock handlers set up - waiting for user interaction');
+        this.debugLog('Global audio unlock handlers set up - waiting for user interaction');
     }
     
     playTestSound() {
-        console.log('Playing test sound to verify audio is working');
+        this.debugLog('Playing test sound to verify audio is working');
         
         // Check if listener and context exist first
         if (!this.listener || !this.listener.context) {
-            console.log('No valid audio listener or context for test sound - using fallback audio');
+            this.debugLog('No valid audio listener or context for test sound - using fallback audio');
             this.useFallbackAudio = true;
             return this.playFallbackSound('menu_select');
         }
@@ -204,7 +203,7 @@ export class SoundManager {
             setTimeout(() => {
                 try {
                     oscillator.stop();
-                    console.log('Test sound completed');
+                    this.debugLog('Test sound completed');
                 } catch (error) {
                     console.error('Error stopping test sound:', error);
                 }
@@ -219,58 +218,50 @@ export class SoundManager {
     checkAudioContext() {
         // If we're already in fallback mode, no need to check
         if (this.useFallbackAudio) {
-            console.log('Using HTML5 Audio fallback mode - skipping audio context check');
+            this.debugLog('Using HTML5 Audio fallback mode - skipping audio context check');
             return;
         }
         
-        // If there's no valid listener or context, switch to fallback mode
         if (!this.listener || !this.listener.context) {
-            console.warn('No valid audio listener or context found - switching to fallback mode');
+            console.warn('No valid audio context found - using fallback');
             this.useFallbackAudio = true;
             return;
         }
         
+        // Check if context is in suspended state
         if (this.listener.context.state === 'suspended') {
-            console.log('Audio context is suspended. Waiting for user interaction...');
+            console.warn('Audio context is suspended. Waiting for user interaction...');
+            
+            // Setup a function to resume audio context on user interaction
             const resumeAudio = () => {
-                console.log('Attempting to resume audio context...');
+                this.debugLog('Attempting to resume audio context...');
                 this.listener.context.resume().then(() => {
-                    console.log('Audio context resumed successfully');
-                    // Retry loading sounds after context is resumed
-                    this.initializeSoundPools();
+                    this.debugLog('Audio context resumed successfully');
+                    document.removeEventListener('click', resumeAudio);
+                    document.removeEventListener('keydown', resumeAudio);
+                    document.removeEventListener('touchstart', resumeAudio);
                 }).catch(error => {
-                    console.error('Error resuming audio context:', error);
-                    // Switch to fallback mode if we can't resume
-                    this.enableFallbackMode();
+                    console.error('Failed to resume audio context:', error);
                 });
-                document.removeEventListener('click', resumeAudio);
-                document.removeEventListener('keydown', resumeAudio);
-                document.removeEventListener('touchstart', resumeAudio);
             };
             
+            // Add event listeners for user interaction
             document.addEventListener('click', resumeAudio);
             document.addEventListener('keydown', resumeAudio);
             document.addEventListener('touchstart', resumeAudio);
             
-            // Set a timeout - if audio context is still suspended after 5 seconds, switch to fallback
-            setTimeout(() => {
-                if (this.listener && this.listener.context && this.listener.context.state === 'suspended') {
-                    console.warn('Audio context still suspended after timeout - switching to fallback mode');
-                    this.enableFallbackMode();
-                }
-            }, 5000);
-        } else {
-            console.log('Audio context is ready:', this.listener.context.state);
+            return false;
         }
+        
+        // Audio context is running
+        this.debugLog('Audio context is ready:', this.listener.context.state);
+        return true;
     }
     
     // Method to explicitly enable fallback mode
     enableFallbackMode() {
-        console.log('Switching to HTML5 Audio fallback mode');
+        this.debugLog('Switching to HTML5 Audio fallback mode');
         this.useFallbackAudio = true;
-        
-        // Play a test sound to verify fallback works
-        this.playFallbackSound('menu_select');
     }
     
     initializeSoundPools() {
@@ -323,17 +314,17 @@ export class SoundManager {
     }
     
     createSoundPool(name, path, poolSize, options = {}) {
-        console.log(`Creating sound pool for ${name} with path ${path}`);
+        this.debugLog(`Creating sound pool for ${name} with path ${path}`);
         
         // Check if pool already exists
         if (this.soundPools.has(name)) {
-            console.log(`Sound pool ${name} already exists, skipping creation`);
+            this.debugLog(`Sound pool ${name} already exists, skipping creation`);
             return;
         }
         
         // If we're in fallback mode, don't even try to create three.js audio
         if (this.useFallbackAudio) {
-            console.log(`Using fallback audio - skipping THREE.js sound pool creation for ${name}`);
+            this.debugLog(`Using fallback audio - skipping THREE.js sound pool creation for ${name}`);
             
             // Still register the sound name so getSoundFilePath works correctly
             const placeholder = {
@@ -352,7 +343,7 @@ export class SoundManager {
             path = '/' + path;
         }
         
-        console.log(`Full sound path: ${window.location.origin}${path}`);
+        this.debugLog(`Full sound path: ${window.location.origin}${path}`);
         
         const pool = [];
         for (let i = 0; i < poolSize; i++) {
@@ -395,7 +386,7 @@ export class SoundManager {
                             return;
                         }
                         
-                        console.log(`Successfully loaded sound: ${name} (instance ${i + 1}/${poolSize})`);
+                        this.debugLog(`Successfully loaded sound: ${name} (instance ${i + 1}/${poolSize})`);
                         
                         try {
                             sound.setBuffer(buffer);
@@ -409,7 +400,7 @@ export class SoundManager {
                             }
                             
                             // Log successful loading
-                            console.log(`Sound ${name} loaded successfully with buffer size: ${buffer.length} bytes, duration: ${buffer.duration}s`);
+                            this.debugLog(`Sound ${name} loaded successfully with buffer size: ${buffer.length} bytes, duration: ${buffer.duration}s`);
                             
                             // Flag that this sound is ready to be played
                             sound.isReady = true;
@@ -419,7 +410,7 @@ export class SoundManager {
                     },
                     (progress) => {
                         const percent = (progress.loaded / progress.total * 100).toFixed(2);
-                        console.log(`Loading sound ${name} (instance ${i + 1}/${poolSize}): ${percent}%`);
+                        this.debugLog(`Loading sound ${name} (instance ${i + 1}/${poolSize}): ${percent}%`);
                     },
                     (error) => {
                         console.error(`Error loading sound ${name} from ${path} (instance ${i + 1}/${poolSize}):`, error);
@@ -434,7 +425,7 @@ export class SoundManager {
         
         if (pool.length > 0) {
             this.soundPools.set(name, pool);
-            console.log(`Created sound pool for ${name} with ${pool.length} instances`);
+            this.debugLog(`Created sound pool for ${name} with ${pool.length} instances`);
         } else {
             console.error(`Failed to create any sound instances for ${name}`);
         }
@@ -443,7 +434,7 @@ export class SoundManager {
     loadMusicTrack(name, path) {
         // Skip normal loading if in fallback mode
         if (this.useFallbackAudio || !this.listener) {
-            console.log(`Using fallback mode - registering music track path: ${name}`);
+            this.debugLog(`Using fallback mode - registering music track path: ${name}`);
             
             // Register the music track info but don't try to load via THREE.js
             this.musicTracks.set(name, {
@@ -485,7 +476,7 @@ export class SoundManager {
                 path = '/' + path;
             }
             
-            console.log(`Loading music track: ${name} from path: ${window.location.origin}${path}`);
+            this.debugLog(`Loading music track: ${name} from path: ${window.location.origin}${path}`);
             
             loader.load(path, 
                 (buffer) => {
@@ -496,7 +487,7 @@ export class SoundManager {
                     }
                     
                     try {
-                        console.log(`Successfully loaded music track: ${name}`);
+                        this.debugLog(`Successfully loaded music track: ${name}`);
                         music.setBuffer(buffer);
                         music.setVolume(this.musicVolume * this.masterVolume);
                         music.setLoop(true);
@@ -511,7 +502,7 @@ export class SoundManager {
                 },
                 (progress) => {
                     const percent = (progress.loaded / progress.total * 100).toFixed(2);
-                    console.log(`Loading music ${name}: ${percent}%`);
+                    this.debugLog(`Loading music ${name}: ${percent}%`);
                 },
                 (error) => {
                     console.error(`Error loading music ${name} from ${path}:`, error);
@@ -548,7 +539,7 @@ export class SoundManager {
     
     // Fallback methods for music playback
     playFallbackMusic(name, path) {
-        console.log(`Playing fallback music: ${name}`);
+        this.debugLog(`Playing fallback music: ${name}`);
         
         // Stop any existing fallback music
         this.stopFallbackMusic();
@@ -609,8 +600,8 @@ export class SoundManager {
     }
     
     playSound(name, position = null) {
-        console.log(`Attempting to play sound: ${name}`);
-        console.log(`Current volume settings - Master: ${this.masterVolume}, SFX: ${this.sfxVolume}, Muted: ${this.isMuted}, SFXMuted: ${this.sfxMuted}`);
+        this.debugLog(`Attempting to play sound: ${name}`);
+        this.debugLog(`Current volume settings - Master: ${this.masterVolume}, SFX: ${this.sfxVolume}, Muted: ${this.isMuted}, SFXMuted: ${this.sfxMuted}`);
         
         // Emergency alternative: Use regular HTML5 Audio API as fallback
         if (this.useFallbackAudio) {
@@ -618,13 +609,13 @@ export class SoundManager {
         }
         
         // Debug info about audio context
-        console.log(`Audio context state: ${this.listener.context.state}`);
+        this.debugLog(`Audio context state: ${this.listener.context.state}`);
         
         // Check audio context state
         if (this.listener.context.state === 'suspended') {
             console.warn('Audio context is suspended, attempting to resume...');
             this.listener.context.resume().then(() => {
-                console.log('Audio context resumed, retrying sound playback');
+                this.debugLog('Audio context resumed, retrying sound playback');
                 this.playSound(name, position);
             }).catch(error => {
                 console.error('Failed to resume audio context:', error);
@@ -660,7 +651,7 @@ export class SoundManager {
             // Apply volume with sound-specific multiplier
             const volumeMultiplier = this.getSoundVolumeMultiplier(name);
             const effectiveVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume * volumeMultiplier;
-            console.log(`Setting sound volume: name=${name}, multiplier=${volumeMultiplier}, effective=${effectiveVolume}`);
+            this.debugLog(`Setting sound volume: name=${name}, multiplier=${volumeMultiplier}, effective=${effectiveVolume}`);
             sound.setVolume(effectiveVolume);
             
             // Only try to play if we have a valid buffer
@@ -677,14 +668,14 @@ export class SoundManager {
                         pos.play();
                         return pos;
                     } catch (err) {
-                        console.warn('Positional audio failed, falling back to regular audio');
+                        this.debugLog('Positional audio failed, falling back to regular audio');
                         // Continue to regular audio playback
                     }
                 }
                 
                 // Regular audio playback
                 sound.play();
-                console.log(`Successfully started playing sound: ${name}`);
+                this.debugLog(`Successfully started playing sound: ${name}`);
                 return sound;
             } else {
                 console.warn(`Sound buffer for ${name} is not valid`);
@@ -699,7 +690,7 @@ export class SoundManager {
     // Fallback method using standard HTML5 Audio
     playFallbackSound(name) {
         try {
-            console.log(`Attempting to play ${name} using HTML5 Audio fallback`);
+            this.debugLog(`Attempting to play ${name} using HTML5 Audio fallback`);
             const path = this.getSoundFilePath(name);
             if (!path) {
                 console.warn(`No path found for sound: ${name}`);
@@ -726,7 +717,7 @@ export class SoundManager {
                     const playPromise = audio.play();
                     if (playPromise) {
                         playPromise.then(() => {
-                            console.log(`Fallback audio playing: ${name}`);
+                            this.debugLog(`Fallback audio playing: ${name}`);
                         }).catch(error => {
                             console.error(`Fallback audio failed: ${name}`, error);
                             
@@ -749,7 +740,7 @@ export class SoundManager {
     
     // Last resort for playing sounds
     playEmergencyFallbackSound(name) {
-        console.log(`Attempting emergency fallback for sound: ${name}`);
+        this.debugLog(`Attempting emergency fallback for sound: ${name}`);
         
         try {
             // Use the global SoundFX object if available
@@ -849,14 +840,10 @@ export class SoundManager {
     }
     
     playMusic(name) {
-        // Stop current music if playing
-        if (this.currentMusic && this.currentMusic.isPlaying) {
-            try {
-                this.currentMusic.stop();
-            } catch (error) {
-                console.warn(`Error stopping current music:`, error);
-                this.stopFallbackMusic(); // Try fallback stop method
-            }
+        // Check if name is provided
+        if (!name) {
+            console.warn('No music name provided');
+            return;
         }
         
         const music = this.musicTracks.get(name);
@@ -879,7 +866,7 @@ export class SoundManager {
                 if (music.buffer) {
                     music.play();
                 } else {
-                    console.log(`Music ${name} buffer not yet loaded, will play when ready`);
+                    this.debugLog(`Music ${name} buffer not yet loaded, will play when ready`);
                 }
             } else {
                 console.warn(`Music track ${name} is not playable`);
@@ -902,67 +889,65 @@ export class SoundManager {
     }
     
     setMasterVolume(volume) {
-        console.log(`Setting master volume to ${volume} (previous: ${this.masterVolume})`);
+        const previousVolume = this.masterVolume;
         this.masterVolume = Math.max(0, Math.min(1, volume));
         
-        // Update all active sounds and pools
-        this.updateAllVolumes();
+        this.debugLog(`Setting master volume to ${volume} (previous: ${previousVolume})`);
         
-        console.log(`Master volume set to ${this.masterVolume}`);
+        // Update all active sounds
+        this.updateAllVolumes();
+        this.debugLog(`Master volume set to ${this.masterVolume}`);
     }
     
     setMusicVolume(volume) {
-        console.log(`Setting music volume to ${volume} (previous: ${this.musicVolume})`);
+        const previousVolume = this.musicVolume;
         this.musicVolume = Math.max(0, Math.min(1, volume));
         
-        // Update music volume if playing
+        this.debugLog(`Setting music volume to ${volume} (previous: ${previousVolume})`);
         this.updateAllVolumes();
-        
-        console.log(`Music volume set to ${this.musicVolume}`);
+        this.debugLog(`Music volume set to ${this.musicVolume}`);
     }
     
     setSFXVolume(volume) {
-        console.log(`Setting SFX volume to ${volume} (previous: ${this.sfxVolume})`);
+        const previousVolume = this.sfxVolume;
         this.sfxVolume = Math.max(0, Math.min(1, volume));
         
-        // Update all sound effects volumes
+        this.debugLog(`Setting SFX volume to ${volume} (previous: ${previousVolume})`);
         this.updateAllVolumes();
-        
-        console.log(`SFX volume set to ${this.sfxVolume}`);
+        this.debugLog(`SFX volume set to ${this.sfxVolume}`);
     }
     
     setMuted(isMuted) {
-        const wasMuted = this.isMuted;
-        this.isMuted = isMuted;
+        const previousState = this.isMuted;
+        this.isMuted = !!isMuted;
         
-        // Update all volumes
-        this.updateAllVolumes();
-        
-        if (wasMuted !== isMuted) {
-            console.log(`Sound ${isMuted ? 'muted' : 'unmuted'}`);
+        if (previousState !== this.isMuted) {
+            this.updateAllVolumes();
+            this.debugLog(`Sound ${isMuted ? 'muted' : 'unmuted'}`);
         }
     }
     
     setSFXMuted(isMuted) {
-        const wasMuted = this.sfxMuted;
-        this.sfxMuted = isMuted;
+        const previousState = this.sfxMuted;
+        this.sfxMuted = !!isMuted;
         
-        // Update all volumes
-        this.updateAllVolumes();
-        
-        if (wasMuted !== isMuted) {
-            console.log(`SFX ${isMuted ? 'muted' : 'unmuted'}`);
+        if (previousState !== this.sfxMuted) {
+            this.updateAllVolumes();
+            this.debugLog(`SFX ${isMuted ? 'muted' : 'unmuted'}`);
         }
     }
     
     updateAllVolumes() {
-        console.log(`Updating all volumes: Master=${this.masterVolume}, SFX=${this.sfxVolume}, Music=${this.musicVolume}, Muted=${this.isMuted}, SFXMuted=${this.sfxMuted}`);
+        this.debugLog(`Updating all volumes: Master=${this.masterVolume}, SFX=${this.sfxVolume}, Music=${this.musicVolume}, Muted=${this.isMuted}, SFXMuted=${this.sfxMuted}`);
+        
+        // Set a flag to prevent circular updates
+        this.isUpdatingVolume = true;
         
         // Update active sounds
         const activeCount = this.activeSounds.size;
-        console.log(`Updating ${activeCount} active sounds`);
+        this.debugLog(`Updating ${activeCount} active sounds`);
         for (const [soundId, sound] of this.activeSounds.entries()) {
-            console.log(`Updating active sound: ${soundId}, isSFX=${sound.isSFX || false}`);
+            this.debugLog(`Updating active sound: ${soundId}, isSFX=${sound.isSFX || false}`);
             this.updateSoundVolume(sound);
         }
         
@@ -970,7 +955,7 @@ export class SoundManager {
         if (window.musicPlayer && typeof window.musicPlayer.updateMusicVolume === 'function' && !this.isUpdatingVolume) {
             try {
                 this.isUpdatingVolume = true;
-                console.log('Updating music player volume');
+                this.debugLog('Updating music player volume');
                 window.musicPlayer.updateMusicVolume();
             } finally {
                 // Reset flag after a small delay to ensure any pending callbacks complete
@@ -982,35 +967,35 @@ export class SoundManager {
         
         // Update sound pools (SFX)
         const effectiveSfxVolume = this.isMuted || this.sfxMuted ? 0 : this.sfxVolume * this.masterVolume;
-        console.log(`Effective SFX volume for pools: ${effectiveSfxVolume}`);
+        this.debugLog(`Effective SFX volume for pools: ${effectiveSfxVolume}`);
         
         let poolCount = 0;
         let soundCount = 0;
         for (const [poolName, pool] of this.soundPools.entries()) {
             poolCount++;
-            console.log(`Updating pool: ${poolName} with ${pool.length} sounds`);
+            this.debugLog(`Updating pool: ${poolName} with ${pool.length} sounds`);
             for (const sound of pool) {
                 soundCount++;
                 if (sound.isPlaying) {
-                    console.log(`- Sound in pool ${poolName} is playing, setting volume to ${effectiveSfxVolume}`);
+                    this.debugLog(`- Sound in pool ${poolName} is playing, setting volume to ${effectiveSfxVolume}`);
                 }
                 sound.setVolume(effectiveSfxVolume);
             }
         }
-        console.log(`Updated ${soundCount} sounds in ${poolCount} pools with volume ${effectiveSfxVolume}`);
+        this.debugLog(`Updated ${soundCount} sounds in ${poolCount} pools with volume ${effectiveSfxVolume}`);
         
         // Update music tracks
         const effectiveMusicVolume = this.isMuted ? 0 : this.musicVolume * this.masterVolume;
-        console.log(`Effective music volume: ${effectiveMusicVolume}`);
+        this.debugLog(`Effective music volume: ${effectiveMusicVolume}`);
         let musicCount = 0;
         for (const [trackName, music] of this.musicTracks.entries()) {
             musicCount++;
             if (music.isPlaying) {
-                console.log(`- Music track ${trackName} is playing, setting volume to ${effectiveMusicVolume}`);
+                this.debugLog(`- Music track ${trackName} is playing, setting volume to ${effectiveMusicVolume}`);
             }
             music.setVolume(effectiveMusicVolume);
         }
-        console.log(`Updated ${musicCount} music tracks with volume ${effectiveMusicVolume}`);
+        this.debugLog(`Updated ${musicCount} music tracks with volume ${effectiveMusicVolume}`);
     }
     
     updateSoundVolume(sound) {
