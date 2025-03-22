@@ -38,7 +38,7 @@ export class SoundManager {
                                 this.camera.add(this.listener);
                                 this.debugLog('Audio listener successfully attached to camera');
                             } else {
-                                console.warn('Camera matrix not valid yet - falling back to HTML5 Audio. This is normal during initialization and is handled automatically.');
+                                this.debugLog('Camera matrix not valid yet - falling back to HTML5 Audio. This is normal during initialization.');
                                 this.useFallbackAudio = true;
                             }
                         }
