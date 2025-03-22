@@ -654,9 +654,15 @@ export class MonsterTruck {
             } else {
                 // Fallback if resetMovementState is not available
                 this.velocity = this.velocity || new THREE.Vector3(0, 0, 0);
-                this.acceleration = this.acceleration || new THREE.Vector3(0, 0, 0);
                 this.velocity.set(0, 0, 0);
-                this.acceleration.set(0, 0, 0);
+                
+                // Check if acceleration is a number or object
+                if (typeof this.acceleration === 'number') {
+                    this.acceleration = 0.02; // Reset to default acceleration value
+                } else if (this.acceleration && typeof this.acceleration.set === 'function') {
+                    this.acceleration.set(0, 0, 0);
+                }
+                // Don't try to use acceleration.set if it's just a number
             }
         }
         
