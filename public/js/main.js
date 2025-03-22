@@ -394,7 +394,149 @@ class Game {
         };
     }
 
-    // ... rest of existing code ...
+    // Add missing methods
+    createArena() {
+        console.log("Creating simplified arena");
+        
+        // Create a simple grid floor
+        const gridHelper = new THREE.GridHelper(100, 20, 0xff00ff, 0x00ffff);
+        this.scene.add(gridHelper);
+        
+        // Create a ground plane
+        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x220033,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.7
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = 0.1;
+        this.scene.add(ground);
+        
+        return Promise.resolve(); // To support async/await pattern
+    }
+
+    createSimpleTruck() {
+        console.log("Creating simplified truck");
+        
+        // Create a basic box for the truck
+        const truckGeometry = new THREE.BoxGeometry(2, 1, 3);
+        const truckMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xff00ff,
+            wireframe: true
+        });
+        this.truck = new THREE.Mesh(truckGeometry, truckMaterial);
+        this.truck.position.set(0, 1, 0);
+        this.scene.add(this.truck);
+        
+        // Add basic properties
+        this.truck.velocity = 0;
+        this.truck.acceleration = 0;
+        this.health = 100;
+        this.maxHealth = 100;
+        
+        return Promise.resolve(); // To support async/await pattern
+    }
+
+    setupControls() {
+        console.log("Setting up controls");
+        
+        // Set up keyboard controls
+        window.addEventListener('keydown', (e) => {
+            if (this.keys.hasOwnProperty(e.key)) {
+                this.keys[e.key] = true;
+            }
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            if (this.keys.hasOwnProperty(e.key)) {
+                this.keys[e.key] = false;
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (this.camera && this.renderer) {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    }
+
+    initHUD() {
+        console.log("Initializing simplified HUD");
+        
+        // Create a simple HUD container
+        const hudContainer = document.createElement('div');
+        hudContainer.style.position = 'absolute';
+        hudContainer.style.top = '10px';
+        hudContainer.style.left = '10px';
+        hudContainer.style.color = '#fff';
+        hudContainer.style.fontFamily = 'Arial, sans-serif';
+        hudContainer.style.fontSize = '16px';
+        hudContainer.style.textShadow = '1px 1px 2px black';
+        
+        // Add health display
+        const healthDiv = document.createElement('div');
+        healthDiv.id = 'health';
+        healthDiv.textContent = `Health: ${this.health}`;
+        hudContainer.appendChild(healthDiv);
+        
+        document.body.appendChild(hudContainer);
+    }
+
+    animate() {
+        if (!this.isInitialized) return;
+        
+        try {
+            // Update game state
+            this.update();
+            
+            // Render the scene
+            if (this.renderer && this.scene && this.camera) {
+                this.renderer.render(this.scene, this.camera);
+            }
+            
+            // Continue animation loop
+            requestAnimationFrame(() => this.animate());
+        } catch (error) {
+            console.error("Error in animation loop:", error);
+            // Try to continue animation despite errors
+            requestAnimationFrame(() => this.animate());
+        }
+    }
+
+    update() {
+        // Basic update for truck movement
+        if (!this.truck) return;
+        
+        // Process keyboard input
+        const moveSpeed = 0.1;
+        const rotateSpeed = 0.05;
+        
+        if (this.keys['ArrowUp']) {
+            this.truck.position.z -= moveSpeed;
+        }
+        if (this.keys['ArrowDown']) {
+            this.truck.position.z += moveSpeed;
+        }
+        if (this.keys['ArrowLeft']) {
+            this.truck.rotation.y += rotateSpeed;
+        }
+        if (this.keys['ArrowRight']) {
+            this.truck.rotation.y -= rotateSpeed;
+        }
+        
+        // Update camera to follow truck
+        if (this.camera) {
+            this.camera.position.x = this.truck.position.x;
+            this.camera.position.z = this.truck.position.z + 10;
+            this.camera.lookAt(this.truck.position);
+        }
+    }
 }
 
 // Initialize game when window is fully loaded
