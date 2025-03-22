@@ -381,9 +381,10 @@ class Game {
         
         // Create a basic box for the truck
         const truckGeometry = new THREE.BoxGeometry(2, 1, 3);
-        const truckMaterial = new THREE.MeshBasicMaterial({ 
+        const truckMaterial = new THREE.MeshPhongMaterial({ 
             color: 0xff00ff,
-            wireframe: true
+            shininess: 30,
+            wireframe: false
         });
         this.truck = new THREE.Mesh(truckGeometry, truckMaterial);
         this.truck.position.set(0, 1, 0);
@@ -392,6 +393,47 @@ class Game {
         // Add basic properties
         this.truck.velocity = 0;
         this.truck.acceleration = 0;
+        
+        // Add wheels for better visual feedback
+        this.addWheelsToTruck();
+    }
+
+    addWheelsToTruck() {
+        // Create wheels
+        const wheelGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 32);
+        wheelGeometry.rotateX(Math.PI / 2); // Rotate to align with truck
+        
+        const wheelMaterial = new THREE.MeshPhongMaterial({
+            color: 0x333333,
+            shininess: 80
+        });
+        
+        // Create and position 4 wheels
+        this.wheels = [];
+        
+        // Front left
+        const wheelFL = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheelFL.position.set(-1.1, -0.3, -1);
+        this.truck.add(wheelFL);
+        this.wheels.push(wheelFL);
+        
+        // Front right
+        const wheelFR = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheelFR.position.set(1.1, -0.3, -1);
+        this.truck.add(wheelFR);
+        this.wheels.push(wheelFR);
+        
+        // Rear left
+        const wheelRL = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheelRL.position.set(-1.1, -0.3, 1);
+        this.truck.add(wheelRL);
+        this.wheels.push(wheelRL);
+        
+        // Rear right
+        const wheelRR = new THREE.Mesh(wheelGeometry, wheelMaterial);
+        wheelRR.position.set(1.1, -0.3, 1);
+        this.truck.add(wheelRR);
+        this.wheels.push(wheelRR);
     }
 
     setupControls() {
@@ -460,29 +502,107 @@ class Game {
         // Basic update for truck movement
         if (!this.truck) return;
         
-        // Process keyboard input
-        const moveSpeed = 0.1;
-        const rotateSpeed = 0.05;
+        // Process keyboard input for more realistic driving
+        const acceleration = 0.01;
+        const deceleration = 0.98; // Friction
+        const maxSpeed = 0.5;
+        const turnSpeed = 0.03;
         
+        // Calculate the truck's forward direction based on its rotation
+        const direction = new THREE.Vector3();
+        direction.z = Math.cos(this.truck.rotation.y);
+        direction.x = Math.sin(this.truck.rotation.y);
+        
+        // Acceleration/braking
         if (this.keys['ArrowUp']) {
-            this.truck.position.z -= moveSpeed;
-        }
-        if (this.keys['ArrowDown']) {
-            this.truck.position.z += moveSpeed;
-        }
-        if (this.keys['ArrowLeft']) {
-            this.truck.rotation.y += rotateSpeed;
-        }
-        if (this.keys['ArrowRight']) {
-            this.truck.rotation.y -= rotateSpeed;
+            this.truck.velocity += acceleration;
+            if (this.truck.velocity > maxSpeed) {
+                this.truck.velocity = maxSpeed;
+            }
+        } else if (this.keys['ArrowDown']) {
+            this.truck.velocity -= acceleration;
+            if (this.truck.velocity < -maxSpeed/2) {  // Slower in reverse
+                this.truck.velocity = -maxSpeed/2;
+            }
+        } else {
+            // Natural deceleration
+            this.truck.velocity *= deceleration;
+            if (Math.abs(this.truck.velocity) < 0.001) {
+                this.truck.velocity = 0;
+            }
         }
         
-        // Update camera to follow truck
+        // Turning - more effective at lower speeds
+        const turnFactor = 1 - (Math.abs(this.truck.velocity) / maxSpeed) * 0.5;
+        if (this.keys['ArrowLeft']) {
+            // Only turn when moving
+            if (Math.abs(this.truck.velocity) > 0.01) {
+                this.truck.rotation.y += turnSpeed * turnFactor * Math.sign(this.truck.velocity);
+                this.animateWheelTurn(this.truck.velocity > 0 ? -1 : 1);
+            }
+        } else if (this.keys['ArrowRight']) {
+            // Only turn when moving
+            if (Math.abs(this.truck.velocity) > 0.01) {
+                this.truck.rotation.y -= turnSpeed * turnFactor * Math.sign(this.truck.velocity);
+                this.animateWheelTurn(this.truck.velocity > 0 ? 1 : -1);
+            }
+        } else {
+            this.resetWheels();
+        }
+        
+        // Apply velocity in the truck's forward direction
+        this.truck.position.x += direction.x * this.truck.velocity;
+        this.truck.position.z += direction.z * this.truck.velocity;
+        
+        // Animate wheels rolling based on speed
+        this.animateWheelRoll(this.truck.velocity);
+        
+        // Update camera to follow truck with smooth transition
         if (this.camera) {
-            this.camera.position.x = this.truck.position.x;
-            this.camera.position.z = this.truck.position.z + 10;
+            // Position camera behind truck based on truck's direction
+            const cameraDistance = 15;
+            const cameraHeight = 8;
+            const targetCameraPos = new THREE.Vector3(
+                this.truck.position.x - direction.x * cameraDistance,
+                this.truck.position.y + cameraHeight,
+                this.truck.position.z - direction.z * cameraDistance
+            );
+            
+            // Smoothly interpolate camera position
+            this.camera.position.lerp(targetCameraPos, 0.05);
             this.camera.lookAt(this.truck.position);
         }
+    }
+
+    animateWheelRoll(speed) {
+        if (!this.wheels || this.wheels.length === 0) return;
+        
+        // Rotate wheels based on speed
+        const rotationSpeed = speed * 0.5;
+        
+        // Rotate all wheels (they're oriented with rotation.x being the roll axis)
+        this.wheels.forEach(wheel => {
+            wheel.rotation.x += rotationSpeed;
+        });
+    }
+
+    animateWheelTurn(direction) {
+        if (!this.wheels || this.wheels.length < 2) return;
+        
+        // Front wheels turn for steering
+        const maxTurnAngle = 0.3; // in radians (about 17 degrees)
+        
+        // Front left and right wheels (first two in the array)
+        this.wheels[0].rotation.y = maxTurnAngle * direction;
+        this.wheels[1].rotation.y = maxTurnAngle * direction;
+    }
+
+    resetWheels() {
+        if (!this.wheels || this.wheels.length < 2) return;
+        
+        // Reset front wheel steering angle
+        this.wheels[0].rotation.y = 0;
+        this.wheels[1].rotation.y = 0;
     }
 }
 
