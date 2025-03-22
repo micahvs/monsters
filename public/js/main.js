@@ -319,7 +319,8 @@ class Game {
             console.log("Renderer created successfully");
             
             // Prevent texture flip issues that can cause WebGL errors
-            this.renderer.outputEncoding = THREE.sRGBEncoding;
+            // Update: Using outputColorSpace instead of deprecated outputEncoding
+            this.renderer.outputColorSpace = THREE.SRGBColorSpace;
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.setPixelRatio(window.devicePixelRatio);
             
