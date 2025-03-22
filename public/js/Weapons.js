@@ -255,6 +255,16 @@ export class Weapon {
         };
     }
     
+    reload() {
+        // Don't reload if already full or already reloading
+        if (this.ammo >= this.maxAmmo || this.isReloading) {
+            return false;
+        }
+        
+        this.startReload();
+        return true;
+    }
+    
     startReload() {
         if (this.isReloading || this.ammo === this.maxAmmo) return;
         

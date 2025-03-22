@@ -132,7 +132,7 @@ class Projectile {
 }
 
 class Turret {
-    constructor(position) {
+    constructor(position, scene) {
         // Create turret base
         const baseGeometry = new THREE.CylinderGeometry(1, 1, 1, 8);
         const baseMaterial = new THREE.MeshPhongMaterial({ 
@@ -141,6 +141,9 @@ class Turret {
         })
         this.base = new THREE.Mesh(baseGeometry, baseMaterial);
         this.base.position.copy(position);
+        
+        // Set the height correctly
+        this.base.position.y = 0.5;
 
         // Create turret gun
         const gunGeometry = new THREE.BoxGeometry(0.3, 0.3, 2);
@@ -155,7 +158,15 @@ class Turret {
 
         this.health = 5;
         this.shootCooldown = 0;
+        this.maxShootCooldown = 60; // Cooldown between shots (60 frames = ~1 second)
         this.alive = true;
+        this.scene = scene;
+        
+        // Add turret to scene
+        scene.add(this.base);
+        
+        // Keep track of fired projectiles
+        this.projectiles = [];
     }
 
     update(playerPosition) {
@@ -169,6 +180,57 @@ class Turret {
 
         // Update shooting cooldown
         if (this.shootCooldown > 0) this.shootCooldown--;
+        
+        // Shoot if possible
+        if (this.canShoot()) {
+            this.shoot(direction);
+        }
+        
+        // Update projectiles
+        this.updateProjectiles();
+    }
+    
+    shoot(direction) {
+        // Calculate position at the end of the gun
+        const gunTip = new THREE.Vector3(0, 0, 1.5);
+        // Transform to world coordinates
+        gunTip.applyMatrix4(this.gun.matrixWorld);
+        
+        // Create projectile
+        const projectile = new Projectile(
+            gunTip, 
+            direction, 
+            0.3, // speed
+            10,  // damage
+            'turret' // source
+        );
+        
+        // Add projectile meshes to scene
+        this.scene.add(projectile.mesh);
+        this.scene.add(projectile.light);
+        
+        // Add to our tracked projectiles
+        this.projectiles.push(projectile);
+        
+        // Reset cooldown
+        this.shootCooldown = this.maxShootCooldown;
+    }
+    
+    updateProjectiles() {
+        for (let i = 0; i < this.projectiles.length; i++) {
+            const projectile = this.projectiles[i];
+            
+            // Update projectile
+            projectile.update();
+            
+            // Remove dead projectiles
+            if (!projectile.alive) {
+                this.scene.remove(projectile.mesh);
+                this.scene.remove(projectile.light);
+                this.projectiles.splice(i, 1);
+                i--;
+            }
+        }
     }
 
     damage() {
@@ -181,6 +243,21 @@ class Turret {
 
     canShoot() {
         return this.alive && this.shootCooldown <= 0;
+    }
+    
+    getProjectiles() {
+        return this.projectiles;
+    }
+    
+    removeFromScene() {
+        // Remove all projectiles
+        for (const projectile of this.projectiles) {
+            this.scene.remove(projectile.mesh);
+            this.scene.remove(projectile.light);
+        }
+        
+        // Remove turret
+        this.scene.remove(this.base);
     }
 }
 
@@ -202,13 +279,18 @@ class Game {
             'ArrowLeft': false,
             'ArrowRight': false,
             ' ': false,
-            'M': false
+            'M': false,
+            'r': false,
+            'R': false
         }
         
         // Core game state
         this.score = 0;
         this.health = 100;
         this.maxHealth = 100;
+        
+        // Add turrets array
+        this.turrets = [];
         
         // Initialize the game
         this.init();
@@ -295,6 +377,12 @@ class Game {
                 console.error("Failed to create truck:", truckError);
                 throw truckError;
             }
+            
+            // Create turrets
+            this.createTurrets();
+            
+            // Create player's weapon
+            this.createWeapon();
             
             // Set up controls
             console.log("Setting up controls...");
@@ -487,6 +575,20 @@ class Game {
         healthDiv.id = 'health';
         healthDiv.textContent = `Health: ${this.health}`;
         hudContainer.appendChild(healthDiv);
+        
+        // Add score display
+        const scoreDiv = document.createElement('div');
+        scoreDiv.id = 'score';
+        scoreDiv.textContent = `Score: ${this.score}`;
+        hudContainer.appendChild(scoreDiv);
+        this.scoreDisplay = scoreDiv;
+        
+        // Add ammo display
+        const ammoDiv = document.createElement('div');
+        ammoDiv.id = 'ammo';
+        ammoDiv.textContent = `Ammo: 0/0`;
+        hudContainer.appendChild(ammoDiv);
+        this.ammoDisplay = ammoDiv;
         
         document.body.appendChild(hudContainer);
     }
@@ -696,6 +798,49 @@ class Game {
             this.camera.position.lerp(targetCameraPos, 0.05);
             this.camera.lookAt(this.truck.position);
         }
+        
+        // Handle shooting
+        if (this.keys[' '] && this.weapon) {
+            const truckDirection = new THREE.Vector3(
+                Math.sin(this.truck.rotation.y),
+                0,
+                Math.cos(this.truck.rotation.y)
+            );
+            
+            // Get position at the front of the truck
+            const weaponPosition = this.weaponMesh.getWorldPosition(new THREE.Vector3());
+            
+            // Fire the weapon
+            this.weapon.shoot(weaponPosition, truckDirection, 'player');
+        }
+        
+        // Handle reload
+        if ((this.keys['r'] || this.keys['R']) && this.weapon && !this.weapon.isReloading && this.weapon.ammo < this.weapon.maxAmmo) {
+            // Start reload
+            this.weapon.reload();
+            
+            // Show reloading notification
+            this.showNotification("Reloading...");
+        }
+        
+        // Update weapon
+        if (this.weapon) {
+            this.weapon.update();
+            
+            // Update ammo display
+            if (this.ammoDisplay) {
+                this.ammoDisplay.textContent = `Ammo: ${this.weapon.ammo}/${this.weapon.maxAmmo}`;
+            }
+        }
+        
+        // Update turrets
+        this.updateTurrets();
+        
+        // Check for projectile hits
+        this.checkProjectileHits();
+        
+        // Check for player projectile hits on turrets
+        this.checkPlayerProjectileHits();
     }
 
     animateWheelRoll(speed) {
@@ -1037,6 +1182,176 @@ class Game {
         
         // Stop the game
         this.isGameOver = true;
+    }
+
+    createTurrets() {
+        // Create several turrets at fixed positions in the arena
+        const turretPositions = [
+            new THREE.Vector3(20, 0, 20),
+            new THREE.Vector3(-20, 0, 20),
+            new THREE.Vector3(20, 0, -20),
+            new THREE.Vector3(-20, 0, -20),
+            new THREE.Vector3(0, 0, 30)
+        ];
+        
+        for (const position of turretPositions) {
+            const turret = new Turret(position, this.scene);
+            this.turrets.push(turret);
+        }
+    }
+
+    updateTurrets() {
+        // Update each turret
+        for (let i = 0; i < this.turrets.length; i++) {
+            const turret = this.turrets[i];
+            
+            // Pass player position
+            if (this.truck) {
+                turret.update(this.truck.position);
+            }
+        }
+    }
+    
+    checkProjectileHits() {
+        if (!this.truck) return;
+        
+        // Check each turret's projectiles
+        for (const turret of this.turrets) {
+            const projectiles = turret.getProjectiles();
+            
+            for (let i = 0; i < projectiles.length; i++) {
+                const projectile = projectiles[i];
+                
+                // Calculate distance to player
+                const distance = projectile.mesh.position.distanceTo(this.truck.position);
+                
+                // If projectile hits player
+                if (distance < 2) { // 2 is roughly the truck size
+                    // Mark projectile as dead
+                    projectile.alive = false;
+                    
+                    // Apply damage to player
+                    this.health -= projectile.damage;
+                    
+                    // Update health display
+                    const healthDiv = document.getElementById('health');
+                    if (healthDiv) {
+                        healthDiv.textContent = `Health: ${this.health}`;
+                    }
+                    
+                    // Check if health depleted
+                    if (this.health <= 0) {
+                        this.gameOver();
+                    }
+                    
+                    // Show hit effect
+                    this.showCollisionEffect(projectile.mesh.position);
+                    
+                    // Shake camera based on damage
+                    this.shakeCamera(projectile.damage / 10);
+                    
+                    // Flash screen red
+                    this.flashScreen(0xff0000);
+                }
+            }
+        }
+    }
+
+    checkPlayerProjectileHits() {
+        // Check if the player's weapon exists
+        if (!this.weapon) return;
+        
+        // Get all active projectiles from the weapon
+        const projectiles = this.weapon.projectiles;
+        
+        // Check each projectile
+        for (let i = 0; i < projectiles.length; i++) {
+            const projectile = projectiles[i];
+            
+            // Check each turret
+            for (let j = 0; j < this.turrets.length; j++) {
+                const turret = this.turrets[j];
+                
+                // Skip dead turrets
+                if (!turret.alive) continue;
+                
+                // Get distance to turret
+                const distance = projectile.mesh.position.distanceTo(turret.base.position);
+                
+                // If hit
+                if (distance < 1.5) {
+                    // Remove projectile
+                    projectile.alive = false;
+                    
+                    // Damage turret
+                    turret.damage();
+                    
+                    // Create hit effect
+                    this.showCollisionEffect(projectile.mesh.position.clone());
+                    
+                    // If turret is destroyed, give player points
+                    if (!turret.alive) {
+                        // Add score or other rewards
+                        this.score += 100;
+                        if (this.scoreDisplay) {
+                            this.scoreDisplay.textContent = `Score: ${this.score}`;
+                        }
+                        
+                        // Show notification
+                        this.showNotification("Turret destroyed! +100 points");
+                    }
+                }
+            }
+        }
+    }
+
+    createWeapon() {
+        // Create a basic weapon for the player
+        this.weapon = new Weapon(this.scene, WeaponTypes.MACHINE_GUN);
+        
+        // Add a simple weapon model attached to the truck
+        const weaponGeometry = new THREE.BoxGeometry(0.3, 0.3, 1);
+        const weaponMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0x00ffff,
+            emissive: 0x005555
+        });
+        
+        this.weaponMesh = new THREE.Mesh(weaponGeometry, weaponMaterial);
+        this.weaponMesh.position.set(0, 0.5, -1); // Mount on front of truck
+        this.truck.add(this.weaponMesh);
+    }
+
+    showNotification(message, duration = 2000) {
+        // Create or get the notification element
+        let notification = document.getElementById('gameNotification');
+        
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.id = 'gameNotification';
+            notification.style.position = 'absolute';
+            notification.style.top = '50px';
+            notification.style.left = '50%';
+            notification.style.transform = 'translateX(-50%)';
+            notification.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+            notification.style.color = '#fff';
+            notification.style.padding = '10px 20px';
+            notification.style.borderRadius = '5px';
+            notification.style.fontFamily = 'Arial, sans-serif';
+            notification.style.zIndex = '1000';
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.3s ease-in-out';
+            document.body.appendChild(notification);
+        }
+        
+        // Set message and show
+        notification.textContent = message;
+        notification.style.opacity = '1';
+        
+        // Hide after duration
+        clearTimeout(this.notificationTimeout);
+        this.notificationTimeout = setTimeout(() => {
+            notification.style.opacity = '0';
+        }, duration);
     }
 }
 
