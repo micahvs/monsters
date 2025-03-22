@@ -1197,9 +1197,18 @@ class Game {
                         -Math.cos(this.truck.rotation.y)
                     );
                     
-                    // Apply velocity to position
-                    this.truck.position.x += direction.x * this.truck.velocity * deltaTime;
-                    this.truck.position.z += direction.z * this.truck.velocity * deltaTime;
+                    // Apply velocity to position - with NaN validation
+                    if (!isNaN(direction.x) && !isNaN(direction.z) && !isNaN(this.truck.velocity)) {
+                        this.truck.position.x += direction.x * this.truck.velocity * deltaTime;
+                        this.truck.position.z += direction.z * this.truck.velocity * deltaTime;
+                    } else {
+                        console.warn("Prevented NaN position update. Resetting values.");
+                        // Reset to safe values if NaNs are detected
+                        this.truck.velocity = 0;
+                        if (isNaN(this.truck.position.x) || isNaN(this.truck.position.z)) {
+                            this.truck.position.set(0, 0.5, 0);
+                        }
+                    }
                 }
             }
         } catch (error) {
@@ -6132,7 +6141,10 @@ class Game {
                 // Ensure truck is present and visible
                 if (this.truck && this.frameCount === 10) {
                     console.log("Verifying truck position:", this.truck.position.toArray());
-                    if (this.truck.position.length() < 0.1) {
+                    if (isNaN(this.truck.position.x) || isNaN(this.truck.position.y) || isNaN(this.truck.position.z)) {
+                        console.warn("NaN values detected in truck position, resetting");
+                        this.truck.position.set(0, 0.5, 0);
+                    } else if (this.truck.position.length() < 0.1) {
                         console.warn("Truck too close to origin, repositioning");
                         this.truck.position.set(0, 0.5, 0);
                     }
