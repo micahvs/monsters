@@ -710,7 +710,7 @@ class Game {
         if (!this.truck) return;
         
         // Process keyboard input for more realistic driving
-        const acceleration = 0.006; // Reduced from 0.01
+        const acceleration = 0.008; // Balanced between original 0.01 and slower 0.006
         const deceleration = 0.98; // Friction
         const maxSpeed = 0.5;
         const turnSpeed = 0.03;
