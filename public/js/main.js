@@ -321,8 +321,16 @@ class Game {
             // Prevent texture flip issues that can cause WebGL errors
             // Update: Using outputColorSpace instead of deprecated outputEncoding
             this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+            
+            // EMERGENCY FIX: Force renderer settings for debugging
+            this.renderer.setClearColor(0x000000, 1); // Set clear color to black for contrast
+            this.renderer.setPixelRatio(1); // Use lower pixel ratio for performance
             this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.renderer.setPixelRatio(window.devicePixelRatio);
+            
+            // DEBUGGING: Add axes helper to show coordinate system
+            const axesHelper = new THREE.AxesHelper(50);
+            this.scene.add(axesHelper);
+            console.log("Added axes helper to scene");
             
             // Add lights to scene
             console.log("Adding lights to scene...")
@@ -537,13 +545,24 @@ class Game {
             
             // Add ground plane
             const groundGeometry = new THREE.PlaneGeometry(arenaSize, arenaSize);
-            const groundMaterial = new THREE.MeshPhongMaterial({ 
-                color: 0x120023,
-                shininess: 10
-            })
+            const groundMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0x220033,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.7
+            });
             const ground = new THREE.Mesh(groundGeometry, groundMaterial);
             ground.rotation.x = -Math.PI / 2;
+            ground.position.y = 0.1; // Slightly above grid to avoid Z-fighting
             this.scene.add(ground);
+            
+            // Add additional visual markers to see arena size
+            const centerMarker = new THREE.Mesh(
+                new THREE.SphereGeometry(5, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0xff0000 })
+            );
+            centerMarker.position.set(0, 5, 0);
+            this.scene.add(centerMarker);
             
             // Create boundary walls - SIMPLIFIED APPROACH
             try {
@@ -562,14 +581,15 @@ class Game {
         try {
             console.log("Creating walls for arena")
             const halfSize = arenaSize / 2;
-            const wallHeight = 20; // Reduced wall height
+            const wallHeight = 30; // Increased wall height for visibility
             
-            // Base wall material
-            const wallMaterial = new THREE.MeshPhongMaterial({ 
+            // Base wall material - using MeshBasicMaterial for guaranteed visibility
+            const wallMaterial = new THREE.MeshBasicMaterial({ 
                 color: 0xff00ff,
-                emissive: 0x330033,
-                shininess: 70
-            })
+                wireframe: true,
+                transparent: true,
+                opacity: 0.8
+            });
             
             // Create the main boundary walls
             const walls = [
@@ -668,26 +688,45 @@ class Game {
             
             console.log("Creating monster truck with type:", machineTypeId, "and color:", color);
             
-            // Create the monster truck with selected settings
+            // EMERGENCY FIX: Create a VERY visible truck regardless of MonsterTruck implementation
+            // This ensures we can see something even if the MonsterTruck class has issues
+            const emergencyTruckGeometry = new THREE.BoxGeometry(5, 3, 8);
+            const emergencyTruckMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xff00ff,
+                wireframe: true,
+                opacity: 0.8,
+                transparent: true
+            });
+            const emergencyTruck = new THREE.Mesh(emergencyTruckGeometry, emergencyTruckMaterial);
+            emergencyTruck.position.set(0, 2, 0); // Elevated position to ensure visibility
+            this.scene.add(emergencyTruck);
+            console.log("Added emergency visible truck at position:", emergencyTruck.position.toArray());
+            
+            // Create another visual marker at the origin
+            const originMarker = new THREE.Mesh(
+                new THREE.SphereGeometry(1, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+            );
+            originMarker.position.set(0, 1, 0);
+            this.scene.add(originMarker);
+            console.log("Added origin marker at position:", originMarker.position.toArray());
+            
+            // Try to create the monster truck with selected settings
             this.monsterTruck = new MonsterTruck(this.scene, new THREE.Vector3(0, 0.5, 0), {
                 machineType: machineTypeId,
                 color: color
             })
             
             // For compatibility with existing code
-            this.truck = this.monsterTruck.body;
+            this.truck = this.monsterTruck.body || emergencyTruck; // Use emergency truck as fallback
             
             // Check if truck was created properly
             if (!this.truck) {
                 console.error("ERROR: Monster truck body is null or undefined!");
                 
-                // Create a fallback truck for debugging
-                console.log("Creating fallback truck object");
-                const geometry = new THREE.BoxGeometry(3, 1.5, 5);
-                const material = new THREE.MeshPhongMaterial({ color: 0xff00ff });
-                this.truck = new THREE.Mesh(geometry, material);
-                this.truck.position.set(0, 1, 0);
-                this.scene.add(this.truck);
+                // Use the emergency truck
+                this.truck = emergencyTruck;
+                console.log("Using emergency truck as main truck object");
             }
             
             // Verify the truck is in the scene
@@ -715,7 +754,10 @@ class Game {
             
             // Create emergency fallback truck if original creation failed
             const geometry = new THREE.BoxGeometry(3, 1.5, 5);
-            const material = new THREE.MeshPhongMaterial({ color: 0xff00ff });
+            const material = new THREE.MeshBasicMaterial({ 
+                color: 0xff00ff,
+                wireframe: true // Make wireframe for visibility
+            });
             this.truck = new THREE.Mesh(geometry, material);
             this.truck.position.set(0, 1, 0);
             this.scene.add(this.truck);
@@ -1171,12 +1213,21 @@ class Game {
             console.warn("updateCamera: Truck or camera missing");
             
             // Set default camera position if not set
-            if (this.camera && (!this.camera.position || this.camera.position.length() < 0.1)) {
-                console.log("Camera position not set, using default position");
-                this.camera.position.set(0, 10, 20);
+            if (this.camera) {
+                console.log("Setting default camera position for debugging");
+                this.camera.position.set(0, 30, 50); // Much higher and further back for better overview
                 this.camera.lookAt(0, 0, 0);
             }
             
+            return;
+        }
+        
+        // EMERGENCY FIX: Temporarily use a fixed camera position to debug scene
+        if (this.frameCount < 5) {
+            // For the first few frames, set a fixed position to get an overview
+            this.camera.position.set(0, 40, 60);
+            this.camera.lookAt(0, 0, 0);
+            console.log("Setting emergency overview camera position:", this.camera.position.toArray());
             return;
         }
         
@@ -1187,18 +1238,18 @@ class Game {
             -Math.cos(this.truck.rotation.y)
         );
         
-        // Position camera BEHIND the truck (not between wheels)
+        // Position camera BEHIND the truck - use larger values for debugging
         const cameraOffset = new THREE.Vector3(
-            truckDirection.x * -20,  // 20 units behind (increased from 10)
-            10,                      // 10 units above (increased from 6)
-            truckDirection.z * -20   // 20 units behind (increased from 10)
+            truckDirection.x * -30,  // 30 units behind (increased for visibility)
+            20,                      // 20 units above (increased for visibility)
+            truckDirection.z * -30   // 30 units behind (increased for visibility)
         );
         
         // Target position
         const targetPos = new THREE.Vector3().copy(this.truck.position).add(cameraOffset);
         
         // Smooth camera movement (reduced smoothing for initial view)
-        const lerpFactor = this.frameCount < 10 ? 0.5 : 0.1 * deltaTime;
+        const lerpFactor = this.frameCount < 10 ? 0.8 : 0.1 * deltaTime;
         this.camera.position.lerp(targetPos, lerpFactor);
         
         // Look at the truck, slightly above it
@@ -1210,9 +1261,13 @@ class Game {
         this.camera.lookAt(lookAtPos);
         
         // Debug camera position
-        if (this.frameCount % 100 === 0) {
+        if (this.frameCount === 1 || this.frameCount % 50 === 0) {
             console.log(`Camera position: ${JSON.stringify(this.camera.position)}`);
             console.log(`Looking at: ${JSON.stringify(lookAtPos)}`);
+            
+            // Print camera frustum information
+            console.log(`Camera FOV: ${this.camera.fov}`);
+            console.log(`Camera near: ${this.camera.near}, far: ${this.camera.far}`);
         }
     }
     

@@ -6,6 +6,7 @@
     "build": "echo 'No build step needed'"
   },
   "devDependencies": {
+    "eslint": "^9.22.0",
     "vercel": "^32.6.1"
   }
 }
