@@ -21,6 +21,43 @@ export class SoundManager {
             // Store camera reference but don't attach listener immediately
             // This avoids issues during initialization
             if (camera) {
+                // Validate camera before storing reference
+                if (!camera.matrixWorld || !camera.matrixWorld.elements) {
+                    console.warn('Invalid camera matrix, creating new matrix');
+                    camera.matrixWorld = new THREE.Matrix4();
+                    camera.matrixWorldNeedsUpdate = true;
+                }
+                
+                // Validate camera matrix elements
+                const elements = camera.matrixWorld.elements;
+                let hasInvalidValues = false;
+                for (let i = 0; i < elements.length; i++) {
+                    if (!Number.isFinite(elements[i])) {
+                        elements[i] = 0;
+                        hasInvalidValues = true;
+                    }
+                }
+                
+                if (hasInvalidValues) {
+                    console.warn('Invalid values in camera matrix, resetting to identity');
+                    camera.matrixWorld.identity();
+                }
+                
+                // Validate camera position and rotation
+                if (!Number.isFinite(camera.position.x) || 
+                    !Number.isFinite(camera.position.y) || 
+                    !Number.isFinite(camera.position.z)) {
+                    console.warn('Invalid camera position, resetting to zero');
+                    camera.position.set(0, 0, 0);
+                }
+                
+                if (!Number.isFinite(camera.rotation.x) || 
+                    !Number.isFinite(camera.rotation.y) || 
+                    !Number.isFinite(camera.rotation.z)) {
+                    console.warn('Invalid camera rotation, resetting to zero');
+                    camera.rotation.set(0, 0, 0);
+                }
+                
                 this.camera = camera;
                 this.debugLog('Camera reference stored - will attach listener later');
                 
@@ -96,6 +133,17 @@ export class SoundManager {
         
         // Add global handler for user interaction
         this.setupGlobalAudioUnlock();
+        
+        // Add validation for camera matrix
+        if (camera && camera.matrixWorld) {
+            const elements = camera.matrixWorld.elements;
+            for (let i = 0; i < elements.length; i++) {
+                if (!Number.isFinite(elements[i])) {
+                    elements[i] = 0;
+                }
+            }
+            camera.matrixWorldNeedsUpdate = true;
+        }
     }
     
     // Helper method for conditional logging
@@ -1051,12 +1099,52 @@ export class SoundManager {
     updateListenerPosition() {
         if (!this.camera || !this.listener) return;
         
-        // In Three.js, the AudioListener automatically updates its position
-        // based on the parent object (camera), so we don't need to manually
-        // update it. The camera.add(this.listener) call in the constructor
-        // sets up this relationship.
-        
-        // We'll keep this method for compatibility with existing code,
-        // but we don't need to do anything here.
+        try {
+            // Validate camera matrix before update
+            if (this.camera.matrixWorld) {
+                const elements = this.camera.matrixWorld.elements;
+                let hasInvalidValues = false;
+                
+                // Check for invalid values in the matrix
+                for (let i = 0; i < elements.length; i++) {
+                    if (!Number.isFinite(elements[i])) {
+                        elements[i] = 0;
+                        hasInvalidValues = true;
+                    }
+                }
+                
+                if (hasInvalidValues) {
+                    this.debugLog('Invalid values detected in camera matrix, resetting to identity');
+                    this.camera.matrixWorld.identity();
+                }
+                
+                this.camera.matrixWorldNeedsUpdate = true;
+            }
+            
+            // Validate camera position and rotation
+            if (!Number.isFinite(this.camera.position.x) || 
+                !Number.isFinite(this.camera.position.y) || 
+                !Number.isFinite(this.camera.position.z)) {
+                this.debugLog('Invalid camera position detected, resetting to last valid position');
+                this.camera.position.set(0, 0, 0);
+            }
+            
+            if (!Number.isFinite(this.camera.rotation.x) || 
+                !Number.isFinite(this.camera.rotation.y) || 
+                !Number.isFinite(this.camera.rotation.z)) {
+                this.debugLog('Invalid camera rotation detected, resetting to zero');
+                this.camera.rotation.set(0, 0, 0);
+            }
+            
+            // Let Three.js handle the update
+            this.camera.updateMatrixWorld();
+        } catch (error) {
+            console.error("Error updating listener position:", error);
+            // Fallback to identity matrix if update fails
+            if (this.camera.matrixWorld) {
+                this.camera.matrixWorld.identity();
+                this.camera.matrixWorldNeedsUpdate = true;
+            }
+        }
     }
 } 
