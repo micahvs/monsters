@@ -8,38 +8,40 @@ import cors from 'cors';
 const app = express();
 const httpServer = createServer(app);
 
-// Enable CORS with specific origins
-app.use(cors({
-  origin: [
-    "https://monsters-kappa.vercel.app", // Your Vercel app URL
-    "https://monsters-micahvs.vercel.app", // Alternative Vercel URL if any
-    "https://monsters-drab.vercel.app", // Added new Vercel URL
+// Define allowed origins
+const allowedOrigins = [
+    "https://monsters-kappa.vercel.app",
+    "https://monsters-micahvs.vercel.app",
+    "https://monsters-drab.vercel.app",
     "http://localhost:3000",
     "http://localhost:5000"
-  ],
-  credentials: true
+];
+
+// Enable CORS with specific origins
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true
 }));
 
-// Create Socket.IO server
+// Create Socket.IO server with optimized settings
 const io = new Server(httpServer, {
-  cors: {
-    origin: [
-      "https://monsters-git-main-micahvallardsmith-gmailcoms-projects.vercel.app",
-      "https://monsters-drab.vercel.app",
-      "http://localhost:3000",
-      "http://localhost:8000"
-    ],
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+    cors: {
+        origin: allowedOrigins,
+        methods: ["GET", "POST"],
+        credentials: true
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    connectTimeout: 10000
 });
 
-// Game state storage
+// Game state storage with optimized cleanup
 const gameState = {
-  players: {},
-  turrets: {},
-  projectiles: [],
-  lastUpdate: Date.now()
+    players: {},
+    turrets: {},
+    projectiles: [],
+    lastUpdate: Date.now(),
+    cleanupThreshold: 60000 // 60 seconds
 };
 
 // Handle socket connections
@@ -204,18 +206,25 @@ io.on('connection', (socket) => {
   });
 });
 
-// Clean up inactive players every minute
+// Optimized cleanup interval
 setInterval(() => {
-  const now = Date.now();
-  Object.keys(gameState.players).forEach(playerId => {
-    const player = gameState.players[playerId];
-    // Remove player if inactive for more than 60 seconds
-    if (now - player.lastUpdate > 60000) {
-      io.emit('playerLeft', { id: playerId });
-      delete gameState.players[playerId];
-    }
-  });
-}, 60000);
+    const now = Date.now();
+    const threshold = gameState.cleanupThreshold;
+    
+    // Clean up inactive players
+    Object.keys(gameState.players).forEach(playerId => {
+        const player = gameState.players[playerId];
+        if (now - player.lastUpdate > threshold) {
+            io.emit('playerLeft', { id: playerId });
+            delete gameState.players[playerId];
+        }
+    });
+    
+    // Clean up old projectiles
+    gameState.projectiles = gameState.projectiles.filter(p => 
+        (now - p.createdAt) < 10000
+    );
+}, 30000); // Run cleanup every 30 seconds instead of 60
 
 // Basic route for healthcheck
 app.get('/', (req, res) => {
