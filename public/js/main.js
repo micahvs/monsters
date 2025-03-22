@@ -715,6 +715,18 @@ class Game {
         const maxSpeed = 0.5;
         const turnSpeed = 0.03;
         
+        // Initialize steering angle if not present
+        if (this.truck.steeringAngle === undefined) {
+            this.truck.steeringAngle = 0;
+        }
+        
+        // Maximum steering angle in radians (about 30 degrees)
+        const maxSteeringAngle = 0.5;
+        // How quickly steering centers when not turning
+        const steeringReturnSpeed = 0.05;
+        // How quickly steering responds to input
+        const steeringResponseSpeed = 0.1;
+        
         // Calculate the truck's forward direction based on its rotation
         const direction = new THREE.Vector3();
         direction.z = Math.cos(this.truck.rotation.y);
@@ -739,20 +751,45 @@ class Game {
             }
         }
         
-        // Turning - more effective at lower speeds
-        const turnFactor = 1 - (Math.abs(this.truck.velocity) / maxSpeed) * 0.5;
+        // Update steering angle based on input
         if (this.keys['ArrowLeft']) {
-            // Only turn when moving
-            if (Math.abs(this.truck.velocity) > 0.01) {
-                this.truck.rotation.y += turnSpeed * turnFactor * Math.sign(this.truck.velocity);
-                this.animateWheelTurn(this.truck.velocity > 0 ? -1 : 1);
-            }
+            // Gradually increase steering angle
+            this.truck.steeringAngle = Math.max(
+                -maxSteeringAngle,
+                this.truck.steeringAngle - steeringResponseSpeed
+            );
         } else if (this.keys['ArrowRight']) {
-            // Only turn when moving
-            if (Math.abs(this.truck.velocity) > 0.01) {
-                this.truck.rotation.y -= turnSpeed * turnFactor * Math.sign(this.truck.velocity);
-                this.animateWheelTurn(this.truck.velocity > 0 ? 1 : -1);
+            // Gradually increase steering angle
+            this.truck.steeringAngle = Math.min(
+                maxSteeringAngle,
+                this.truck.steeringAngle + steeringResponseSpeed
+            );
+        } else {
+            // Gradually return steering to center
+            if (Math.abs(this.truck.steeringAngle) < steeringReturnSpeed) {
+                this.truck.steeringAngle = 0;
+            } else if (this.truck.steeringAngle > 0) {
+                this.truck.steeringAngle -= steeringReturnSpeed;
+            } else {
+                this.truck.steeringAngle += steeringReturnSpeed;
             }
+        }
+        
+        // Apply steering - turning effect is proportional to velocity
+        // Note: We use the absolute velocity for turning amount, but preserve
+        // turning direction regardless of forward/backward motion
+        if (Math.abs(this.truck.velocity) > 0.01) {
+            // Rotation amount is influenced by:
+            // 1. Steering angle
+            // 2. Velocity (faster = more turning)
+            // 3. TurnFactor (slower = more responsive steering)
+            const turnFactor = 1 - (Math.abs(this.truck.velocity) / maxSpeed) * 0.5;
+            this.truck.rotation.y -= this.truck.steeringAngle * Math.abs(this.truck.velocity) * turnFactor * 0.5;
+        }
+        
+        // Visualize wheel steering
+        if (this.truck.steeringAngle !== 0) {
+            this.animateWheelTurn(-this.truck.steeringAngle / maxSteeringAngle);
         } else {
             this.resetWheels();
         }
