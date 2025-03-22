@@ -299,6 +299,8 @@ class Game {
             if (!this.scene) {
                 console.log("Creating new scene")
                 this.scene = new THREE.Scene();
+            } else {
+                console.log("Scene already exists with", this.scene.children.length, "children")
             }
             
             // Setup three.js renderer first
@@ -307,12 +309,14 @@ class Game {
             if (!canvas) {
                 throw new Error("Canvas element with id 'game' not found");
             }
+            console.log("Canvas found:", canvas);
             this.renderer = new THREE.WebGLRenderer({ 
                 canvas: canvas,
                 antialias: true,
                 alpha: true,
                 powerPreference: 'high-performance'
             });
+            console.log("Renderer created successfully");
             
             // Prevent texture flip issues that can cause WebGL errors
             this.renderer.outputEncoding = THREE.sRGBEncoding;
@@ -326,10 +330,13 @@ class Game {
             // Create the arena
             console.log("Creating arena...")
             this.createArena();
+            console.log("Arena created, scene now has", this.scene.children.length, "children");
             
             // Create the truck
             console.log("Creating truck...")
             this.createSimpleTruck();
+            console.log("Truck created, scene now has", this.scene.children.length, "children");
+            console.log("Truck position:", this.truck ? this.truck.position.toArray() : "No truck created");
             
             // Setup controls
             console.log("Setting up controls...")
@@ -349,8 +356,12 @@ class Game {
             
             // Debug check for scene
             console.log(`AFTER INIT: Scene has ${this.scene.children.length} children`);
+            if (this.scene.children.length === 0) {
+                console.error("WARNING: Scene has no children after initialization!");
+            }
             console.log(`Truck added to scene? ${this.truck && this.truck.parent === this.scene}`);
             console.log(`Camera set up: ${!!this.camera}`);
+            console.log(`Camera position:`, this.camera ? this.camera.position.toArray() : "No camera");
             
             // Initialize sound manager after WebGL context is set up
             console.log("Initializing sound manager...")
@@ -654,6 +665,8 @@ class Game {
             
             const color = localStorage.getItem('monsterTruckColor') || '#ff00ff'
             
+            console.log("Creating monster truck with type:", machineTypeId, "and color:", color);
+            
             // Create the monster truck with selected settings
             this.monsterTruck = new MonsterTruck(this.scene, new THREE.Vector3(0, 0.5, 0), {
                 machineType: machineTypeId,
@@ -662,15 +675,35 @@ class Game {
             
             // For compatibility with existing code
             this.truck = this.monsterTruck.body;
+            
+            // Check if truck was created properly
+            if (!this.truck) {
+                console.error("ERROR: Monster truck body is null or undefined!");
+                
+                // Create a fallback truck for debugging
+                console.log("Creating fallback truck object");
+                const geometry = new THREE.BoxGeometry(3, 1.5, 5);
+                const material = new THREE.MeshPhongMaterial({ color: 0xff00ff });
+                this.truck = new THREE.Mesh(geometry, material);
+                this.truck.position.set(0, 1, 0);
+                this.scene.add(this.truck);
+            }
+            
+            // Verify the truck is in the scene
+            if (this.truck.parent !== this.scene) {
+                console.warn("WARNING: Truck not added to scene! Adding it now...");
+                this.scene.add(this.truck);
+            }
+            
             this.truck.velocity = 0;
             this.truck.acceleration = 0;
             this.truck.turning = 0;
             
             // Initialize health based on truck settings
-            this.health = this.monsterTruck.health;
-            this.maxHealth = this.monsterTruck.maxHealth;
+            this.health = this.monsterTruck.health || 100;
+            this.maxHealth = this.monsterTruck.maxHealth || 100;
             
-            console.log("Truck created at", this.truck.position)
+            console.log("Truck created at", this.truck.position.toArray());
             console.log("Truck specs:", {
                 type: machineTypeId,
                 health: this.health,
@@ -678,6 +711,20 @@ class Game {
             })
         } catch (error) {
             console.error("Error creating truck:", error)
+            
+            // Create emergency fallback truck if original creation failed
+            const geometry = new THREE.BoxGeometry(3, 1.5, 5);
+            const material = new THREE.MeshPhongMaterial({ color: 0xff00ff });
+            this.truck = new THREE.Mesh(geometry, material);
+            this.truck.position.set(0, 1, 0);
+            this.scene.add(this.truck);
+            
+            this.truck.velocity = 0;
+            this.truck.acceleration = 0;
+            this.truck.turning = 0;
+            this.health = 100;
+            this.maxHealth = 100;
+            console.log("Created emergency fallback truck");
         }
     }
     
@@ -875,6 +922,33 @@ class Game {
         if (!this.isInitialized || this.isGameOver) return;
         
         try {
+            // DEBUGGING ONLY - remove after issue is fixed
+            const debugFrequency = 100; // Log debug info every 100 frames
+            if (this.frameCount === 1 || this.frameCount % debugFrequency === 0) {
+                console.log(`Frame ${this.frameCount} - Scene children: ${this.scene.children.length}`);
+                console.log(`Truck exists: ${!!this.truck}, Position: ${this.truck ? JSON.stringify(this.truck.position) : 'N/A'}`);
+                console.log(`Camera Position: ${JSON.stringify(this.camera.position)}`);
+                console.log(`Initialized: ${this.isInitialized}, GameOver: ${this.isGameOver}`);
+                
+                // Ensure camera is at a good viewing position if it's too close to origin
+                if (this.camera && this.camera.position.length() < 1) {
+                    console.log("Camera too close to origin, repositioning");
+                    this.camera.position.set(0, 10, 20);
+                    this.camera.lookAt(0, 0, 0);
+                }
+                
+                // If no truck, create a visual debug sphere
+                if (!this.truck && this.frameCount === 1) {
+                    console.log("No truck found, creating debug sphere");
+                    const sphere = new THREE.Mesh(
+                        new THREE.SphereGeometry(2, 16, 16),
+                        new THREE.MeshBasicMaterial({ color: 0xff0000 })
+                    );
+                    sphere.position.set(0, 2, 0);
+                    this.scene.add(sphere);
+                }
+            }
+            
             // Handle controls - always needed for responsiveness
             this.handleControls();
             
@@ -1092,7 +1166,18 @@ class Game {
     
     // Update camera to follow the truck properly
     updateCamera(deltaTime) {
-        if (!this.truck || !this.camera) return;
+        if (!this.truck || !this.camera) {
+            console.warn("updateCamera: Truck or camera missing");
+            
+            // Set default camera position if not set
+            if (this.camera && (!this.camera.position || this.camera.position.length() < 0.1)) {
+                console.log("Camera position not set, using default position");
+                this.camera.position.set(0, 10, 20);
+                this.camera.lookAt(0, 0, 0);
+            }
+            
+            return;
+        }
         
         // Calculate target position behind the truck
         const truckDirection = new THREE.Vector3(
@@ -1103,16 +1188,17 @@ class Game {
         
         // Position camera BEHIND the truck (not between wheels)
         const cameraOffset = new THREE.Vector3(
-            truckDirection.x * -10,  // 10 units behind
-            6,                       // 6 units above
-            truckDirection.z * -10   // 10 units behind
+            truckDirection.x * -20,  // 20 units behind (increased from 10)
+            10,                      // 10 units above (increased from 6)
+            truckDirection.z * -20   // 20 units behind (increased from 10)
         );
         
         // Target position
         const targetPos = new THREE.Vector3().copy(this.truck.position).add(cameraOffset);
         
-        // Smooth camera movement
-        this.camera.position.lerp(targetPos, 0.1 * deltaTime);
+        // Smooth camera movement (reduced smoothing for initial view)
+        const lerpFactor = this.frameCount < 10 ? 0.5 : 0.1 * deltaTime;
+        this.camera.position.lerp(targetPos, lerpFactor);
         
         // Look at the truck, slightly above it
         const lookAtPos = new THREE.Vector3(
@@ -1121,6 +1207,12 @@ class Game {
             this.truck.position.z
         );
         this.camera.lookAt(lookAtPos);
+        
+        // Debug camera position
+        if (this.frameCount % 100 === 0) {
+            console.log(`Camera position: ${JSON.stringify(this.camera.position)}`);
+            console.log(`Looking at: ${JSON.stringify(lookAtPos)}`);
+        }
     }
     
     // Add collision detection and handling to the Game class
@@ -5887,25 +5979,106 @@ class Game {
     
     // Main animation loop
     animate() {
-        if (this.isInitialized) {
-            // Call update with a fixed delta time for consistent physics
-            this.update(1);
+        try {
+            // Increment frame counter for debugging and timing
+            this.frameCount = (this.frameCount || 0) + 1;
             
-            // Render the scene
-            if (this.renderer && this.scene && this.camera) {
-                this.renderer.render(this.scene, this.camera);
+            if (this.isInitialized) {
+                // Call update with a fixed delta time for consistent physics
+                this.update(1);
+                
+                // Check if scene has any children
+                if (this.scene && this.scene.children.length === 0 && this.frameCount % 100 === 0) {
+                    console.error("WARNING: Scene has no children to render!");
+                }
+                
+                // Check if camera is properly positioned
+                if (this.camera && this.camera.position.length() < 0.1) {
+                    console.warn("Camera too close to origin, repositioning");
+                    this.camera.position.set(0, 10, 20);
+                    this.camera.lookAt(0, 0, 0);
+                }
+                
+                // Ensure truck is present and visible
+                if (this.truck && this.frameCount === 10) {
+                    console.log("Verifying truck position:", this.truck.position.toArray());
+                    if (this.truck.position.length() < 0.1) {
+                        console.warn("Truck too close to origin, repositioning");
+                        this.truck.position.set(0, 0.5, 0);
+                    }
+                }
+                
+                // Render the scene
+                if (this.renderer && this.scene && this.camera) {
+                    // Check WebGL context is still valid
+                    if (this.renderer.getContext()) {
+                        this.renderer.render(this.scene, this.camera);
+                    } else {
+                        console.error("WebGL context lost - attempting to reinitialize renderer");
+                        const canvas = document.getElementById('game');
+                        if (canvas) {
+                            this.renderer = new THREE.WebGLRenderer({ 
+                                canvas: canvas,
+                                antialias: true,
+                                alpha: true
+                            });
+                            this.renderer.setSize(window.innerWidth, window.innerHeight);
+                            this.renderer.setPixelRatio(window.devicePixelRatio);
+                        }
+                    }
+                } else {
+                    console.error("Cannot render: missing renderer, scene, or camera");
+                    
+                    // Try to recover missing pieces
+                    if (!this.renderer) {
+                        console.log("Attempting to recreate renderer");
+                        const canvas = document.getElementById('game');
+                        if (canvas) {
+                            this.renderer = new THREE.WebGLRenderer({ 
+                                canvas: canvas,
+                                antialias: true
+                            });
+                            this.renderer.setSize(window.innerWidth, window.innerHeight);
+                        }
+                    }
+                    
+                    if (!this.scene) {
+                        console.log("Attempting to recreate scene");
+                        this.scene = new THREE.Scene();
+                        
+                        // Create a basic grid to see if rendering works
+                        const gridHelper = new THREE.GridHelper(400, 50, 0xff00ff, 0x00ffff);
+                        this.scene.add(gridHelper);
+                    }
+                    
+                    if (!this.camera) {
+                        console.log("Attempting to recreate camera");
+                        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+                        this.camera.position.set(0, 10, 20);
+                        this.camera.lookAt(0, 0, 0);
+                    }
+                }
+                
+                // Debug mode logs - limit frequency to avoid console spam
+                if (this.debugMode && this.frameCount % 100 === 0) {
+                    this.debugGameState();
+                }
             } else {
-                console.error("Cannot render: missing renderer, scene, or camera");
+                // If not initialized, check if we need to force initialization
+                if (this.frameCount > 50 && !this.isInitialized) {
+                    console.warn("Game not initialized after 50 frames, forcing initialization");
+                    this.init();
+                }
             }
             
-            // Debug mode logs - limit frequency to avoid console spam
-            if (this.debugMode && this.frameCount % 100 === 0) {
-                this.debugGameState();
-            }
+            // Continue the animation loop
+            requestAnimationFrame(() => this.animate());
+        } catch (error) {
+            console.error("Error in animation loop:", error);
+            
+            // Try to continue animation loop despite error
+            requestAnimationFrame(() => this.animate());
         }
-        
-        // Continue the animation loop
-        requestAnimationFrame(() => this.animate());
     }
 }
 
