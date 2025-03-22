@@ -227,17 +227,47 @@ class Turret {
             }
         }
 
-        // Rotate to face player
+        // Calculate direction to player
         const direction = new THREE.Vector3()
             .subVectors(playerPosition, this.base.position)
             .normalize();
-        this.base.rotation.y = Math.atan2(direction.x, direction.z);
+        
+        // Calculate target rotation (angle in Y-axis)
+        const targetRotation = Math.atan2(direction.x, direction.z);
+        
+        // Get current rotation as angle
+        let currentRotation = this.base.rotation.y;
+        
+        // Normalize angles to -PI to PI range
+        while (currentRotation > Math.PI) currentRotation -= Math.PI * 2;
+        while (currentRotation < -Math.PI) currentRotation += Math.PI * 2;
+        
+        // Calculate shortest rotation direction
+        let deltaRotation = targetRotation - currentRotation;
+        
+        // Ensure we rotate the shortest way
+        if (deltaRotation > Math.PI) deltaRotation -= Math.PI * 2;
+        if (deltaRotation < -Math.PI) deltaRotation += Math.PI * 2;
+        
+        // Apply rotation speed limit
+        const rotationSpeed = this.type.rotationSpeed || 0.01; // Default if not defined
+        
+        // Clamp rotation amount to maximum rotation speed
+        if (Math.abs(deltaRotation) > rotationSpeed) {
+            deltaRotation = Math.sign(deltaRotation) * rotationSpeed;
+        }
+        
+        // Apply rotation
+        this.base.rotation.y += deltaRotation;
 
         // Update shooting cooldown
         if (this.shootCooldown > 0) this.shootCooldown--;
         
-        // Shoot if possible
-        if (this.canShoot()) {
+        // Only shoot if facing close enough to the player
+        const facingPlayer = Math.abs(deltaRotation) < 0.1; // About 5.7 degrees
+        
+        // Shoot if possible and facing player
+        if (this.canShoot() && facingPlayer) {
             this.shoot(direction);
         }
         
@@ -1267,8 +1297,9 @@ class Game {
                 warningColor: 0xffff00,
                 health: 5,
                 damage: 10,
-                fireRate: 60, // 1 shot per second
-                projectileSpeed: 0.3
+                fireRate: 120, // 2 seconds between shots (was 60)
+                projectileSpeed: 0.3,
+                rotationSpeed: 0.015 // Slow rotation speed
             },
             {
                 name: "Heavy",
@@ -1277,8 +1308,9 @@ class Game {
                 warningColor: 0xbbbb00,
                 health: 8,
                 damage: 20,
-                fireRate: 120, // 1 shot per 2 seconds
-                projectileSpeed: 0.25
+                fireRate: 180, // 3 seconds between shots (was 120)
+                projectileSpeed: 0.25,
+                rotationSpeed: 0.008 // Very slow rotation for heavy turrets
             },
             {
                 name: "Rapid",
@@ -1287,8 +1319,9 @@ class Game {
                 warningColor: 0xffff33,
                 health: 3,
                 damage: 5,
-                fireRate: 30, // 2 shots per second
-                projectileSpeed: 0.35
+                fireRate: 90, // 1.5 seconds between shots (was 30)
+                projectileSpeed: 0.35,
+                rotationSpeed: 0.02 // Slightly faster rotation for rapid turrets
             }
         ];
         
