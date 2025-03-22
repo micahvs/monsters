@@ -356,14 +356,15 @@ class Game {
     }
 
     createArena() {
-        console.log("Creating simplified arena");
+        console.log("Creating larger arena with walls");
         
-        // Create a simple grid floor
-        const gridHelper = new THREE.GridHelper(100, 20, 0xff00ff, 0x00ffff);
+        // Create a simple grid floor - 200x200 for 4x larger area
+        const gridSize = 200;
+        const gridHelper = new THREE.GridHelper(gridSize, 40, 0xff00ff, 0x00ffff);
         this.scene.add(gridHelper);
         
         // Create a ground plane
-        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundGeometry = new THREE.PlaneGeometry(gridSize, gridSize);
         const groundMaterial = new THREE.MeshBasicMaterial({ 
             color: 0x220033,
             wireframe: true,
@@ -374,6 +375,12 @@ class Game {
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = 0.1;
         this.scene.add(ground);
+        
+        // Add bounding walls
+        this.createWalls(gridSize);
+        
+        // Create obstacles
+        this.createObstacles(gridSize);
     }
 
     createSimpleTruck() {
@@ -550,9 +557,74 @@ class Game {
             this.resetWheels();
         }
         
-        // Apply velocity in the truck's forward direction
-        this.truck.position.x += direction.x * this.truck.velocity;
-        this.truck.position.z += direction.z * this.truck.velocity;
+        // Calculate new position
+        const newPosition = new THREE.Vector3(
+            this.truck.position.x + direction.x * this.truck.velocity,
+            this.truck.position.y,
+            this.truck.position.z + direction.z * this.truck.velocity
+        );
+        
+        // Check for wall collisions before moving
+        if (this.walls) {
+            const truckSize = 2.5; // Half width/length of truck for collision
+            const wallHalfSize = this.walls.halfSize;
+            const wallThickness = this.walls.thickness;
+            
+            // Check X boundaries (East and West walls)
+            if (newPosition.x > wallHalfSize - truckSize) {
+                newPosition.x = wallHalfSize - truckSize;
+                this.truck.velocity *= 0.5; // Bounce effect
+            } else if (newPosition.x < -wallHalfSize + truckSize) {
+                newPosition.x = -wallHalfSize + truckSize;
+                this.truck.velocity *= 0.5; // Bounce effect
+            }
+            
+            // Check Z boundaries (North and South walls)
+            if (newPosition.z > wallHalfSize - truckSize) {
+                newPosition.z = wallHalfSize - truckSize;
+                this.truck.velocity *= 0.5; // Bounce effect
+            } else if (newPosition.z < -wallHalfSize + truckSize) {
+                newPosition.z = -wallHalfSize + truckSize;
+                this.truck.velocity *= 0.5; // Bounce effect
+            }
+        }
+        
+        // Check collisions with pillars/obstacles
+        if (this.obstacles && this.obstacles.length > 0) {
+            const truckRadius = 2.5; // Approx radius of truck for collision
+            
+            for (const obstacle of this.obstacles) {
+                // Calculate distance between truck and obstacle center on the XZ plane
+                const truckPos2D = new THREE.Vector2(newPosition.x, newPosition.z);
+                const distance = truckPos2D.distanceTo(obstacle.position);
+                
+                // Check if collision occurs (sum of radii)
+                if (distance < (truckRadius + obstacle.radius)) {
+                    // Collision detected, calculate push vector
+                    const pushVector = new THREE.Vector2(
+                        truckPos2D.x - obstacle.position.x,
+                        truckPos2D.y - obstacle.position.y
+                    );
+                    
+                    // Normalize and scale to minimum separation distance
+                    pushVector.normalize();
+                    const separation = truckRadius + obstacle.radius;
+                    
+                    // Update position to avoid overlap
+                    newPosition.x = obstacle.position.x + pushVector.x * separation;
+                    newPosition.z = obstacle.position.y + pushVector.y * separation;
+                    
+                    // Reduce velocity (bounce effect)
+                    this.truck.velocity *= 0.4;
+                    
+                    // Break after first collision for simplicity
+                    break;
+                }
+            }
+        }
+        
+        // Apply final position
+        this.truck.position.copy(newPosition);
         
         // Animate wheels rolling based on speed
         this.animateWheelRoll(this.truck.velocity);
@@ -603,6 +675,104 @@ class Game {
         // Reset front wheel steering angle
         this.wheels[0].rotation.y = 0;
         this.wheels[1].rotation.y = 0;
+    }
+
+    createWalls(gridSize) {
+        const wallHeight = 10;
+        const wallThickness = 2;
+        const halfSize = gridSize / 2;
+        
+        // Common material for all walls
+        const wallMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff00ff,
+            emissive: 0x550055,
+            shininess: 30
+        });
+        
+        // North wall (positive Z)
+        const northWallGeometry = new THREE.BoxGeometry(gridSize + wallThickness * 2, wallHeight, wallThickness);
+        const northWall = new THREE.Mesh(northWallGeometry, wallMaterial);
+        northWall.position.set(0, wallHeight / 2, halfSize + wallThickness / 2);
+        this.scene.add(northWall);
+        
+        // South wall (negative Z)
+        const southWallGeometry = new THREE.BoxGeometry(gridSize + wallThickness * 2, wallHeight, wallThickness);
+        const southWall = new THREE.Mesh(southWallGeometry, wallMaterial);
+        southWall.position.set(0, wallHeight / 2, -halfSize - wallThickness / 2);
+        this.scene.add(southWall);
+        
+        // East wall (positive X)
+        const eastWallGeometry = new THREE.BoxGeometry(wallThickness, wallHeight, gridSize);
+        const eastWall = new THREE.Mesh(eastWallGeometry, wallMaterial);
+        eastWall.position.set(halfSize + wallThickness / 2, wallHeight / 2, 0);
+        this.scene.add(eastWall);
+        
+        // West wall (negative X)
+        const westWallGeometry = new THREE.BoxGeometry(wallThickness, wallHeight, gridSize);
+        const westWall = new THREE.Mesh(westWallGeometry, wallMaterial);
+        westWall.position.set(-halfSize - wallThickness / 2, wallHeight / 2, 0);
+        this.scene.add(westWall);
+        
+        // Store wall references for collision detection
+        this.walls = {
+            north: northWall,
+            south: southWall,
+            east: eastWall,
+            west: westWall,
+            size: gridSize,
+            halfSize: halfSize,
+            thickness: wallThickness
+        };
+    }
+
+    createObstacles(gridSize) {
+        const halfSize = gridSize / 2;
+        
+        // Create pillars as obstacles around the arena
+        const pillarGeometry = new THREE.CylinderGeometry(3, 3, 15, 16);
+        const pillarMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ffff,
+            emissive: 0x005555,
+            shininess: 50
+        });
+        
+        // Create array for obstacles
+        this.obstacles = [];
+        
+        // Add several pillars in various locations
+        const pillarPositions = [
+            // Outer ring
+            { x: halfSize * 0.8, z: 0 },
+            { x: -halfSize * 0.8, z: 0 },
+            { x: 0, z: halfSize * 0.8 },
+            { x: 0, z: -halfSize * 0.8 },
+            
+            // Inner obstacles
+            { x: halfSize * 0.4, z: halfSize * 0.4 },
+            { x: -halfSize * 0.4, z: halfSize * 0.4 },
+            { x: halfSize * 0.4, z: -halfSize * 0.4 },
+            { x: -halfSize * 0.4, z: -halfSize * 0.4 },
+            
+            // Random additional pillars
+            { x: halfSize * 0.2, z: halfSize * 0.6 },
+            { x: -halfSize * 0.2, z: -halfSize * 0.6 },
+            { x: halfSize * 0.6, z: -halfSize * 0.2 },
+            { x: -halfSize * 0.6, z: halfSize * 0.2 }
+        ];
+        
+        // Create all the pillars
+        pillarPositions.forEach(pos => {
+            const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+            pillar.position.set(pos.x, 7.5, pos.z); // Half height is 7.5
+            this.scene.add(pillar);
+            
+            // Store for collision detection
+            this.obstacles.push({
+                mesh: pillar,
+                position: new THREE.Vector2(pos.x, pos.z),
+                radius: 3 // Radius of the pillar
+            });
+        });
     }
 }
 
