@@ -1,5 +1,17 @@
+// Print diagnostic info to help debug module loading
+console.log("Main.js loading...");
+console.log("Module meta information:", import.meta);
+
 // Import THREE.js using ES modules (from importmap)
 import * as THREE from 'three';
+console.log("THREE.js imported:", THREE);
+
+// Check if THREE was loaded properly
+if (!THREE || !THREE.Scene) {
+    console.error("THREE.js did not load properly! Scene class is missing.");
+} else {
+    console.log("THREE.js Scene class found:", THREE.Scene);
+}
 
 import { MonsterTruck } from './MonsterTruck.js'
 import { World } from './World.js'
@@ -204,38 +216,142 @@ class Game {
 
     init() {
         try {
+            console.log("Starting game initialization...");
+            
             // Initialize renderer
-            this.renderer = new THREE.WebGLRenderer({ antialias: true });
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(this.renderer.domElement);
+            console.log("Creating WebGL renderer...");
+            try {
+                // Get the canvas element
+                const canvas = document.getElementById('game');
+                console.log("Canvas element found:", canvas);
+                
+                // If canvas not found, create one
+                if (!canvas) {
+                    console.warn("Canvas element not found! Creating a new one.");
+                    const newCanvas = document.createElement('canvas');
+                    newCanvas.id = 'game';
+                    newCanvas.style.width = '100%';
+                    newCanvas.style.height = '100%';
+                    newCanvas.style.display = 'block';
+                    document.body.appendChild(newCanvas);
+                    
+                    this.renderer = new THREE.WebGLRenderer({ 
+                        antialias: true,
+                        canvas: newCanvas
+                    });
+                } else {
+                    this.renderer = new THREE.WebGLRenderer({ 
+                        antialias: true,
+                        canvas: canvas
+                    });
+                }
+                
+                console.log("Renderer created successfully:", this.renderer);
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            } catch (rendererError) {
+                console.error("Failed to create renderer:", rendererError);
+                throw rendererError;
+            }
             
             // Set up camera
-            this.camera.position.set(0, 10, 20);
-            this.camera.lookAt(0, 0, 0);
+            console.log("Setting up camera...");
+            try {
+                this.camera.position.set(0, 10, 20);
+                this.camera.lookAt(0, 0, 0);
+                console.log("Camera configured successfully:", this.camera);
+            } catch (cameraError) {
+                console.error("Failed to configure camera:", cameraError);
+                throw cameraError;
+            }
             
             // Add basic lighting
-            const ambientLight = new THREE.AmbientLight(0x404040);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            directionalLight.position.set(1, 1, 1);
-            this.scene.add(ambientLight, directionalLight);
+            console.log("Adding lighting...");
+            try {
+                const ambientLight = new THREE.AmbientLight(0x404040);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+                directionalLight.position.set(1, 1, 1);
+                this.scene.add(ambientLight, directionalLight);
+                console.log("Lighting added successfully");
+            } catch (lightingError) {
+                console.error("Failed to add lighting:", lightingError);
+                throw lightingError;
+            }
             
             // Create arena and truck
-            this.createArena();
-            this.createSimpleTruck();
+            console.log("Creating arena...");
+            try {
+                this.createArena();
+                console.log("Arena created successfully");
+            } catch (arenaError) {
+                console.error("Failed to create arena:", arenaError);
+                throw arenaError;
+            }
+            
+            console.log("Creating truck...");
+            try {
+                this.createSimpleTruck();
+                console.log("Truck created successfully");
+            } catch (truckError) {
+                console.error("Failed to create truck:", truckError);
+                throw truckError;
+            }
             
             // Set up controls
-            this.setupControls();
+            console.log("Setting up controls...");
+            try {
+                this.setupControls();
+                console.log("Controls set up successfully");
+            } catch (controlsError) {
+                console.error("Failed to set up controls:", controlsError);
+                throw controlsError;
+            }
             
             // Initialize HUD
-            this.initHUD();
+            console.log("Initializing HUD...");
+            try {
+                this.initHUD();
+                console.log("HUD initialized successfully");
+            } catch (hudError) {
+                console.error("Failed to initialize HUD:", hudError);
+                throw hudError;
+            }
+            
+            // Remove loading screen
+            console.log("Removing loading screen...");
+            try {
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                    console.log("Loading screen removed");
+                } else {
+                    console.warn("Loading screen element not found");
+                }
+            } catch (loadingError) {
+                console.error("Failed to remove loading screen:", loadingError);
+                // Don't throw, this is not critical
+            }
             
             // Start animation loop
+            console.log("Starting animation loop...");
             this.isInitialized = true;
             console.log("Game initialized successfully");
             this.animate();
             
         } catch (error) {
-            console.error("Error in game initialization:", error);
+            console.error("Critical error in game initialization:", error);
+            // Show error message on screen
+            try {
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    const loadingText = loadingScreen.querySelector('.loading-text');
+                    if (loadingText) {
+                        loadingText.innerHTML = `ERROR: ${error.message}<br>Check console for details`;
+                        loadingText.style.color = 'red';
+                    }
+                }
+            } catch (e) {
+                console.error("Couldn't display error message:", e);
+            }
         }
     }
 
