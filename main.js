@@ -25,8 +25,21 @@ function updateAudio(position) {
     // ... existing code ...
     
     // Validate values before updating audio parameters
+    if (!audioParam || !audioContext) {
+        console.warn('Invalid audio parameters: audioParam or audioContext is null');
+        return;
+    }
+    
+    // Validate value and duration parameters
     const safeValue = Number.isFinite(value) ? value : 0;
-    audioParam.linearRampToValueAtTime(safeValue, audioContext.currentTime + duration);
+    const safeDuration = Number.isFinite(duration) ? duration : 0.1; // Default small duration
+    
+    // Use safe values for the audio update
+    try {
+        audioParam.linearRampToValueAtTime(safeValue, audioContext.currentTime + safeDuration);
+    } catch (error) {
+        console.error('Error updating audio parameter:', error);
+    }
     
     // ... existing code ...
 }

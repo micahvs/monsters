@@ -642,16 +642,27 @@ export class MonsterTruck {
             Math.cos(this.rotation)
         );
         
-        // VALIDATION: Check for NaN values
+        // VALIDATION: Check for NaN values in direction and speed
         if (isNaN(direction.x) || isNaN(direction.z) || isNaN(this.speed)) {
             console.warn("NaN values detected in movement calculation! Resetting values.");
             direction.set(0, 0, 1);
             this.speed = 0;
+            
+            // Call resetMovementState to ensure all motion variables are reset
+            if (typeof this.resetMovementState === 'function') {
+                this.resetMovementState();
+            } else {
+                // Fallback if resetMovementState is not available
+                this.velocity = this.velocity || new THREE.Vector3(0, 0, 0);
+                this.acceleration = this.acceleration || new THREE.Vector3(0, 0, 0);
+                this.velocity.set(0, 0, 0);
+                this.acceleration.set(0, 0, 0);
+            }
         }
         
-        // Update velocity with grip factor
-        this.velocity.x = direction.x * this.speed;
-        this.velocity.z = direction.z * this.speed;
+        // Update velocity with grip factor - ensure finite values
+        this.velocity.x = Number.isFinite(direction.x * this.speed) ? direction.x * this.speed : 0;
+        this.velocity.z = Number.isFinite(direction.z * this.speed) ? direction.z * this.speed : 0;
         
         // VALIDATION: Check for NaN values in velocity
         if (isNaN(this.velocity.x) || isNaN(this.velocity.z)) {

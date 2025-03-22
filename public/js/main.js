@@ -6144,6 +6144,23 @@ class Game {
                     this.camera.lookAt(0, 0, 0);
                 }
                 
+                // Validate camera matrix before rendering
+                if (this.camera && this.camera.matrixWorld) {
+                    const elements = this.camera.matrixWorld.elements;
+                    let hasInvalidValues = false;
+                    for (let i = 0; i < elements.length; i++) {
+                        if (!Number.isFinite(elements[i])) {
+                            elements[i] = 0;
+                            hasInvalidValues = true;
+                        }
+                    }
+                    if (hasInvalidValues) {
+                        console.warn("Invalid camera matrix detected, resetting to identity");
+                        this.camera.matrixWorld.identity();
+                        this.camera.matrixWorldNeedsUpdate = true;
+                    }
+                }
+                
                 // Ensure truck is present and visible
                 if (this.truck && this.frameCount === 10) {
                     console.log("Verifying truck position:", this.truck.position.toArray());
@@ -6160,6 +6177,11 @@ class Game {
                 if (this.renderer && this.scene && this.camera) {
                     // Check WebGL context is still valid
                     if (this.renderer.getContext()) {
+                        // Update audio listener position if needed
+                        if (this.soundManager) {
+                            this.soundManager.updateListenerPosition();
+                        }
+                        
                         this.renderer.render(this.scene, this.camera);
                     } else {
                         console.error("WebGL context lost - attempting to reinitialize renderer");
