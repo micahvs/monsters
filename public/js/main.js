@@ -355,6 +355,14 @@ class Game {
             // Initialize sound manager after WebGL context is set up
             console.log("Initializing sound manager...")
             try {
+                // Ensure camera has a valid matrixWorld
+                if (!this.camera.matrixWorld || isNaN(this.camera.matrixWorld.elements[0])) {
+                    console.log("Initializing camera matrixWorld for sound manager");
+                    this.camera.matrixWorld = new THREE.Matrix4();
+                    this.camera.matrixWorldNeedsUpdate = true;
+                    this.camera.updateMatrixWorld();
+                }
+                
                 this.soundManager = new SoundManager(this.camera);
                 
                 // Expose sound manager globally for UI controls

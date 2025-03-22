@@ -26,12 +26,16 @@ export class SoundManager {
                 setTimeout(() => {
                     try {
                         if (this.camera && this.listener) {
-                            // Check if camera is properly initialized
-                            if (this.camera.matrixWorld && !isNaN(this.camera.matrixWorld.elements[0])) {
+                            // Enhanced camera initialization check
+                            const isValidMatrix = this.camera.matrixWorld && 
+                                                 this.camera.matrixWorld.elements && 
+                                                 !isNaN(this.camera.matrixWorld.elements[0]);
+                            
+                            if (isValidMatrix) {
                                 this.camera.add(this.listener);
-                                console.log('Audio listener attached to camera');
+                                console.log('Audio listener successfully attached to camera');
                             } else {
-                                console.warn('Camera not fully initialized, falling back to HTML5 Audio');
+                                console.warn('Camera matrix not valid yet - falling back to HTML5 Audio. This is normal during initialization and is handled automatically.');
                                 this.useFallbackAudio = true;
                             }
                         }
