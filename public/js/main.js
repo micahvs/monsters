@@ -132,11 +132,24 @@ class Projectile {
 }
 
 class Turret {
-    constructor(position, scene) {
-        // Create turret base
-        const baseGeometry = new THREE.CylinderGeometry(1, 1, 1, 8);
+    constructor(position, scene, type = {
+        name: "Standard",
+        color: 0x666666,
+        activeColor: 0xff0000,
+        warningColor: 0xffff00,
+        health: 5,
+        damage: 10,
+        fireRate: 60,
+        projectileSpeed: 0.3
+    }) {
+        // Save type
+        this.type = type;
+        
+        // Create turret base - adjust size based on type
+        const baseScale = type.name === "Heavy" ? 1.3 : (type.name === "Rapid" ? 0.8 : 1);
+        const baseGeometry = new THREE.CylinderGeometry(1 * baseScale, 1 * baseScale, 1, 8);
         const baseMaterial = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color(0xff0000),
+            color: new THREE.Color(type.color),
             shininess: 30
         })
         this.base = new THREE.Mesh(baseGeometry, baseMaterial);
@@ -145,10 +158,22 @@ class Turret {
         // Set the height correctly
         this.base.position.y = 0.5;
 
-        // Create turret gun
-        const gunGeometry = new THREE.BoxGeometry(0.3, 0.3, 2);
+        // Create turret gun - adjust shape based on type
+        let gunGeometry;
+        
+        if (type.name === "Heavy") {
+            // Larger, shorter gun for heavy turret
+            gunGeometry = new THREE.BoxGeometry(0.4, 0.4, 1.5);
+        } else if (type.name === "Rapid") {
+            // Thinner, longer gun for rapid turret
+            gunGeometry = new THREE.BoxGeometry(0.2, 0.2, 2.2);
+        } else {
+            // Standard gun
+            gunGeometry = new THREE.BoxGeometry(0.3, 0.3, 2);
+        }
+        
         const gunMaterial = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color(0x666666),
+            color: new THREE.Color(type.color),
             shininess: 30
         })
         this.gun = new THREE.Mesh(gunGeometry, gunMaterial);
@@ -156,11 +181,13 @@ class Turret {
         this.gun.position.z = 0.5;
         this.base.add(this.gun);
 
-        this.health = 5;
+        this.health = type.health;
         this.shootCooldown = 0;
-        this.maxShootCooldown = 60; // Cooldown between shots (60 frames = ~1 second)
+        this.maxShootCooldown = type.fireRate; // Cooldown between shots (60 frames = ~1 second)
         this.alive = true;
         this.scene = scene;
+        this.activated = false;
+        this.activationDelay = 180; // Default delay (3 seconds)
         
         // Add turret to scene
         scene.add(this.base);
@@ -171,6 +198,34 @@ class Turret {
 
     update(playerPosition) {
         if (!this.alive) return;
+        
+        // Handle activation delay
+        if (!this.activated) {
+            if (this.activationDelay > 0) {
+                this.activationDelay--;
+                
+                // Change color to yellow when about to activate (last second)
+                if (this.activationDelay < 60) {
+                    this.base.material.color.setHex(this.type.warningColor);
+                    
+                    // Create pulsing effect
+                    if (this.activationDelay % 10 === 0) {
+                        // Flash between yellow and orange
+                        const color = this.activationDelay % 20 === 0 ? this.type.warningColor : 0xff8800;
+                        this.base.material.color.setHex(color);
+                    }
+                }
+                
+                return; // Don't do anything until activated
+            } else {
+                // Activate the turret
+                this.activated = true;
+                this.base.material.color.setHex(this.type.activeColor); // Change to active color
+                
+                // Randomize initial cooldown to prevent all turrets from firing at once
+                this.shootCooldown = Math.floor(Math.random() * this.maxShootCooldown);
+            }
+        }
 
         // Rotate to face player
         const direction = new THREE.Vector3()
@@ -191,6 +246,19 @@ class Turret {
     }
     
     shoot(direction) {
+        // Add slight randomness to aiming (imperfect aim)
+        const randomSpread = 0.1; // Max 0.1 radians spread (about 5.7 degrees)
+        const randomX = (Math.random() * 2 - 1) * randomSpread;
+        const randomY = (Math.random() * 2 - 1) * randomSpread * 0.5; // Less vertical spread
+        const randomZ = (Math.random() * 2 - 1) * randomSpread;
+        
+        // Apply randomness to direction
+        const shootDir = direction.clone();
+        shootDir.x += randomX;
+        shootDir.y += randomY; 
+        shootDir.z += randomZ;
+        shootDir.normalize();
+        
         // Calculate position at the end of the gun
         const gunTip = new THREE.Vector3(0, 0, 1.5);
         // Transform to world coordinates
@@ -199,9 +267,9 @@ class Turret {
         // Create projectile
         const projectile = new Projectile(
             gunTip, 
-            direction, 
-            0.3, // speed
-            10,  // damage
+            shootDir, 
+            this.type.projectileSpeed, // speed
+            this.type.damage,  // damage
             'turret' // source
         );
         
@@ -242,7 +310,7 @@ class Turret {
     }
 
     canShoot() {
-        return this.alive && this.shootCooldown <= 0;
+        return this.alive && this.activated && this.shootCooldown <= 0;
     }
     
     getProjectiles() {
@@ -1185,30 +1253,96 @@ class Game {
     }
 
     createTurrets() {
-        // Create several turrets at fixed positions in the arena
-        const turretPositions = [
-            new THREE.Vector3(20, 0, 20),
-            new THREE.Vector3(-20, 0, 20),
-            new THREE.Vector3(20, 0, -20),
-            new THREE.Vector3(-20, 0, -20),
-            new THREE.Vector3(0, 0, 30)
+        // Create turrets at random positions in the arena
+        const arenaSize = 100; // Assuming arena is 100x100
+        const minDistanceFromCenter = 30; // Minimum distance from center
+        const numTurrets = 8; // Number of turrets to create
+        
+        // Define turret types
+        const turretTypes = [
+            {
+                name: "Standard",
+                color: 0x666666,
+                activeColor: 0xff0000,
+                warningColor: 0xffff00,
+                health: 5,
+                damage: 10,
+                fireRate: 60, // 1 shot per second
+                projectileSpeed: 0.3
+            },
+            {
+                name: "Heavy",
+                color: 0x444444,
+                activeColor: 0xbb0000,
+                warningColor: 0xbbbb00,
+                health: 8,
+                damage: 20,
+                fireRate: 120, // 1 shot per 2 seconds
+                projectileSpeed: 0.25
+            },
+            {
+                name: "Rapid",
+                color: 0x888888,
+                activeColor: 0xff3333,
+                warningColor: 0xffff33,
+                health: 3,
+                damage: 5,
+                fireRate: 30, // 2 shots per second
+                projectileSpeed: 0.35
+            }
         ];
         
-        for (const position of turretPositions) {
-            const turret = new Turret(position, this.scene);
+        for (let i = 0; i < numTurrets; i++) {
+            // Generate random position, ensuring it's not too close to center
+            let x, z;
+            do {
+                x = (Math.random() * 2 - 1) * arenaSize/2;
+                z = (Math.random() * 2 - 1) * arenaSize/2;
+            } while (Math.sqrt(x*x + z*z) < minDistanceFromCenter);
+            
+            const position = new THREE.Vector3(x, 0, z);
+            
+            // Select random turret type
+            const typeIndex = Math.floor(Math.random() * turretTypes.length);
+            const turretType = turretTypes[typeIndex];
+            
+            // Create turret with type
+            const turret = new Turret(position, this.scene, turretType);
+            
+            // Add random activation delay (2-7 seconds)
+            turret.activationDelay = Math.floor(Math.random() * 300) + 120; // 120-420 frames (2-7 seconds)
+            
             this.turrets.push(turret);
         }
     }
 
     updateTurrets() {
+        // Track if any turrets activated this frame
+        let newActivations = 0;
+        
         // Update each turret
         for (let i = 0; i < this.turrets.length; i++) {
             const turret = this.turrets[i];
+            
+            // Check if turret is about to activate
+            const wasActive = turret.activated;
             
             // Pass player position
             if (this.truck) {
                 turret.update(this.truck.position);
             }
+            
+            // Check if turret just activated
+            if (!wasActive && turret.activated) {
+                newActivations++;
+            }
+        }
+        
+        // Show notification if turrets activated
+        if (newActivations === 1) {
+            this.showNotification("Warning: Turret activated!", 2000);
+        } else if (newActivations > 1) {
+            this.showNotification(`Warning: ${newActivations} turrets activated!`, 2000);
         }
     }
     
@@ -1291,14 +1425,24 @@ class Game {
                     
                     // If turret is destroyed, give player points
                     if (!turret.alive) {
-                        // Add score or other rewards
-                        this.score += 100;
+                        // Add score based on turret type
+                        let scoreValue = 100; // Default score
+                        
+                        // Bonus score for harder turrets
+                        if (turret.type.name === "Heavy") {
+                            scoreValue = 200;
+                        } else if (turret.type.name === "Rapid") {
+                            scoreValue = 150;
+                        }
+                        
+                        // Add score
+                        this.score += scoreValue;
                         if (this.scoreDisplay) {
                             this.scoreDisplay.textContent = `Score: ${this.score}`;
                         }
                         
-                        // Show notification
-                        this.showNotification("Turret destroyed! +100 points");
+                        // Show notification with appropriate message
+                        this.showNotification(`${turret.type.name} Turret destroyed! +${scoreValue} points`);
                     }
                 }
             }
