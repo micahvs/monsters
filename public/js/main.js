@@ -569,27 +569,63 @@ class Game {
             const truckSize = 2.5; // Half width/length of truck for collision
             const wallHalfSize = this.walls.halfSize;
             const wallThickness = this.walls.thickness;
+            let wallCollision = false;
             
             // Check X boundaries (East and West walls)
             if (newPosition.x > wallHalfSize - truckSize) {
+                // Save previous position to calculate bounce
+                const prevX = newPosition.x;
                 newPosition.x = wallHalfSize - truckSize;
-                this.truck.velocity *= 0.5; // Bounce effect
+                
+                // Reverse velocity with bounce factor (don't just reduce it)
+                this.truck.velocity *= -0.7; // Bounce with 70% of original speed in opposite direction
+                
+                // Mark collision for damage calculation
+                wallCollision = true;
             } else if (newPosition.x < -wallHalfSize + truckSize) {
+                // Save previous position to calculate bounce
+                const prevX = newPosition.x;
                 newPosition.x = -wallHalfSize + truckSize;
-                this.truck.velocity *= 0.5; // Bounce effect
+                
+                // Reverse velocity with bounce factor
+                this.truck.velocity *= -0.7; // Bounce with 70% of original speed in opposite direction
+                
+                // Mark collision for damage calculation
+                wallCollision = true;
             }
             
             // Check Z boundaries (North and South walls)
             if (newPosition.z > wallHalfSize - truckSize) {
+                // Save previous position to calculate bounce
+                const prevZ = newPosition.z;
                 newPosition.z = wallHalfSize - truckSize;
-                this.truck.velocity *= 0.5; // Bounce effect
+                
+                // Reverse velocity with bounce factor
+                this.truck.velocity *= -0.7; // Bounce with 70% of original speed in opposite direction
+                
+                // Mark collision for damage calculation
+                wallCollision = true;
             } else if (newPosition.z < -wallHalfSize + truckSize) {
+                // Save previous position to calculate bounce
+                const prevZ = newPosition.z;
                 newPosition.z = -wallHalfSize + truckSize;
-                this.truck.velocity *= 0.5; // Bounce effect
+                
+                // Reverse velocity with bounce factor
+                this.truck.velocity *= -0.7; // Bounce with 70% of original speed in opposite direction
+                
+                // Mark collision for damage calculation
+                wallCollision = true;
+            }
+            
+            // Apply damage on collision
+            if (wallCollision) {
+                this.applyCollisionDamage();
+                this.showCollisionEffect(newPosition);
             }
         }
         
         // Check collisions with pillars/obstacles
+        let obstacleCollision = false;
         if (this.obstacles && this.obstacles.length > 0) {
             const truckRadius = 2.5; // Approx radius of truck for collision
             
@@ -610,16 +646,32 @@ class Game {
                     pushVector.normalize();
                     const separation = truckRadius + obstacle.radius;
                     
+                    // Bounce direction calculation
+                    const dotProduct = 
+                        (direction.x * pushVector.x) + 
+                        (direction.z * pushVector.y);
+                    
                     // Update position to avoid overlap
                     newPosition.x = obstacle.position.x + pushVector.x * separation;
                     newPosition.z = obstacle.position.y + pushVector.y * separation;
                     
-                    // Reduce velocity (bounce effect)
-                    this.truck.velocity *= 0.4;
+                    // Apply bounce effect (reverse velocity component in the collision normal)
+                    this.truck.velocity *= -0.7; // Bounce with 70% of velocity in opposite direction
+                    
+                    // Set collision flag for damage
+                    obstacleCollision = true;
+                    
+                    // Create collision effect at the impact point
+                    this.showCollisionEffect(newPosition);
                     
                     // Break after first collision for simplicity
                     break;
                 }
+            }
+            
+            // Apply damage on obstacle collision
+            if (obstacleCollision) {
+                this.applyCollisionDamage();
             }
         }
         
@@ -773,6 +825,218 @@ class Game {
                 radius: 3 // Radius of the pillar
             });
         });
+    }
+
+    applyCollisionDamage() {
+        // Apply 25% damage to health
+        const damageAmount = Math.ceil(this.maxHealth * 0.25);
+        this.health = Math.max(0, this.health - damageAmount);
+        
+        console.log(`Collision damage applied: -${damageAmount}. Health now: ${this.health}`);
+        
+        // Update health display
+        const healthDiv = document.getElementById('health');
+        if (healthDiv) {
+            healthDiv.textContent = `Health: ${this.health}`;
+            
+            // Add visual feedback with red flash
+            healthDiv.style.color = 'red';
+            setTimeout(() => {
+                healthDiv.style.color = 'white';
+            }, 300);
+        }
+        
+        // Flash the screen red
+        this.flashScreen('rgba(255, 0, 0, 0.3)');
+        
+        // Check if health is depleted
+        if (this.health <= 0) {
+            this.gameOver();
+        }
+    }
+
+    showCollisionEffect(position) {
+        // Create particles for collision
+        const particleCount = 15;
+        const particles = [];
+        
+        for (let i = 0; i < particleCount; i++) {
+            // Create a particle
+            const size = Math.random() * 0.5 + 0.2;
+            const geometry = new THREE.SphereGeometry(size, 8, 8);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(geometry, material);
+            
+            // Position at collision point
+            particle.position.set(
+                position.x + (Math.random() - 0.5) * 2,
+                position.y + Math.random() * 3,
+                position.z + (Math.random() - 0.5) * 2
+            );
+            
+            // Add velocity
+            particle.userData = {
+                velocity: new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.3,
+                    Math.random() * 0.5,
+                    (Math.random() - 0.5) * 0.3
+                ),
+                life: 1.0
+            };
+            
+            this.scene.add(particle);
+            particles.push(particle);
+        }
+        
+        // Animate particles
+        const animateParticles = () => {
+            let allDead = true;
+            
+            for (let i = 0; i < particles.length; i++) {
+                const particle = particles[i];
+                
+                // Update position
+                particle.position.x += particle.userData.velocity.x;
+                particle.position.y += particle.userData.velocity.y;
+                particle.position.z += particle.userData.velocity.z;
+                
+                // Apply gravity
+                particle.userData.velocity.y -= 0.02;
+                
+                // Update life and opacity
+                particle.userData.life -= 0.02;
+                if (particle.material) {
+                    particle.material.opacity = particle.userData.life;
+                }
+                
+                // Check if still alive
+                if (particle.userData.life > 0) {
+                    allDead = false;
+                } else {
+                    // Remove dead particles
+                    this.scene.remove(particle);
+                }
+            }
+            
+            // Continue animation if particles are still alive
+            if (!allDead) {
+                requestAnimationFrame(animateParticles);
+            }
+        };
+        
+        // Start animation
+        animateParticles();
+        
+        // Shake camera for effect
+        this.shakeCamera(0.5);
+    }
+
+    flashScreen(color) {
+        // Create a fullscreen overlay for the flash effect
+        const flash = document.createElement('div');
+        flash.style.position = 'fixed';
+        flash.style.top = '0';
+        flash.style.left = '0';
+        flash.style.width = '100%';
+        flash.style.height = '100%';
+        flash.style.backgroundColor = color;
+        flash.style.pointerEvents = 'none';
+        flash.style.zIndex = '1000';
+        flash.style.opacity = '1';
+        flash.style.transition = 'opacity 0.3s ease-out';
+        
+        document.body.appendChild(flash);
+        
+        // Fade out and remove
+        setTimeout(() => {
+            flash.style.opacity = '0';
+            setTimeout(() => {
+                document.body.removeChild(flash);
+            }, 300);
+        }, 100);
+    }
+
+    shakeCamera(intensity) {
+        // Store original camera position
+        if (!this.cameraOriginalPosition) {
+            this.cameraOriginalPosition = this.camera.position.clone();
+        }
+        
+        // Apply random offset to camera
+        const shake = () => {
+            this.camera.position.x += (Math.random() - 0.5) * intensity;
+            this.camera.position.y += (Math.random() - 0.5) * intensity;
+            this.camera.position.z += (Math.random() - 0.5) * intensity;
+        };
+        
+        // Shake for a short time
+        let shakeCount = 0;
+        const maxShakes = 5;
+        
+        const shakeInterval = setInterval(() => {
+            shake();
+            shakeCount++;
+            
+            if (shakeCount >= maxShakes) {
+                clearInterval(shakeInterval);
+            }
+        }, 50);
+    }
+
+    gameOver() {
+        console.log("Game Over! Health depleted.");
+        
+        // Create game over screen
+        const gameOverDiv = document.createElement('div');
+        gameOverDiv.style.position = 'fixed';
+        gameOverDiv.style.top = '0';
+        gameOverDiv.style.left = '0';
+        gameOverDiv.style.width = '100%';
+        gameOverDiv.style.height = '100%';
+        gameOverDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        gameOverDiv.style.display = 'flex';
+        gameOverDiv.style.flexDirection = 'column';
+        gameOverDiv.style.justifyContent = 'center';
+        gameOverDiv.style.alignItems = 'center';
+        gameOverDiv.style.zIndex = '2000';
+        
+        // Add message
+        const gameOverText = document.createElement('h1');
+        gameOverText.textContent = 'GAME OVER';
+        gameOverText.style.color = '#ff00ff';
+        gameOverText.style.fontFamily = 'Arial, sans-serif';
+        gameOverText.style.fontSize = '48px';
+        gameOverText.style.textShadow = '0 0 10px #ff00ff';
+        gameOverDiv.appendChild(gameOverText);
+        
+        // Add restart button
+        const restartButton = document.createElement('button');
+        restartButton.textContent = 'RESTART';
+        restartButton.style.marginTop = '30px';
+        restartButton.style.padding = '10px 20px';
+        restartButton.style.fontSize = '24px';
+        restartButton.style.backgroundColor = '#ff00ff';
+        restartButton.style.color = 'white';
+        restartButton.style.border = 'none';
+        restartButton.style.borderRadius = '5px';
+        restartButton.style.cursor = 'pointer';
+        
+        restartButton.onclick = () => {
+            window.location.reload();
+        };
+        
+        gameOverDiv.appendChild(restartButton);
+        
+        // Add to document
+        document.body.appendChild(gameOverDiv);
+        
+        // Stop the game
+        this.isGameOver = true;
     }
 }
 

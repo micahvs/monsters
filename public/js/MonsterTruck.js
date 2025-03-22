@@ -25,6 +25,8 @@ export class MonsterTruck {
         this.maxSpeed = this.getMaxSpeedForMachine(machineType);
         this.acceleration = this.getAccelerationForMachine(machineType);
         this.turnSpeed = this.getTurnSpeedForMachine(machineType);
+        this.brakingForce = this.getBrakingForceForMachine(machineType);
+        this.deceleration = this.getDecelerationForMachine(machineType);
         
         // Validate position before creating truck
         if (!position || isNaN(position.x) || isNaN(position.y) || isNaN(position.z)) {
@@ -60,6 +62,24 @@ export class MonsterTruck {
             'cyber-beast': 0.035
         };
         return turnSpeeds[machineType] || 0.03;
+    }
+    
+    getBrakingForceForMachine(machineType) {
+        const brakingForces = {
+            'grid-ripper': 0.03,
+            'neon-crusher': 0.04,
+            'cyber-beast': 0.025
+        };
+        return brakingForces[machineType] || 0.03;
+    }
+    
+    getDecelerationForMachine(machineType) {
+        const decelerations = {
+            'grid-ripper': 0.01,
+            'neon-crusher': 0.015,
+            'cyber-beast': 0.008
+        };
+        return decelerations[machineType] || 0.01;
     }
     
     getMaxHealthForMachine(machineType) {
@@ -615,6 +635,33 @@ export class MonsterTruck {
         }
     }
     
+    resetMovementState() {
+        this.velocity = this.velocity || new THREE.Vector3(0, 0, 0);
+        this.velocity.set(0, 0, 0);
+        this.speed = 0;
+        
+        // Reset rotation if it's NaN
+        if (isNaN(this.rotation)) {
+            this.rotation = 0;
+        }
+        
+        // Get the default values for this machine type
+        const machineType = this.config.machineType || 'grid-ripper';
+        
+        // Reset physics properties if they are NaN
+        if (isNaN(this.acceleration)) {
+            this.acceleration = this.getAccelerationForMachine(machineType);
+        }
+        
+        if (isNaN(this.brakingForce)) {
+            this.brakingForce = this.getBrakingForceForMachine(machineType);
+        }
+        
+        if (isNaN(this.deceleration)) {
+            this.deceleration = this.getDecelerationForMachine(machineType);
+        }
+    }
+    
     handleControls(accelerating, braking, turningLeft, turningRight) {
         // Acceleration and braking
         if (accelerating) {
@@ -646,36 +693,12 @@ export class MonsterTruck {
         if (isNaN(direction.x) || isNaN(direction.z) || isNaN(this.speed)) {
             console.warn("NaN values detected in movement calculation! Resetting values.");
             direction.set(0, 0, 1);
-            this.speed = 0;
-            
-            // Call resetMovementState to ensure all motion variables are reset
-            if (typeof this.resetMovementState === 'function') {
-                this.resetMovementState();
-            } else {
-                // Fallback if resetMovementState is not available
-                this.velocity = this.velocity || new THREE.Vector3(0, 0, 0);
-                this.velocity.set(0, 0, 0);
-                
-                // Check if acceleration is a number or object
-                if (typeof this.acceleration === 'number') {
-                    this.acceleration = 0.02; // Reset to default acceleration value
-                } else if (this.acceleration && typeof this.acceleration.set === 'function') {
-                    this.acceleration.set(0, 0, 0);
-                }
-                // Don't try to use acceleration.set if it's just a number
-            }
+            this.resetMovementState();
         }
         
-        // Update velocity with grip factor - ensure finite values
-        this.velocity.x = Number.isFinite(direction.x * this.speed) ? direction.x * this.speed : 0;
-        this.velocity.z = Number.isFinite(direction.z * this.speed) ? direction.z * this.speed : 0;
-        
-        // VALIDATION: Check for NaN values in velocity
-        if (isNaN(this.velocity.x) || isNaN(this.velocity.z)) {
-            console.warn("NaN values detected in velocity! Resetting values.");
-            this.velocity.set(0, 0, 0);
-            this.speed = 0;
-        }
+        // Update velocity based on direction and speed
+        this.velocity.x = direction.x * this.speed;
+        this.velocity.z = direction.z * this.speed;
         
         // Apply velocity to position
         this.body.position.add(this.velocity);
@@ -684,6 +707,7 @@ export class MonsterTruck {
         if (isNaN(this.body.position.x) || isNaN(this.body.position.y) || isNaN(this.body.position.z)) {
             console.warn("NaN values detected in truck position! Resetting position.");
             this.body.position.set(0, 0.5, 0);
+            this.resetMovementState();
         }
         
         // Update truck rotation
