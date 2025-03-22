@@ -3932,12 +3932,41 @@ class Game {
         // Set global multiplayer status flag
         window.isMultiplayerInitialized = false;
         
+        // Check if multiplayer is enabled in settings
+        this.isMultiplayerEnabled = localStorage.getItem('monsterTruckMultiplayer') === 'true';
+        
         if (!this.isMultiplayerEnabled) {
             console.log('Multiplayer disabled - running in single player mode')
             // Notify chat system that multiplayer is disabled
             if (window.addChatMessage && typeof window.addChatMessage === 'function') {
                 window.addChatMessage('System', 'Multiplayer disabled - running in single player mode')
             }
+            
+            // Show option to enable multiplayer
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                const enableButton = document.createElement('button');
+                enableButton.textContent = 'Enable Multiplayer';
+                enableButton.style.background = '#ff00ff';
+                enableButton.style.color = 'white';
+                enableButton.style.padding = '8px';
+                enableButton.style.margin = '8px';
+                enableButton.style.border = 'none';
+                enableButton.style.cursor = 'pointer';
+                enableButton.style.fontSize = '14px';
+                enableButton.style.fontFamily = "'Orbitron', sans-serif";
+                
+                enableButton.addEventListener('click', () => {
+                    localStorage.setItem('monsterTruckMultiplayer', 'true');
+                    if (window.addChatMessage) {
+                        window.addChatMessage('System', 'Multiplayer enabled! Refreshing game...');
+                    }
+                    setTimeout(() => window.location.reload(), 1500);
+                });
+                
+                chatContainer.insertBefore(enableButton, chatContainer.firstChild);
+            }
+            
             return;
         }
 
@@ -3947,68 +3976,113 @@ class Game {
             // Check if socket.io is loaded
             if (typeof io === 'undefined') {
                 console.error('Socket.io is not loaded! Cannot initialize multiplayer without socket.io.')
-                throw new Error('Socket.io not found - make sure socket.io is loaded before initializing multiplayer')
-            }
-            
-            // Direct initialization
-            this.multiplayer = new Multiplayer(this);
-            console.log('Multiplayer instance created successfully')
-            
-            // Set player name and color for chat
-            this.playerName = localStorage.getItem('monsterTruckNickname') || 'Player'
-            this.playerColor = localStorage.getItem('monsterTruckColor') || '#ff00ff'
-            console.log('Player info set for chat:', this.playerName, this.playerColor)
-            
-            // Verify socket connection with better retry logic
-            if (!this.multiplayer.socket) {
-                console.error('Socket not initialized in multiplayer instance')
-                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                    window.addChatMessage('System', 'Error: Socket not initialized. Chat may not work properly.')
-                }
-            } else {
-                // Set up connection timeout
-                const connectionTimeout = setTimeout(() => {
-                    if (!this.multiplayer.socket.connected) {
-                        console.warn('Socket connection timeout - retrying connection...')
-                        // Try to reconnect
-                        this.multiplayer.socket.connect();
-                        
-                        if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                            window.addChatMessage('System', 'Connection timeout. Attempting to reconnect...')
-                        }
+                this.loadSocketIO().then(() => {
+                    console.log('Socket.io loaded dynamically. Retrying multiplayer init...');
+                    this.initMultiplayerCore();
+                }).catch(error => {
+                    console.error('Failed to load Socket.io dynamically:', error);
+                    this.showMessage('Multiplayer initialization failed - playing in single player mode');
+                    if (window.addChatMessage) {
+                        window.addChatMessage('System', 'Error: Socket.io not found. Playing in single player mode.');
                     }
-                }, 5000);
+                });
                 
-                if (!this.multiplayer.socket.connected) {
-                    console.warn('Socket not connected yet - waiting for connection')
-                    if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                        window.addChatMessage('System', 'Connecting to multiplayer server...')
-                    }
-                    
-                    // Add a connection event listener to initialize chat when connected
-                    this.multiplayer.socket.on('connect', () => {
-                        clearTimeout(connectionTimeout);
-                        console.log('Socket connected - initializing chat listeners')
-                        window.isMultiplayerInitialized = true;
-                        if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                            window.addChatMessage('System', 'Connected to multiplayer server!')
-                        }
-                        this.initChatListeners();
-                    })
-                } else {
-                    console.log('Socket already connected - initializing chat listeners')
-                    window.isMultiplayerInitialized = true;
-                    if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                        window.addChatMessage('System', 'Connected to multiplayer server!')
-                    }
-                    this.initChatListeners();
-                }
+                return;
             }
+            
+            // Proceed with core multiplayer init
+            this.initMultiplayerCore();
+            
         } catch (error) {
             console.error('Failed to initialize multiplayer:', error)
             this.showMessage('Multiplayer initialization failed - playing in single player mode')
             if (window.addChatMessage && typeof window.addChatMessage === 'function') {
                 window.addChatMessage('System', 'Error: ' + error.message)
+            }
+        }
+    }
+    
+    // Load Socket.io dynamically if not present
+    loadSocketIO() {
+        return new Promise((resolve, reject) => {
+            console.log('Attempting to load Socket.io dynamically...');
+            
+            // Check if it's already loaded
+            if (typeof io !== 'undefined') {
+                return resolve();
+            }
+            
+            const script = document.createElement('script');
+            script.src = 'https://cdn.socket.io/4.5.4/socket.io.min.js';
+            script.async = true;
+            
+            script.onload = () => {
+                console.log('Socket.io loaded successfully!');
+                resolve();
+            };
+            
+            script.onerror = () => {
+                reject(new Error('Failed to load Socket.io script'));
+            };
+            
+            document.head.appendChild(script);
+        });
+    }
+    
+    // Core multiplayer initialization logic
+    initMultiplayerCore() {
+        // Direct initialization
+        this.multiplayer = new Multiplayer(this);
+        console.log('Multiplayer instance created successfully')
+        
+        // Set player name and color for chat
+        this.playerName = localStorage.getItem('monsterTruckNickname') || 'Player'
+        this.playerColor = localStorage.getItem('monsterTruckColor') || '#ff00ff'
+        console.log('Player info set for chat:', this.playerName, this.playerColor)
+        
+        // Verify socket connection with better retry logic
+        if (!this.multiplayer.socket) {
+            console.error('Socket not initialized in multiplayer instance')
+            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                window.addChatMessage('System', 'Error: Socket not initialized. Chat may not work properly.')
+            }
+        } else {
+            // Set up connection timeout
+            const connectionTimeout = setTimeout(() => {
+                if (!this.multiplayer.socket.connected) {
+                    console.warn('Socket connection timeout - retrying connection...')
+                    // Try to reconnect
+                    this.multiplayer.socket.connect();
+                    
+                    if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                        window.addChatMessage('System', 'Connection timeout. Attempting to reconnect...')
+                    }
+                }
+            }, 8000); // Increased timeout
+            
+            if (!this.multiplayer.socket.connected) {
+                console.warn('Socket not connected yet - waiting for connection')
+                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                    window.addChatMessage('System', 'Connecting to multiplayer server...')
+                }
+                
+                // Add a connection event listener to initialize chat when connected
+                this.multiplayer.socket.on('connect', () => {
+                    clearTimeout(connectionTimeout);
+                    console.log('Socket connected - initializing chat listeners')
+                    window.isMultiplayerInitialized = true;
+                    if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                        window.addChatMessage('System', 'Connected to multiplayer server!')
+                    }
+                    this.initChatListeners();
+                })
+            } else {
+                console.log('Socket already connected - initializing chat listeners')
+                window.isMultiplayerInitialized = true;
+                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                    window.addChatMessage('System', 'Connected to multiplayer server!')
+                }
+                this.initChatListeners();
             }
         }
     }

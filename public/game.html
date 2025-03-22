@@ -1005,7 +1005,25 @@
             function sendChatMessage() {
                 const message = chatInput.value.trim();
                 if (message) {
-                    // Don't add message to local chat immediately
+                    // Clear input first
+                    chatInput.value = '';
+                    
+                    // Check if we're in offline mode
+                    if (window.game && window.game.multiplayer && window.game.multiplayer.isOfflineMode) {
+                        console.log('Sending chat message in offline mode');
+                        
+                        // Add message to local chat - we're in offline mode
+                        addChatMessage('You', message);
+                        
+                        // Call offline handler if available
+                        if (window.game.multiplayer.offlineChatHandler && typeof window.game.multiplayer.offlineChatHandler === 'function') {
+                            window.game.multiplayer.offlineChatHandler(message);
+                        }
+                        
+                        return;
+                    }
+                    
+                    // Don't add message to local chat immediately for multiplayer
                     // We'll wait for the server to echo it back
                     console.log('Sending chat message, waiting for server echo:', message);
                     
@@ -1023,13 +1041,27 @@
                         if (!window.game.multiplayer.socket.connected) {
                             console.error('Socket is not connected when trying to send chat message from game.html');
                             addChatMessage('System', 'Error: Not connected to server. Message may not be delivered.');
+                            
+                            // Add message anyway so the player sees it
+                            addChatMessage('You', message);
                         }
                     } else {
                         console.error('Cannot send chat message: multiplayer not initialized');
-                        addChatMessage('System', 'Error: Multiplayer not initialized. Message not sent.');
+                        addChatMessage('System', 'Error: Multiplayer not initialized. Message sent in local mode only.');
                         
                         // In single player mode, just show the message locally
                         addChatMessage('You', message);
+                        
+                        // Provide a system response for better UX in single player
+                        setTimeout(() => {
+                            const responses = [
+                                "The server seems to be offline. Your message was displayed locally only.",
+                                "You're in single-player mode. Messages are local only.",
+                                "Try enabling multiplayer in the game settings!",
+                                "Echo: " + message
+                            ];
+                            addChatMessage('System', responses[Math.floor(Math.random() * responses.length)]);
+                        }, 500);
                         
                         // Check specific conditions to provide better error messages
                         if (!window.game) {
@@ -1042,9 +1074,6 @@
                             addChatMessage('System', 'Error: Waiting for multiplayer to initialize. Try again in a moment.');
                         }
                     }
-                    
-                    // Clear input
-                    chatInput.value = '';
                 }
             }
             
@@ -1073,6 +1102,15 @@
                 if (!window.game.multiplayer) {
                     console.log('Multiplayer not available yet, retrying in 1 second...');
                     if (chatStatus) chatStatus.classList.remove('online');
+                    
+                    // Check if multiplayer is disabled on purpose
+                    if (localStorage.getItem('monsterTruckMultiplayer') !== 'true') {
+                        if (window.addChatMessage) {
+                            window.addChatMessage('System', 'Multiplayer disabled in settings. Chat will work in single-player mode only.');
+                        }
+                        return; // Don't retry if multiplayer is intentionally disabled
+                    }
+                    
                     setTimeout(window.initChatSocketListeners, 1000);
                     return;
                 }
@@ -1086,10 +1124,44 @@
                 }
                 
                 console.log('All components available, setting up chat listeners');
-                if (chatStatus) chatStatus.classList.add('online');
                 
                 // Remove any existing listeners to prevent duplicates
                 window.game.multiplayer.socket.off('chat');
+                
+                // Check if we're in offline mode
+                if (window.game.multiplayer.isOfflineMode) {
+                    if (chatStatus) chatStatus.classList.remove('online');
+                    chatStatus.style.backgroundColor = 'orange'; // Show as offline but functional
+                    
+                    if (window.addChatMessage) {
+                        window.addChatMessage('System', 'Chat is in offline mode. Messages are local only.');
+                    }
+                    
+                    // Set up local chat handling
+                    if (window.game.multiplayer.offlineChatHandler) return; // Already set up
+                    
+                    window.game.multiplayer.offlineChatHandler = function(message) {
+                        if (window.addChatMessage) {
+                            window.addChatMessage('You', message);
+                            
+                            // Simulate a response in single player mode
+                            setTimeout(() => {
+                                const responses = [
+                                    "The server is currently offline. Try again later!",
+                                    "Echo: " + message,
+                                    "Your message was received but the server is in maintenance.",
+                                    "Single-player mode active. Multiplayer chat disabled."
+                                ];
+                                const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                                window.addChatMessage('System', randomResponse);
+                            }, 500);
+                        }
+                    };
+                    
+                    return;
+                }
+                
+                if (chatStatus) chatStatus.classList.add('online');
                 
                 // Listen for chat messages from server
                 window.game.multiplayer.socket.on('chat', function(chatData) {
