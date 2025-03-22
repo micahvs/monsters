@@ -256,8 +256,7 @@ export class MonsterTruck {
                 const bumperGeometry = new THREE.BoxGeometry(3.5 * this.scale, 0.8 * this.scale, 0.6 * this.scale);
                 const bumperMaterial = new THREE.MeshPhongMaterial({
                     color: 0x444444,
-                    shininess: 80,
-                    metalness: 0.8
+                    shininess: 80
                 });
                 const bumper = new THREE.Mesh(bumperGeometry, bumperMaterial);
                 bumper.position.set(0, -0.6 * this.scale, 2.5 * this.scale);
@@ -420,8 +419,7 @@ export class MonsterTruck {
                 const exhaustMaterial = new THREE.MeshPhongMaterial({
                     color: 0x333333,
                     emissive: 0x331111,
-                    shininess: 100,
-                    metalness: 0.8
+                    shininess: 100
                 });
                 
                 const leftExhaust = new THREE.Mesh(exhaustGeometry, exhaustMaterial);

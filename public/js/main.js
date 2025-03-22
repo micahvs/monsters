@@ -3867,34 +3867,50 @@ class Game {
             this.playerColor = localStorage.getItem('monsterTruckColor') || '#ff00ff'
             console.log('Player info set for chat:', this.playerName, this.playerColor)
             
-            // Verify socket connection
+            // Verify socket connection with better retry logic
             if (!this.multiplayer.socket) {
                 console.error('Socket not initialized in multiplayer instance')
                 if (window.addChatMessage && typeof window.addChatMessage === 'function') {
                     window.addChatMessage('System', 'Error: Socket not initialized. Chat may not work properly.')
                 }
-            } else if (!this.multiplayer.socket.connected) {
-                console.warn('Socket not connected yet - waiting for connection')
-                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                    window.addChatMessage('System', 'Connecting to multiplayer server...')
-                }
+            } else {
+                // Set up connection timeout
+                const connectionTimeout = setTimeout(() => {
+                    if (!this.multiplayer.socket.connected) {
+                        console.warn('Socket connection timeout - retrying connection...')
+                        // Try to reconnect
+                        this.multiplayer.socket.connect();
+                        
+                        if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                            window.addChatMessage('System', 'Connection timeout. Attempting to reconnect...')
+                        }
+                    }
+                }, 5000);
                 
-                // Add a connection event listener to initialize chat when connected
-                this.multiplayer.socket.on('connect', () => {
-                    console.log('Socket connected - initializing chat listeners')
+                if (!this.multiplayer.socket.connected) {
+                    console.warn('Socket not connected yet - waiting for connection')
+                    if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                        window.addChatMessage('System', 'Connecting to multiplayer server...')
+                    }
+                    
+                    // Add a connection event listener to initialize chat when connected
+                    this.multiplayer.socket.on('connect', () => {
+                        clearTimeout(connectionTimeout);
+                        console.log('Socket connected - initializing chat listeners')
+                        window.isMultiplayerInitialized = true;
+                        if (window.addChatMessage && typeof window.addChatMessage === 'function') {
+                            window.addChatMessage('System', 'Connected to multiplayer server!')
+                        }
+                        this.initChatListeners();
+                    })
+                } else {
+                    console.log('Socket already connected - initializing chat listeners')
                     window.isMultiplayerInitialized = true;
                     if (window.addChatMessage && typeof window.addChatMessage === 'function') {
                         window.addChatMessage('System', 'Connected to multiplayer server!')
                     }
                     this.initChatListeners();
-                })
-            } else {
-                console.log('Socket already connected - initializing chat listeners')
-                window.isMultiplayerInitialized = true;
-                if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                    window.addChatMessage('System', 'Connected to multiplayer server!')
                 }
-                this.initChatListeners();
             }
         } catch (error) {
             console.error('Failed to initialize multiplayer:', error)
@@ -5167,13 +5183,13 @@ class Game {
             // Debris pieces
             if (i < 60) {
                 const debrisGeometry = new THREE.TetrahedronGeometry(Math.random() * 0.5 + 0.2, 0);
-                const debrisMaterial = new THREE.MeshStandardMaterial({
+                const debrisMaterial = new THREE.MeshPhongMaterial({
                     color: 0x333333,
-                    roughness: 0.7,
-                    metalness: 0.2,
+                    shininess: 70,
+                    specular: 0x444444,
                     transparent: true,
                     opacity: 0
-                })
+                });
                 
                 const debris = new THREE.Mesh(debrisGeometry, debrisMaterial);
                 debris.visible = false;
