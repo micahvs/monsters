@@ -172,18 +172,14 @@ class Turret {
 
 class Game {
     constructor() {
-        console.log("Game constructor called")
+        console.log("Game constructor called");
         
         // Core initialization only
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
         this.renderer = null;
         this.truck = null;
-        this.multiplayer = null;
         this.isInitialized = false;
-        this.debugMode = true;
-        this.isGameOver = false;
-        this.frameCount = 0;
         
         // Essential controls only
         this.keys = {
@@ -197,15 +193,16 @@ class Game {
         
         // Core game state
         this.score = 0;
-        this.projectiles = [];
+        this.health = 100;
+        this.maxHealth = 100;
         
         // Initialize the game
         this.init();
     }
 
-    async init() {
+    init() {
         try {
-            // Initialize renderer first
+            // Initialize renderer
             this.renderer = new THREE.WebGLRenderer({ antialias: true });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(this.renderer.domElement);
@@ -221,8 +218,8 @@ class Game {
             this.scene.add(ambientLight, directionalLight);
             
             // Create arena and truck
-            await this.createArena();
-            await this.createSimpleTruck();
+            this.createArena();
+            this.createSimpleTruck();
             
             // Set up controls
             this.setupControls();
@@ -230,171 +227,16 @@ class Game {
             // Initialize HUD
             this.initHUD();
             
-            // Initialize particle pool
-            this.initializeParticlePools();
-            
             // Start animation loop
-            this.animate();
-            
             this.isInitialized = true;
             console.log("Game initialized successfully");
+            this.animate();
             
         } catch (error) {
             console.error("Error in game initialization:", error);
-            // Attempt to recover
-            this.handleInitError(error);
         }
     }
 
-    handleInitError(error) {
-        console.error("Initialization error:", error);
-        
-        // Clean up any partially initialized resources
-        if (this.renderer) {
-            this.renderer.dispose();
-        }
-        
-        // Reset game state
-        this.isInitialized = false;
-        this.isGameOver = false;
-        
-        // Show error message to user
-        const errorDiv = document.createElement('div');
-        errorDiv.style.position = 'fixed';
-        errorDiv.style.top = '50%';
-        errorDiv.style.left = '50%';
-        errorDiv.style.transform = 'translate(-50%, -50%)';
-        errorDiv.style.color = 'red';
-        errorDiv.style.fontSize = '24px';
-        errorDiv.textContent = 'Failed to initialize game. Please refresh the page.';
-        document.body.appendChild(errorDiv);
-        
-        // Attempt to reinitialize after a delay
-        setTimeout(() => {
-            errorDiv.remove();
-            this.init();
-        }, 5000);
-    }
-
-    // Simplified particle system
-    createParticlePool(size = 100) {
-        const pool = [];
-        const geometry = new THREE.BufferGeometry();
-        const material = new THREE.PointsMaterial({
-            size: 0.1,
-            transparent: true,
-            opacity: 0.6
-        });
-        
-        for (let i = 0; i < size; i++) {
-            pool.push({
-                position: new THREE.Vector3(),
-                velocity: new THREE.Vector3(),
-                life: 0,
-                active: false
-            });
-        }
-        
-        return {
-            pool,
-            geometry,
-            material,
-            points: new THREE.Points(geometry, material)
-        };
-    }
-
-    // Simplified explosion effect
-    createExplosion(position, type = 'standard') {
-        const particleCount = type === 'standard' ? 20 : 10;
-        const particles = this.createParticlePool(particleCount);
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particle = particles.pool[i];
-            particle.position.copy(position);
-            particle.velocity.set(
-                (Math.random() - 0.5) * 0.5,
-                Math.random() * 0.5,
-                (Math.random() - 0.5) * 0.5
-            );
-            particle.life = 1.0;
-            particle.active = true;
-        }
-        
-        this.scene.add(particles.points);
-        return particles;
-    }
-
-    // Remove redundant particle systems
-    createOptimizedImpactEffect(position, hitType) {
-        // Simplified impact effect
-        const particleCount = 5;
-        const particles = [];
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particle = new THREE.Mesh(
-                new THREE.SphereGeometry(0.1, 8, 8),
-                new THREE.MeshBasicMaterial({
-                    color: 0xffffff,
-                    transparent: true,
-                    opacity: 0.8
-                })
-            );
-            
-            particle.position.copy(position);
-            particle.velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 0.2,
-                Math.random() * 0.2,
-                (Math.random() - 0.5) * 0.2
-            );
-            particle.life = 1.0;
-            
-            this.scene.add(particle);
-            particles.push(particle);
-        }
-        
-        return particles;
-    }
-
-    // Remove redundant explosion effects
-    createExplosion(position, type = 'standard') {
-        const particleCount = type === 'standard' ? 10 : 5;
-        const particles = [];
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particle = new THREE.Mesh(
-                new THREE.SphereGeometry(0.1, 8, 8),
-                new THREE.MeshBasicMaterial({
-                    color: 0xff0000,
-                    transparent: true,
-                    opacity: 0.8
-                })
-            );
-            
-            particle.position.copy(position);
-            particle.velocity = new THREE.Vector3(
-                (Math.random() - 0.5) * 0.3,
-                Math.random() * 0.3,
-                (Math.random() - 0.5) * 0.3
-            );
-            particle.life = 1.0;
-            
-            this.scene.add(particle);
-            particles.push(particle);
-        }
-        
-        return particles;
-    }
-
-    // Remove redundant particle pools
-    initializeParticlePools() {
-        // Single particle pool for all effects
-        this.particlePool = {
-            particles: [],
-            maxSize: 50
-        };
-    }
-
-    // Add missing methods
     createArena() {
         console.log("Creating simplified arena");
         
@@ -414,8 +256,6 @@ class Game {
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = 0.1;
         this.scene.add(ground);
-        
-        return Promise.resolve(); // To support async/await pattern
     }
 
     createSimpleTruck() {
@@ -434,10 +274,6 @@ class Game {
         // Add basic properties
         this.truck.velocity = 0;
         this.truck.acceleration = 0;
-        this.health = 100;
-        this.maxHealth = 100;
-        
-        return Promise.resolve(); // To support async/await pattern
     }
 
     setupControls() {
@@ -489,23 +325,16 @@ class Game {
     }
 
     animate() {
+        requestAnimationFrame(() => this.animate());
+        
         if (!this.isInitialized) return;
         
-        try {
-            // Update game state
-            this.update();
-            
-            // Render the scene
-            if (this.renderer && this.scene && this.camera) {
-                this.renderer.render(this.scene, this.camera);
-            }
-            
-            // Continue animation loop
-            requestAnimationFrame(() => this.animate());
-        } catch (error) {
-            console.error("Error in animation loop:", error);
-            // Try to continue animation despite errors
-            requestAnimationFrame(() => this.animate());
+        // Update game state
+        this.update();
+        
+        // Render the scene
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
         }
     }
 
@@ -543,114 +372,18 @@ class Game {
 window.addEventListener('load', () => {
     console.log("Window loaded, creating game");
     try {
-        // Initialize SoundFX global utility
+        // Create simple sound system
         window.SoundFX = {
-            // Keep track of whether audio is unlocked
-            audioUnlocked: false,
-            
-            // Directly play a sound with error handling
-            play: function(soundName) {
-                if (!soundName) return;
-                
-                try {
-                    // Create a sound path
-                    const soundPath = '/sounds/' + soundName + '.mp3'
-                    
-                    // Create a new audio element
-                    const audio = new Audio(soundPath);
-                    audio.volume = 0.5;
-                    
-                    // Try to play with error handling
-                    const playPromise = audio.play();
-                    if (playPromise) {
-                        playPromise.catch(error => {
-                            console.log(`SoundFX: Could not play ${soundName}:`, error);
-                            
-                            // If not allowed, queue for next user interaction
-                            if (error.name === 'NotAllowedError' && !this.audioUnlocked) {
-                                this.setupUnlockHandlers()
-                            }
-                        })
-                    }
-                    return audio;
-                } catch (error) {
-                    console.error(`SoundFX: Error playing ${soundName}:`, error);
-                    return null;
-                }
-            },
-            
-            // Unlock audio on first user interaction
-            unlockAudio: function() {
-                if (this.audioUnlocked) return;
-                
-                console.log('SoundFX: Unlocking audio context')
-                
-                try {
-                    // Try to play a silent sound
-                    const audio = new Audio();
-                    audio.volume = 0;
-                    const promise = audio.play();
-                    
-                    if (promise) {
-                        promise.then(() => {
-                            console.log('SoundFX: Audio unlocked successfully')
-                            this.audioUnlocked = true;
-                        }).catch(error => {
-                            console.error('SoundFX: Could not unlock audio:', error)
-                        })
-                    }
-                    
-                    // Also try to unlock AudioContext if available
-                    if (window.AudioContext || window.webkitAudioContext) {
-                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                        if (ctx.state === 'suspended') {
-                            ctx.resume()
-                        }
-                        
-                        // Create and play a silent buffer
-                        const source = ctx.createBufferSource();
-                        source.buffer = ctx.createBuffer(1, 1, 22050);
-                        source.connect(ctx.destination);
-                        source.start(0);
-                    }
-                } catch (e) {
-                    console.error('SoundFX: Error in audio unlock:', e)
-                }
-            },
-            
-            // Set up event handlers for unlocking audio
-            setupUnlockHandlers: function() {
-                if (this.handlersSet) return;
-                
-                console.log('SoundFX: Setting up unlock handlers')
-                this.handlersSet = true;
-                
-                const unlockFn = () => {
-                    this.unlockAudio();
-                    document.removeEventListener('click', unlockFn)
-                    document.removeEventListener('touchstart', unlockFn)
-                    document.removeEventListener('keydown', unlockFn)
-                }
-                
-                document.addEventListener('click', unlockFn)
-                document.addEventListener('touchstart', unlockFn)
-                document.addEventListener('keydown', unlockFn)
-            }
-        }
-        
-        // Initialize unlock handlers
-        window.SoundFX.setupUnlockHandlers();
+            play: function() {} // Empty function - no sound handling
+        };
         
         // Create game
         window.game = new Game();
         
-        // Initialize the game
-        window.game.init();
-        
-        console.log("Game instance created and initialized")
+        console.log("Game instance created and initialized");
     } catch (error) {
         console.error("Error creating game instance:", error);
     }
-})
+});
 
 export { Game }
