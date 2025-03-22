@@ -1,4 +1,24 @@
-import * as THREE from 'three'
+// Check if THREE is available globally (from CDN)
+let THREE;
+if (typeof window.THREE !== 'undefined') {
+    THREE = window.THREE;
+    console.log("Using global THREE object");
+} else {
+    console.error("THREE.js not found globally. Make sure it's loaded via script tag before main.js");
+    // Display error message
+    document.addEventListener('DOMContentLoaded', () => {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.position = 'fixed';
+        errorDiv.style.top = '50%';
+        errorDiv.style.left = '50%';
+        errorDiv.style.transform = 'translate(-50%, -50%)';
+        errorDiv.style.color = 'red';
+        errorDiv.style.fontSize = '24px';
+        errorDiv.textContent = 'THREE.js library not loaded. Please refresh the page.';
+        document.body.appendChild(errorDiv);
+    });
+}
+
 import { MonsterTruck } from './MonsterTruck.js'
 import { World } from './World.js'
 import Multiplayer from './Multiplayer.js'
