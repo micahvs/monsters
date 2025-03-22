@@ -26,6 +26,12 @@ export class MonsterTruck {
         this.acceleration = this.getAccelerationForMachine(machineType);
         this.turnSpeed = this.getTurnSpeedForMachine(machineType);
         
+        // Validate position before creating truck
+        if (!position || isNaN(position.x) || isNaN(position.y) || isNaN(position.z)) {
+            console.warn("Invalid position provided to MonsterTruck constructor! Using default position.");
+            position = new THREE.Vector3(0, 0.5, 0);
+        }
+        
         this.createTruck(position);
     }
     
@@ -636,12 +642,32 @@ export class MonsterTruck {
             Math.cos(this.rotation)
         );
         
+        // VALIDATION: Check for NaN values
+        if (isNaN(direction.x) || isNaN(direction.z) || isNaN(this.speed)) {
+            console.warn("NaN values detected in movement calculation! Resetting values.");
+            direction.set(0, 0, 1);
+            this.speed = 0;
+        }
+        
         // Update velocity with grip factor
         this.velocity.x = direction.x * this.speed;
         this.velocity.z = direction.z * this.speed;
         
+        // VALIDATION: Check for NaN values in velocity
+        if (isNaN(this.velocity.x) || isNaN(this.velocity.z)) {
+            console.warn("NaN values detected in velocity! Resetting values.");
+            this.velocity.set(0, 0, 0);
+            this.speed = 0;
+        }
+        
         // Apply velocity to position
         this.body.position.add(this.velocity);
+        
+        // VALIDATION: Final check for position validity
+        if (isNaN(this.body.position.x) || isNaN(this.body.position.y) || isNaN(this.body.position.z)) {
+            console.warn("NaN values detected in truck position! Resetting position.");
+            this.body.position.set(0, 0.5, 0);
+        }
         
         // Update truck rotation
         this.body.rotation.y = this.rotation;

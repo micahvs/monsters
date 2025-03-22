@@ -720,6 +720,12 @@ class Game {
             // For compatibility with existing code
             this.truck = this.monsterTruck.body || emergencyTruck; // Use emergency truck as fallback
             
+            // Validate truck position to prevent NaN values early
+            if (this.truck && (isNaN(this.truck.position.x) || isNaN(this.truck.position.y) || isNaN(this.truck.position.z))) {
+                console.warn("NaN values detected in initial truck position! Resetting position.");
+                this.truck.position.set(0, 0.5, 0);
+            }
+            
             // Check if truck was created properly
             if (!this.truck) {
                 console.error("ERROR: Monster truck body is null or undefined!");
