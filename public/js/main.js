@@ -1327,7 +1327,7 @@ class Game {
 
     createTurrets() {
         // Create turrets at random positions in the arena
-        const arenaSize = 100; // Assuming arena is 100x100
+        const arenaSize = 200; // Arena is 200x200
         const minDistanceFromCenter = 30; // Minimum distance from center
         const numTurrets = 8; // Number of turrets to create
         
