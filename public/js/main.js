@@ -366,6 +366,7 @@ class Game {
         // Core initialization only
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        this.camera.position.set(0, 480, 960); // Increased height and distance for larger arena
         this.renderer = null;
         this.truck = null;
         this.isInitialized = false;
@@ -436,7 +437,7 @@ class Game {
             // Set up camera
             console.log("Setting up camera...");
             try {
-                this.camera.position.set(0, 10, 20);
+                this.camera.position.set(0, 480, 960); // Increased height and distance for larger arena
                 this.camera.lookAt(0, 0, 0);
                 console.log("Camera configured successfully:", this.camera);
             } catch (cameraError) {
@@ -542,31 +543,101 @@ class Game {
     }
 
     createArena() {
-        console.log("Creating larger arena with walls");
+        console.log("Creating arena...");
         
-        // Create a simple grid floor - 200x200 for 4x larger area
-        const gridSize = 200;
-        const gridHelper = new THREE.GridHelper(gridSize, 40, 0xff00ff, 0x00ffff);
-        this.scene.add(gridHelper);
-        
-        // Create a ground plane
-        const groundGeometry = new THREE.PlaneGeometry(gridSize, gridSize);
-        const groundMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x220033,
-            wireframe: true,
-            transparent: true,
-            opacity: 0.7
+        // Create ground
+        const groundGeometry = new THREE.PlaneGeometry(600, 600);
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x333333,
+            roughness: 0.8,
+            metalness: 0.2
         });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
-        ground.position.y = 0.1;
+        ground.receiveShadow = true;
         this.scene.add(ground);
-        
-        // Add bounding walls
-        this.createWalls(gridSize);
-        
-        // Create obstacles
-        this.createObstacles(gridSize);
+        console.log("Ground added to scene");
+
+        // Create walls
+        const wallMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x666666,
+            roughness: 0.7,
+            metalness: 0.3
+        });
+
+        // North wall
+        const northWall = new THREE.Mesh(
+            new THREE.BoxGeometry(600, 100, 10),
+            wallMaterial
+        );
+        northWall.position.set(0, 50, -300);
+        northWall.castShadow = true;
+        northWall.receiveShadow = true;
+        this.scene.add(northWall);
+        console.log("North wall added to scene");
+
+        // South wall
+        const southWall = new THREE.Mesh(
+            new THREE.BoxGeometry(600, 100, 10),
+            wallMaterial
+        );
+        southWall.position.set(0, 50, 300);
+        southWall.castShadow = true;
+        southWall.receiveShadow = true;
+        this.scene.add(southWall);
+        console.log("South wall added to scene");
+
+        // East wall
+        const eastWall = new THREE.Mesh(
+            new THREE.BoxGeometry(10, 100, 600),
+            wallMaterial
+        );
+        eastWall.position.set(300, 50, 0);
+        eastWall.castShadow = true;
+        eastWall.receiveShadow = true;
+        this.scene.add(eastWall);
+        console.log("East wall added to scene");
+
+        // West wall
+        const westWall = new THREE.Mesh(
+            new THREE.BoxGeometry(10, 100, 600),
+            wallMaterial
+        );
+        westWall.position.set(-300, 50, 0);
+        westWall.castShadow = true;
+        westWall.receiveShadow = true;
+        this.scene.add(westWall);
+        console.log("West wall added to scene");
+
+        // Add grid helper for reference
+        const gridHelper = new THREE.GridHelper(600, 60);
+        this.scene.add(gridHelper);
+        console.log("Grid helper added to scene");
+
+        // Add arena lighting
+        const arenaLight = new THREE.PointLight(0xffffff, 1, 1000);
+        arenaLight.position.set(0, 200, 0);
+        arenaLight.castShadow = true;
+        this.scene.add(arenaLight);
+        console.log("Arena light added to scene");
+
+        // Add corner lights
+        const cornerLight = new THREE.PointLight(0xffffff, 0.5, 500);
+        cornerLight.position.set(400, 100, 400);
+        cornerLight.castShadow = true;
+        this.scene.add(cornerLight);
+        console.log("Corner light added to scene");
+
+        // Store wall references for collision detection
+        this.walls = {
+            north: northWall,
+            south: southWall,
+            east: eastWall,
+            west: westWall,
+            halfSize: 300, // Half of arena size (600/2)
+            thickness: 10
+        };
+        console.log("Arena creation complete");
     }
 
     createSimpleTruck() {
