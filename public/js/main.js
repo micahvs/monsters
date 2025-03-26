@@ -366,7 +366,7 @@ class Game {
         // Core initialization only
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-        this.camera.position.set(0, 480, 960); // Increased height and distance for larger arena
+        this.camera.position.set(0, 624, 1248); // Increased height and distance for larger arena (30% larger)
         this.renderer = null;
         this.truck = null;
         this.isInitialized = false;
@@ -429,6 +429,7 @@ class Game {
                 
                 console.log("Renderer created successfully:", this.renderer);
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
             } catch (rendererError) {
                 console.error("Failed to create renderer:", rendererError);
                 throw rendererError;
@@ -437,7 +438,7 @@ class Game {
             // Set up camera
             console.log("Setting up camera...");
             try {
-                this.camera.position.set(0, 480, 960); // Increased height and distance for larger arena
+                this.camera.position.set(0, 624, 1248); // Increased height and distance for larger arena (30% larger)
                 this.camera.lookAt(0, 0, 0);
                 console.log("Camera configured successfully:", this.camera);
             } catch (cameraError) {
@@ -546,7 +547,7 @@ class Game {
         console.log("Creating arena...");
         
         // Create ground
-        const groundGeometry = new THREE.PlaneGeometry(600, 600);
+        const groundGeometry = new THREE.PlaneGeometry(780, 780); // Increased from 600 to 780 (30% larger)
         const groundMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x333333,
             roughness: 0.8,
@@ -567,10 +568,10 @@ class Game {
 
         // North wall
         const northWall = new THREE.Mesh(
-            new THREE.BoxGeometry(600, 100, 10),
+            new THREE.BoxGeometry(780, 100, 10), // Increased from 600 to 780
             wallMaterial
         );
-        northWall.position.set(0, 50, -300);
+        northWall.position.set(0, 50, -390); // Adjusted from -300 to -390
         northWall.castShadow = true;
         northWall.receiveShadow = true;
         this.scene.add(northWall);
@@ -578,10 +579,10 @@ class Game {
 
         // South wall
         const southWall = new THREE.Mesh(
-            new THREE.BoxGeometry(600, 100, 10),
+            new THREE.BoxGeometry(780, 100, 10), // Increased from 600 to 780
             wallMaterial
         );
-        southWall.position.set(0, 50, 300);
+        southWall.position.set(0, 50, 390); // Adjusted from 300 to 390
         southWall.castShadow = true;
         southWall.receiveShadow = true;
         this.scene.add(southWall);
@@ -589,10 +590,10 @@ class Game {
 
         // East wall
         const eastWall = new THREE.Mesh(
-            new THREE.BoxGeometry(10, 100, 600),
+            new THREE.BoxGeometry(10, 100, 780), // Increased from 600 to 780
             wallMaterial
         );
-        eastWall.position.set(300, 50, 0);
+        eastWall.position.set(390, 50, 0); // Adjusted from 300 to 390
         eastWall.castShadow = true;
         eastWall.receiveShadow = true;
         this.scene.add(eastWall);
@@ -600,17 +601,17 @@ class Game {
 
         // West wall
         const westWall = new THREE.Mesh(
-            new THREE.BoxGeometry(10, 100, 600),
+            new THREE.BoxGeometry(10, 100, 780), // Increased from 600 to 780
             wallMaterial
         );
-        westWall.position.set(-300, 50, 0);
+        westWall.position.set(-390, 50, 0); // Adjusted from -300 to -390
         westWall.castShadow = true;
         westWall.receiveShadow = true;
         this.scene.add(westWall);
         console.log("West wall added to scene");
 
         // Add grid helper for reference
-        const gridHelper = new THREE.GridHelper(600, 60);
+        const gridHelper = new THREE.GridHelper(780, 78); // Increased from 600 to 780, adjusted grid divisions
         this.scene.add(gridHelper);
         console.log("Grid helper added to scene");
 
@@ -623,7 +624,7 @@ class Game {
 
         // Add corner lights
         const cornerLight = new THREE.PointLight(0xffffff, 0.5, 500);
-        cornerLight.position.set(400, 100, 400);
+        cornerLight.position.set(520, 100, 520); // Adjusted from 400 to 520
         cornerLight.castShadow = true;
         this.scene.add(cornerLight);
         console.log("Corner light added to scene");
@@ -634,7 +635,7 @@ class Game {
             south: southWall,
             east: eastWall,
             west: westWall,
-            halfSize: 300, // Half of arena size (600/2)
+            halfSize: 390, // Half of arena size (780/2)
             thickness: 10
         };
         console.log("Arena creation complete");
@@ -998,8 +999,8 @@ class Game {
         // Update camera to follow truck with smooth transition
         if (this.camera) {
             // Position camera behind truck based on truck's direction
-            const cameraDistance = 15;
-            const cameraHeight = 8;
+            const cameraDistance = 19.5; // Increased from 15 (30% larger)
+            const cameraHeight = 10.4; // Increased from 8 (30% larger)
             const targetCameraPos = new THREE.Vector3(
                 this.truck.position.x - direction.x * cameraDistance,
                 this.truck.position.y + cameraHeight,
