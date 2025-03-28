@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #222;
+            color: #fff;
+        }
+        h1 {
+            text-align: center;
+            color: #0ff;
+        }
+        .sound-button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            background: #333;
+            color: #0ff;
+            border: 2px solid #0ff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s;
+        }
+        .sound-button:hover {
+            background: #0ff;
+            color: #000;
+        }
+        .info {
+            background: #333;
+            border-left: 4px solid #0ff;
+            padding: 10px;
+            margin: 20px 0;
+        }
+        .path-display {
+            color: #0f0;
+            font-family: monospace;
+            margin-top: 5px;
+            font-size: 14px;
+        }
+        #log {
+            background: #111;
+            border: 1px solid #333;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .log-entry {
+            margin: 5px 0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+        .success {
+            color: #0f0;
+        }
+        .error {
+            color: #f00;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sound Test Page</h1>
+    
+    <div class="info">
+        <p>This page tests sound playback directly using different methods. Click the buttons below to play sounds:</p>
+    </div>
+    
+    <button id="unlock" class="sound-button">🔓 UNLOCK AUDIO (Click First)</button>
+    
+    <button id="engine-rev" class="sound-button">🏎️ Play Engine Rev</button>
+    <div class="path-display" id="engine-rev-path">/sounds/engine_rev.mp3</div>
+    
+    <button id="engine-deceleration" class="sound-button">🛑 Play Engine Deceleration</button>
+    <div class="path-display" id="engine-deceleration-path">/sounds/engine_deceleration.mp3</div>
+    
+    <button id="engine-idle" class="sound-button">🔄 Play Engine Idle</button>
+    <div class="path-display" id="engine-idle-path">/sounds/engine_idle.mp3</div>
+
+    <h2>Log:</h2>
+    <div id="log"></div>
+
+    <script>
+        // Log function
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // Unlock audio context (for browsers that require user interaction)
+        document.getElementById('unlock').addEventListener('click', function() {
+            log('Attempting to unlock audio...');
+            
+            // Create and play silent audio
+            const audio = new Audio();
+            audio.play().then(() => {
+                log('Audio context unlocked successfully!', 'success');
+            }).catch(err => {
+                log(`Failed to unlock audio: ${err.message}`, 'error');
+            });
+        });
+
+        // Play sound function
+        function playSound(soundPath) {
+            log(`Attempting to play: ${soundPath}`);
+            
+            try {
+                // Method 1: Audio object
+                const audio = new Audio(soundPath);
+                
+                audio.oncanplaythrough = () => {
+                    log(`Sound loaded and ready to play: ${soundPath}`, 'success');
+                };
+
+                audio.onerror = (err) => {
+                    log(`Error loading sound: ${soundPath} - ${err.type}`, 'error');
+                    
+                    // Try fallback method
+                    playFallbackSound(soundPath);
+                };
+                
+                // Play the sound
+                audio.play().then(() => {
+                    log(`Sound playing: ${soundPath}`, 'success');
+                }).catch(err => {
+                    log(`Error playing sound: ${err.message}`, 'error');
+                    
+                    // Try fallback method
+                    playFallbackSound(soundPath);
+                });
+            } catch (err) {
+                log(`Exception playing sound: ${err.message}`, 'error');
+                
+                // Try fallback method
+                playFallbackSound(soundPath);
+            }
+        }
+
+        // Fallback method using DOM audio elements
+        function playFallbackSound(soundPath) {
+            log(`Using fallback method for: ${soundPath}`);
+            
+            try {
+                const audioElement = document.createElement('audio');
+                audioElement.src = soundPath;
+                audioElement.style.display = 'none';
+                document.body.appendChild(audioElement);
+                
+                audioElement.addEventListener('canplaythrough', () => {
+                    log(`Fallback sound loaded: ${soundPath}`, 'success');
+                    audioElement.play().catch(err => {
+                        log(`Fallback play error: ${err.message}`, 'error');
+                    });
+                });
+
+                audioElement.addEventListener('error', () => {
+                    log(`Fallback loading error for: ${soundPath}`, 'error');
+                });
+                
+                // Set up cleanup
+                audioElement.addEventListener('ended', () => {
+                    log(`Sound finished playing: ${soundPath}`);
+                    document.body.removeChild(audioElement);
+                });
+            } catch (error) {
+                log(`Fallback method failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Set up click handlers for sound buttons
+        document.getElementById('engine-rev').addEventListener('click', function() {
+            const soundPath = document.getElementById('engine-rev-path').textContent;
+            playSound(soundPath);
+        });
+
+        document.getElementById('engine-deceleration').addEventListener('click', function() {
+            const soundPath = document.getElementById('engine-deceleration-path').textContent;
+            playSound(soundPath);
+        });
+
+        document.getElementById('engine-idle').addEventListener('click', function() {
+            const soundPath = document.getElementById('engine-idle-path').textContent;
+            playSound(soundPath);
+        });
+    </script>
+</body>
+</html> 

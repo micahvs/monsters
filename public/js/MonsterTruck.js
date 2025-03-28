@@ -663,14 +663,56 @@ export class MonsterTruck {
     }
     
     handleControls(accelerating, braking, turningLeft, turningRight) {
+        // Track the previous speed to detect state changes
+        const wasMoving = Math.abs(this.speed) >= 0.05;
+        
         // Acceleration and braking
         if (accelerating) {
             this.speed = Math.min(this.speed + this.acceleration, this.maxSpeed);
+            // Play engine rev sound when accelerating
+            if (window.soundManager) {
+                console.log("MonsterTruck: Playing engine_rev sound");
+                window.soundManager.playSound('engine_rev');
+            } else {
+                console.warn("MonsterTruck: No sound manager available for engine_rev");
+            }
         } else if (braking) {
             this.speed = Math.max(this.speed - this.brakingForce, -this.maxSpeed * 0.5);
+            // Play engine deceleration sound when braking
+            if (window.soundManager) {
+                console.log("MonsterTruck: Playing engine_deceleration sound");
+                window.soundManager.playSound('engine_deceleration');
+            } else {
+                console.warn("MonsterTruck: No sound manager available for engine_deceleration");
+            }
         } else {
             // Natural deceleration
             this.speed *= (1 - this.deceleration);
+            
+            // Check if the vehicle is almost stopped (idle)
+            if (Math.abs(this.speed) < 0.05) {
+                // Play engine idle sound when the vehicle is not moving
+                if (window.soundManager) {
+                    console.log("MonsterTruck: Playing engine_idle sound - vehicle at rest");
+                    window.soundManager.playSound('engine_idle');
+                } else {
+                    console.warn("MonsterTruck: No sound manager available for engine_idle");
+                }
+            } 
+            // Play engine deceleration sound during natural deceleration if speed is significant
+            else if (Math.abs(this.speed) > 0.1 && window.soundManager) {
+                console.log("MonsterTruck: Playing engine_deceleration sound for natural deceleration");
+                window.soundManager.playSound('engine_deceleration');
+            }
+        }
+        
+        // Check if we just started moving (transition from idle to moving)
+        const isMoving = Math.abs(this.speed) >= 0.05;
+        if (!wasMoving && isMoving && window.soundManager) {
+            // Stop idle sound when starting to move
+            console.log("MonsterTruck: Vehicle starting to move - transitioning from idle to rev");
+            // Start engine rev sound as we begin to move
+            window.soundManager.playSound('engine_rev');
         }
         
         // Turning (more effective at lower speeds)
@@ -826,6 +868,12 @@ export class MonsterTruck {
         // Add to scene and handle projectile logic
         this.scene.add(projectile);
         this.ammo--;
+        
+        // Play weapon fire sound if projectiles were created (successful shot)
+        if (projectile && window.soundManager) {
+            console.log("Game: Playing weapon_fire sound");
+            window.soundManager.playSound('weapon_fire');
+        }
     }
     
     takeDamage(amount) {

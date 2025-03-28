@@ -52,6 +52,7 @@
             pointer-events: none;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
             padding: 12px;
             letter-spacing: 0.5px;
             border: none;
@@ -882,39 +883,39 @@
     <div id="audio-panel">
         <div class="audio-panel-header">
             <div class="audio-panel-title">AUDIO</div>
-            <button id="audio-panel-toggle">
+            <button id="audio-panel-toggle" title="Toggle audio panel">
                 <i class="fas fa-chevron-up"></i>
             </button>
         </div>
         <div class="audio-panel-content">
             <!-- Master Volume -->
             <div class="audio-control-group">
-                <label>MASTER</label>
+                <label for="master-volume">MASTER</label>
                 <div class="volume-control">
-                    <button id="master-mute" class="audio-button">
+                    <button id="master-mute" class="audio-button" title="Mute master volume">
                         <i class="fas fa-volume-up"></i>
                     </button>
-                    <input type="range" id="master-volume" min="0" max="100" value="100" class="volume-slider">
+                    <input type="range" id="master-volume" min="0" max="100" value="100" class="volume-slider" title="Master volume">
                 </div>
             </div>
             
             <!-- Music Controls -->
             <div class="audio-control-group">
-                <label>MUSIC</label>
+                <label for="music-volume">MUSIC</label>
                 <div class="volume-control">
-                    <button id="music-mute" class="audio-button">
+                    <button id="music-mute" class="audio-button" title="Mute music">
                         <i class="fas fa-music"></i>
                     </button>
-                    <input type="range" id="music-volume" min="0" max="100" value="30" class="volume-slider">
+                    <input type="range" id="music-volume" min="0" max="100" value="30" class="volume-slider" title="Music volume">
                 </div>
                 <div class="music-controls">
-                    <button id="music-prev" class="audio-button">
+                    <button id="music-prev" class="audio-button" title="Previous track">
                         <i class="fas fa-step-backward"></i>
                     </button>
-                    <button id="music-play" class="audio-button">
+                    <button id="music-play" class="audio-button" title="Play/Pause music">
                         <i class="fas fa-play"></i>
                     </button>
-                    <button id="music-next" class="audio-button">
+                    <button id="music-next" class="audio-button" title="Next track">
                         <i class="fas fa-step-forward"></i>
                     </button>
                 </div>
@@ -922,12 +923,12 @@
             
             <!-- Sound Effects Controls -->
             <div class="audio-control-group">
-                <label>SFX</label>
+                <label for="sfx-volume">SFX</label>
                 <div class="volume-control">
-                    <button id="sfx-mute" class="audio-button">
+                    <button id="sfx-mute" class="audio-button" title="Mute sound effects">
                         <i class="fas fa-volume-up"></i>
                     </button>
-                    <input type="range" id="sfx-volume" min="0" max="100" value="70" class="volume-slider">
+                    <input type="range" id="sfx-volume" min="0" max="100" value="70" class="volume-slider" title="Sound effects volume">
                 </div>
             </div>
             
@@ -1318,6 +1319,45 @@
                         }
                     }
                 }
+            }
+        });
+    </script>
+    <!-- Add at the end of the file, just before </body> -->
+    <script>
+        // Sound initialization status
+        document.addEventListener('click', function() {
+            console.log('User interaction detected - audio should be enabled now');
+            if (window.soundManager) {
+                console.log('Sound manager is available globally');
+            } else {
+                console.warn('Sound manager is not available globally yet');
+            }
+        });
+    </script>
+
+    <!-- Sound System Check -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("SOUND CHECK: DOM content loaded");
+        });
+
+        // Listen for clicks and test sound system
+        document.addEventListener('click', function() {
+            console.log("SOUND CHECK: User clicked - checking sound manager");
+            
+            // Check if sound manager exists
+            if (window.soundManager) {
+                console.log("SOUND CHECK: Sound manager found:", window.soundManager);
+                
+                // Try to play a sound
+                try {
+                    window.soundManager.playSound('engine_rev');
+                    console.log("SOUND CHECK: Attempted to play engine_rev sound");
+                } catch (e) {
+                    console.error("SOUND CHECK: Error playing sound:", e);
+                }
+            } else {
+                console.warn("SOUND CHECK: No sound manager available yet");
             }
         });
     </script>

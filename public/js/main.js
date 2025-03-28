@@ -371,6 +371,10 @@ class Game {
         this.truck = null;
         this.isInitialized = false;
         
+        // Initialize sound manager
+        this.soundManager = new SoundManager(this.camera);
+        window.soundManager = this.soundManager; // Make it globally available
+        
         // Essential controls only
         this.keys = {
             'ArrowUp': false,
@@ -398,6 +402,16 @@ class Game {
     init() {
         try {
             console.log("Starting game initialization...");
+            
+            // Initialize sound manager first
+            console.log("Initializing sound manager...");
+            try {
+                this.soundManager.initializeSoundPools();
+                console.log("Sound manager initialized successfully");
+            } catch (soundError) {
+                console.error("Failed to initialize sound manager:", soundError);
+                throw soundError;
+            }
             
             // Initialize renderer
             console.log("Creating WebGL renderer...");
@@ -1024,7 +1038,13 @@ class Game {
             const weaponPosition = this.weaponMesh.getWorldPosition(new THREE.Vector3());
             
             // Fire the weapon
-            this.weapon.shoot(weaponPosition, truckDirection, 'player');
+            const projectiles = this.weapon.shoot(weaponPosition, truckDirection, 'player');
+            
+            // Play weapon fire sound if projectiles were created (successful shot)
+            if (projectiles && window.soundManager) {
+                console.log("Game: Playing weapon_fire sound");
+                window.soundManager.playSound('weapon_fire');
+            }
         }
         
         // Handle reload
