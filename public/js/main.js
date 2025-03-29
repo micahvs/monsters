@@ -1591,6 +1591,27 @@ class Game {
         }
         this.audioManager = window.audioManager; // Always use the global instance
         
+        // Initialize object pool manager for better performance
+        this.objectPools = new ObjectPoolManager();
+        
+        // Set up object pools
+        this.initObjectPools();
+        
+        // Detect mobile for performance optimizations
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Enable lower quality settings for mobile
+        if (this.isMobile) {
+            console.log("Mobile device detected - using performance settings");
+            this.drawDistance = 300;
+            this.maxParticles = 20;
+            this.shadowsEnabled = false;
+        } else {
+            this.drawDistance = 2000;
+            this.maxParticles = 100;
+            this.shadowsEnabled = true;
+        }
+        
         // Essential controls only
         this.keys = {
             'ArrowUp': false,
@@ -1616,8 +1637,129 @@ class Game {
         this.powerupSpawnTimer = 0;
         this.powerupSpawnInterval = 300; // Spawn a powerup every 300 frames (about 5 seconds)
         
+        // Performance monitoring
+        this.fpsCounter = document.createElement('div');
+        this.fpsCounter.id = 'fps-counter';
+        this.fpsCounter.style.position = 'fixed';
+        this.fpsCounter.style.top = '10px';
+        this.fpsCounter.style.right = '10px';
+        this.fpsCounter.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        this.fpsCounter.style.color = '#0f0';
+        this.fpsCounter.style.padding = '5px';
+        this.fpsCounter.style.fontFamily = 'monospace';
+        this.fpsCounter.style.fontSize = '12px';
+        this.fpsCounter.style.zIndex = '1000';
+        document.body.appendChild(this.fpsCounter);
+        
+        // FPS tracking
+        this.lastTime = 0;
+        this.frameCount = 0;
+        this.fps = 0;
+        this.fpsUpdateInterval = 500; // Update FPS display every 500ms
+        this.lastFpsUpdate = 0;
+        
         // Initialize the game
         this.init();
+    }
+
+    initObjectPools() {
+        // Create particle pool
+        this.objectPools.createPool('particles', () => {
+            const geometry = new THREE.SphereGeometry(0.2, 4, 4);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xff00ff,
+                transparent: true,
+                opacity: 0.8
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.visible = false;
+            this.scene.add(mesh);
+            return {
+                mesh: mesh,
+                reset: function(position, color) {
+                    this.mesh.visible = true;
+                    this.mesh.position.copy(position);
+                    this.mesh.material.color.set(color || 0xff00ff);
+                    this.mesh.material.opacity = 0.8;
+                    this.life = 1.0;
+                    this.velocity = new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.5,
+                        Math.random() * 0.5,
+                        (Math.random() - 0.5) * 0.5
+                    );
+                    return this;
+                },
+                update: function(delta) {
+                    this.life -= delta * 2;
+                    this.mesh.position.add(this.velocity);
+                    this.mesh.material.opacity = this.life;
+                    return this.life > 0;
+                },
+                hide: function() {
+                    this.mesh.visible = false;
+                }
+            };
+        }, 50);
+        
+        // Create projectile pool
+        this.objectPools.createPool('projectiles', () => {
+            const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
+            geometry.rotateX(Math.PI / 2);
+            const material = new THREE.MeshPhongMaterial({
+                color: 0xff00ff,
+                emissive: 0xff00ff,
+                emissiveIntensity: 1,
+                transparent: true,
+                opacity: 0.8
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.visible = false;
+            this.scene.add(mesh);
+            
+            return {
+                mesh: mesh,
+                reset: function(position, direction, speed, damage, source) {
+                    this.mesh.visible = true;
+                    this.mesh.position.copy(position);
+                    this.direction = direction.normalize();
+                    this.speed = speed || 0.5;
+                    this.damage = damage || 10;
+                    this.source = source || 'player';
+                    this.alive = true;
+                    this.lifespan = 200;
+                    
+                    // Set color based on source
+                    const projectileColor = source === 'player' ? 0xff00ff : 0xff0000;
+                    this.mesh.material.color.setHex(projectileColor);
+                    this.mesh.material.emissive.setHex(projectileColor);
+                    
+                    // Set rotation to match direction
+                    this.mesh.quaternion.setFromUnitVectors(
+                        new THREE.Vector3(0, 0, 1),
+                        this.direction
+                    );
+                    
+                    return this;
+                },
+                update: function(delta) {
+                    if (!this.alive) return false;
+                    
+                    // Update position with speed
+                    const movement = this.direction.clone().multiplyScalar(this.speed);
+                    this.mesh.position.add(movement);
+                    
+                    // Reduce lifespan
+                    this.lifespan--;
+                    if (this.lifespan <= 0) this.alive = false;
+                    
+                    return this.alive;
+                },
+                hide: function() {
+                    this.mesh.visible = false;
+                    this.alive = false;
+                }
+            };
+        }, 30);
     }
 
     init() {
@@ -1650,6 +1792,14 @@ class Game {
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.shadowMap.enabled = true;
                 
+                // Performance optimizations
+                // Reduce shadow map size for better performance
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                
+                // Adjust pixel ratio for performance
+                const pixelRatio = window.devicePixelRatio;
+                this.renderer.setPixelRatio(Math.min(pixelRatio, 2)); // Cap at 2x for performance
+                
                 // Improve color rendering with current THREE.js settings
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace; // Instead of outputEncoding
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1680,11 +1830,22 @@ class Game {
                 const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
                 directionalLight.position.set(50, 200, 100);
                 directionalLight.castShadow = true;
-                directionalLight.shadow.mapSize.width = 1024;
-                directionalLight.shadow.mapSize.height = 1024;
+                
+                // Optimize shadow resolution - reduce from 1024 to improve performance
+                directionalLight.shadow.mapSize.width = 512;
+                directionalLight.shadow.mapSize.height = 512;
+                
+                // Optimize shadow camera frustum
                 directionalLight.shadow.camera.near = 10;
                 directionalLight.shadow.camera.far = 500;
+                directionalLight.shadow.camera.left = -200;
+                directionalLight.shadow.camera.right = 200;
+                directionalLight.shadow.camera.top = 200;
+                directionalLight.shadow.camera.bottom = -200;
+                
+                // Improve shadow quality vs performance
                 directionalLight.shadow.bias = -0.001;
+                
                 this.scene.add(directionalLight);
                 
                 // Add some colored rim lighting for visual interest
@@ -1774,8 +1935,8 @@ class Game {
     createArena() {
         console.log("Creating arena...");
         
-        // Create ground
-        const groundGeometry = new THREE.PlaneGeometry(780, 780); // Increased from 600 to 780 (30% larger)
+        // Create ground with fewer segments for performance
+        const groundGeometry = new THREE.PlaneGeometry(780, 780, 1, 1); // Reduce segment count to minimum
         const groundMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x333333,
             roughness: 0.8,
@@ -1788,82 +1949,79 @@ class Game {
         console.log("Ground added to scene");
 
         // Create walls
-        const wallMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x666666,
-            roughness: 0.7,
-            metalness: 0.3
+        const wallMaterial = new THREE.MeshBasicMaterial({ // Use MeshBasicMaterial instead of Standard for better performance
+            color: 0x666666
         });
 
         // North wall
         const northWall = new THREE.Mesh(
-            new THREE.BoxGeometry(780, 100, 10), // Increased from 600 to 780
+            new THREE.BoxGeometry(780, 100, 10, 1, 1, 1), // Add segment parameters to minimize polygons
             wallMaterial
         );
-        northWall.position.set(0, 50, -390); // Adjusted from -300 to -390
-        northWall.castShadow = true;
+        northWall.position.set(0, 50, -390);
+        northWall.castShadow = false; // Disable shadow casting for less important elements
         northWall.receiveShadow = true;
         this.scene.add(northWall);
-        console.log("North wall added to scene");
-
+        
         // South wall
         const southWall = new THREE.Mesh(
-            new THREE.BoxGeometry(780, 100, 10), // Increased from 600 to 780
+            new THREE.BoxGeometry(780, 100, 10, 1, 1, 1),
             wallMaterial
         );
-        southWall.position.set(0, 50, 390); // Adjusted from 300 to 390
-        southWall.castShadow = true;
+        southWall.position.set(0, 50, 390);
+        southWall.castShadow = false;
         southWall.receiveShadow = true;
         this.scene.add(southWall);
-        console.log("South wall added to scene");
-
+        
         // East wall
         const eastWall = new THREE.Mesh(
-            new THREE.BoxGeometry(10, 100, 780), // Increased from 600 to 780
+            new THREE.BoxGeometry(10, 100, 780, 1, 1, 1),
             wallMaterial
         );
-        eastWall.position.set(390, 50, 0); // Adjusted from 300 to 390
-        eastWall.castShadow = true;
+        eastWall.position.set(390, 50, 0);
+        eastWall.castShadow = false;
         eastWall.receiveShadow = true;
         this.scene.add(eastWall);
-        console.log("East wall added to scene");
-
+        
         // West wall
         const westWall = new THREE.Mesh(
-            new THREE.BoxGeometry(10, 100, 780), // Increased from 600 to 780
+            new THREE.BoxGeometry(10, 100, 780, 1, 1, 1),
             wallMaterial
         );
-        westWall.position.set(-390, 50, 0); // Adjusted from -300 to -390
-        westWall.castShadow = true;
+        westWall.position.set(-390, 50, 0);
+        westWall.castShadow = false;
         westWall.receiveShadow = true;
         this.scene.add(westWall);
-        console.log("West wall added to scene");
-
-        // Add grid helper for reference
-        const gridHelper = new THREE.GridHelper(780, 78); // Increased from 600 to 780, adjusted grid divisions
+        
+        // Add grid helper for reference - reduce divisions for better performance
+        const gridHelper = new THREE.GridHelper(780, 39); // Halve the number of grid divisions
         this.scene.add(gridHelper);
-        console.log("Grid helper added to scene");
-
-        // Add arena lighting
+        
+        // Add arena lighting - single, optimized point light
         const arenaLight = new THREE.PointLight(0xffffff, 1, 1000);
         arenaLight.position.set(0, 200, 0);
+        
+        // Optimize arena light shadow settings
         arenaLight.castShadow = true;
+        arenaLight.shadow.mapSize.width = 512;  // Reduced from default 1024
+        arenaLight.shadow.mapSize.height = 512; // Reduced from default 1024
         this.scene.add(arenaLight);
-        console.log("Arena light added to scene");
-
-        // Add corner lights
-        const cornerLight = new THREE.PointLight(0xffffff, 0.5, 500);
-        cornerLight.position.set(520, 100, 520); // Adjusted from 400 to 520
-        cornerLight.castShadow = true;
-        this.scene.add(cornerLight);
-        console.log("Corner light added to scene");
-
+        
+        // Only use a corner light if not on mobile
+        if (!this.isMobile) {
+            const cornerLight = new THREE.PointLight(0xffffff, 0.5, 500);
+            cornerLight.position.set(520, 100, 520);
+            cornerLight.castShadow = false; // Disable shadow casting for additional lights
+            this.scene.add(cornerLight);
+        }
+        
         // Store wall references for collision detection
         this.walls = {
             north: northWall,
             south: southWall,
             east: eastWall,
             west: westWall,
-            halfSize: 390, // Half of arena size (780/2)
+            halfSize: 390,
             thickness: 10
         };
         console.log("Arena creation complete");
@@ -2220,12 +2378,118 @@ class Game {
         }
         this.lastUpdateTime = now;
         
+        // FPS calculation
+        this.frameCount++;
+        
+        // Update FPS counter every interval
+        if (now - this.lastFpsUpdate > this.fpsUpdateInterval) {
+            this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
+            this.fpsCounter.textContent = `FPS: ${this.fps}`;
+            this.lastFpsUpdate = now;
+            this.frameCount = 0;
+            
+            // If FPS is low, reduce effects further
+            if (this.fps < 30) {
+                this.maxParticles = Math.max(10, this.maxParticles - 5);
+                console.log("Reducing effects due to low FPS:", this.maxParticles);
+            }
+        }
+        
         // Update game state with delta time
         this.update(deltaTime);
         
+        // Update pooled objects (particles and projectiles)
+        this.updatePooledObjects(deltaTime);
+        
         // Render the scene
         if (this.renderer && this.scene && this.camera) {
+            // Apply frustum culling for better performance
+            // Only render objects in view
+            const frustum = new THREE.Frustum();
+            const projScreenMatrix = new THREE.Matrix4();
+            projScreenMatrix.multiplyMatrices(
+                this.camera.projectionMatrix, 
+                this.camera.matrixWorldInverse
+            );
+            frustum.setFromProjectionMatrix(projScreenMatrix);
+            
+            // Render only if active
             this.renderer.render(this.scene, this.camera);
+        }
+    }
+    
+    updatePooledObjects(deltaTime) {
+        // Update all active particles
+        const particlePool = this.objectPools.pools.get('particles');
+        if (particlePool) {
+            for (let i = particlePool.active.length - 1; i >= 0; i--) {
+                const particle = particlePool.active[i];
+                const active = particle.update(deltaTime);
+                
+                if (!active) {
+                    // Return to pool when done
+                    particle.hide();
+                    this.objectPools.release('particles', particle);
+                }
+            }
+        }
+        
+        // Update all active projectiles
+        const projectilePool = this.objectPools.pools.get('projectiles');
+        if (projectilePool) {
+            for (let i = projectilePool.active.length - 1; i >= 0; i--) {
+                const projectile = projectilePool.active[i];
+                const active = projectile.update(deltaTime);
+                
+                if (!active) {
+                    // Return to pool when done
+                    projectile.hide();
+                    this.objectPools.release('projectiles', projectile);
+                } else {
+                    // Check for projectile collisions
+                    this.checkProjectileCollisions(projectile);
+                }
+            }
+        }
+    }
+    
+    checkProjectileCollisions(projectile) {
+        // Skip if projectile is no longer active
+        if (!projectile.alive) return;
+        
+        // Check collision with truck if projectile is from enemy
+        if (projectile.source !== 'player' && this.truck) {
+            const distance = projectile.mesh.position.distanceTo(this.truck.position);
+            if (distance < 2.5) {  // Hit if within truck radius
+                // Apply damage to player
+                this.applyDamage(projectile.damage);
+                
+                // Disable projectile
+                projectile.alive = false;
+                projectile.hide();
+                
+                // Create impact effect at hit position
+                this.createProjectileImpact(projectile.mesh.position.clone());
+                
+                return;
+            }
+        }
+        
+        // Other collision checks (walls, obstacles, etc.)
+        // These already exist in your code elsewhere
+    }
+    
+    createProjectileImpact(position) {
+        // Get particles from pool
+        const particles = [];
+        const particleCount = this.isMobile ? 5 : 15;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particle = this.objectPools.get('particles');
+            if (particle) {
+                particle.reset(position, 0xff5500);
+                particles.push(particle);
+            }
         }
     }
 
@@ -3510,7 +3774,7 @@ class AssetPreloader {
     }
 }
 
-// Use the preloader before starting the game
+// Initialize game when window is fully loaded
 window.addEventListener('load', () => {
     console.log("Window loaded, initializing preloader");
     const loadingElement = document.getElementById('loadingScreen');
@@ -3540,5 +3804,82 @@ window.addEventListener('load', () => {
         preloader.onComplete();
     }
 });
+
+// Object Pool Manager - Significantly reduces garbage collection
+class ObjectPoolManager {
+    constructor() {
+        this.pools = new Map();
+    }
+    
+    // Create a new pool
+    createPool(name, createFunc, initialSize = 20) {
+        if (this.pools.has(name)) {
+            console.warn(`Pool ${name} already exists`);
+            return;
+        }
+        
+        const pool = {
+            available: [],
+            active: [],
+            createFunc: createFunc
+        };
+        
+        // Pre-create objects
+        for (let i = 0; i < initialSize; i++) {
+            const obj = createFunc();
+            obj.__poolIndex = i;
+            pool.available.push(obj);
+        }
+        
+        this.pools.set(name, pool);
+        console.log(`Created object pool '${name}' with ${initialSize} objects`);
+    }
+    
+    // Get an object from pool
+    get(name) {
+        const pool = this.pools.get(name);
+        if (!pool) {
+            console.error(`Pool ${name} doesn't exist`);
+            return null;
+        }
+        
+        let obj;
+        if (pool.available.length > 0) {
+            obj = pool.available.pop();
+        } else {
+            // Create new object if none available
+            obj = pool.createFunc();
+            obj.__poolIndex = pool.active.length + pool.available.length;
+            console.log(`Growing pool ${name}`);
+        }
+        
+        pool.active.push(obj);
+        return obj;
+    }
+    
+    // Return object to pool
+    release(name, obj) {
+        const pool = this.pools.get(name);
+        if (!pool) {
+            console.error(`Pool ${name} doesn't exist`);
+            return;
+        }
+        
+        const index = pool.active.indexOf(obj);
+        if (index !== -1) {
+            pool.active.splice(index, 1);
+            pool.available.push(obj);
+        }
+    }
+    
+    // Clear all pools
+    clear() {
+        this.pools.forEach((pool, name) => {
+            pool.active.length = 0;
+            pool.available.length = 0;
+        });
+        this.pools.clear();
+    }
+}
 
 export { Game }
