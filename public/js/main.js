@@ -2028,8 +2028,19 @@ class Game {
             fire: false
         };
         
+        // Touch throttling to improve performance
+        this.lastTouchTime = 0;
+        this.touchThrottleMs = 16; // ~60fps
+        
         // Helper to update keys based on touch controls
         const updateKeysFromTouch = () => {
+            // Throttle touch events for better performance
+            const now = performance.now();
+            if (now - this.lastTouchTime < this.touchThrottleMs) {
+                return;
+            }
+            this.lastTouchTime = now;
+            
             this.keys['w'] = touchControls.up;
             this.keys['s'] = touchControls.down;
             this.keys['a'] = touchControls.left;
@@ -2047,6 +2058,9 @@ class Game {
         const fireButton = document.getElementById('fire-button');
         const weaponButton = document.getElementById('weapon-button');
         
+        // Use passive event listeners where possible for better performance
+        const touchOptions = { passive: false };
+        
         // Movement controls
         if (padUp) {
             padUp.addEventListener('touchstart', (e) => {
@@ -2054,14 +2068,14 @@ class Game {
                 touchControls.up = true;
                 padUp.classList.add('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
             
             padUp.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 touchControls.up = false;
                 padUp.classList.remove('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
         }
         
         if (padDown) {
@@ -2070,14 +2084,14 @@ class Game {
                 touchControls.down = true;
                 padDown.classList.add('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
             
             padDown.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 touchControls.down = false;
                 padDown.classList.remove('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
         }
         
         if (padLeft) {
@@ -2086,14 +2100,14 @@ class Game {
                 touchControls.left = true;
                 padLeft.classList.add('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
             
             padLeft.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 touchControls.left = false;
                 padLeft.classList.remove('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
         }
         
         if (padRight) {
@@ -2102,14 +2116,14 @@ class Game {
                 touchControls.right = true;
                 padRight.classList.add('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
             
             padRight.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 touchControls.right = false;
                 padRight.classList.remove('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
         }
         
         // Fire button
@@ -2119,14 +2133,14 @@ class Game {
                 touchControls.fire = true;
                 fireButton.classList.add('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
             
             fireButton.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 touchControls.fire = false;
                 fireButton.classList.remove('active');
                 updateKeysFromTouch();
-            });
+            }, touchOptions);
         }
         
         // Weapon switch button
@@ -2141,18 +2155,18 @@ class Game {
                 } else if (this.truck && this.truck.cycleWeapon) {
                     this.truck.cycleWeapon();
                 }
-            });
+            }, touchOptions);
             
             weaponButton.addEventListener('touchend', (e) => {
                 e.preventDefault();
                 weaponButton.classList.remove('active');
-            });
+            }, touchOptions);
         }
         
         // Update mobile UI when window resizes
         window.addEventListener('resize', () => {
             this.updateMobileUI();
-        });
+        }, { passive: true });
     }
 
     initHUD() {
@@ -2196,8 +2210,18 @@ class Game {
         
         if (!this.isInitialized) return;
         
-        // Update game state
-        this.update();
+        // Calculate delta time for stable physics updates
+        const now = performance.now();
+        let deltaTime = 0;
+        if (this.lastUpdateTime) {
+            deltaTime = (now - this.lastUpdateTime) / 1000; // Convert ms to seconds
+            // Limit max delta to avoid large jumps on performance hiccups
+            if (deltaTime > 0.1) deltaTime = 0.1;
+        }
+        this.lastUpdateTime = now;
+        
+        // Update game state with delta time
+        this.update(deltaTime);
         
         // Render the scene
         if (this.renderer && this.scene && this.camera) {
@@ -2205,7 +2229,7 @@ class Game {
         }
     }
 
-    update() {
+    update(deltaTime = 1/60) {
         // Basic update for truck movement
         if (!this.truck) return;
         
@@ -3452,22 +3476,68 @@ class Game {
     }
 }
 
-// Initialize game when window is fully loaded
-window.addEventListener('load', () => {
-    console.log("Window loaded, creating game");
-    try {
-        // Create audio manager first to ensure it's available globally
-        if (!window.audioManager) {
-            console.log("Creating global AudioManager instance");
-            window.audioManager = new AudioManager();
+// Implement a preloader
+class AssetPreloader {
+    constructor(onComplete) {
+        this.assetsToLoad = 0;
+        this.assetsLoaded = 0;
+        this.onComplete = onComplete;
+    }
+    
+    loadAudio(path) {
+        this.assetsToLoad++;
+        const audio = new Audio();
+        audio.addEventListener('canplaythrough', () => this.assetLoaded());
+        audio.addEventListener('error', () => this.assetLoaded());
+        audio.src = path;
+        return audio;
+    }
+    
+    loadImage(path) {
+        this.assetsToLoad++;
+        const img = new Image();
+        img.onload = () => this.assetLoaded();
+        img.onerror = () => this.assetLoaded();
+        img.src = path;
+        return img;
+    }
+    
+    assetLoaded() {
+        this.assetsLoaded++;
+        if (this.assetsLoaded >= this.assetsToLoad) {
+            this.onComplete();
         }
-        
-        // Create game
+    }
+}
+
+// Use the preloader before starting the game
+window.addEventListener('load', () => {
+    console.log("Window loaded, initializing preloader");
+    const loadingElement = document.getElementById('loadingScreen');
+    
+    const preloader = new AssetPreloader(() => {
+        if (loadingElement) loadingElement.style.display = 'none';
+        console.log("Assets preloaded, creating game");
         window.game = new Game();
-        
-        console.log("Game instance created and initialized");
-    } catch (error) {
-        console.error("Error creating game instance:", error);
+    });
+    
+    // Preload key assets
+    // Audio files
+    preloader.loadAudio('sounds/engine_rev.mp3');
+    preloader.loadAudio('sounds/engine_idle.mp3');
+    preloader.loadAudio('sounds/engine_deceleration.mp3');
+    preloader.loadAudio('sounds/weapon_fire.mp3');
+    preloader.loadAudio('sounds/suspension_bounce.mp3');
+    preloader.loadAudio('sounds/tire_screech.mp3');
+    preloader.loadAudio('sounds/tire_dirt.mp3');
+    preloader.loadAudio('sounds/vehicle_hit.mp3');
+    preloader.loadAudio('sounds/vehicle_explosion.mp3');
+    preloader.loadAudio('sounds/powerup_pickup.mp3');
+    preloader.loadAudio('sounds/powerup_activate.mp3');
+    
+    // If there are no assets to load, call complete immediately
+    if (preloader.assetsToLoad === 0) {
+        preloader.onComplete();
     }
 });
 

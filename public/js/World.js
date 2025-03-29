@@ -8,14 +8,13 @@ export class World {
     
     createGrid() {
         // Create ground
-        const gridHelper = new THREE.GridHelper(1000, 100, 0xff00ff, 0x00ffff);
+        const gridHelper = new THREE.GridHelper(1000, 50, 0xff00ff, 0x00ffff);
         this.scene.add(gridHelper);
         
-        // Create ground plane
-        const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
-        const groundMaterial = new THREE.MeshPhongMaterial({
-            color: 0x000000,
-            shininess: 0
+        // Create ground plane with simpler geometry
+        const groundGeometry = new THREE.PlaneGeometry(1000, 1000, 1, 1);
+        const groundMaterial = new THREE.MeshBasicMaterial({
+            color: 0x000000
         });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
@@ -23,7 +22,9 @@ export class World {
         this.scene.add(ground);
     }
     
-    update() {
-        // Add any world updates here
+    update(camera) {
+        // Only update objects that are within view distance
+        const viewDistance = 200;
+        // Implement distance-based detail levels
     }
 }

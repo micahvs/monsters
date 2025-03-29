@@ -359,51 +359,46 @@ export class AudioManager {
         }
         
         try {
-            // Stop conflicting sounds
-            if (name === 'engine_rev' || name === 'engine_deceleration') {
-                this.stopSound('engine_idle');
-            } else if (name === 'engine_idle') {
-                this.stopSound('engine_rev');
-                this.stopSound('engine_deceleration');
-            }
-            
-            const path = this.sounds[name];
-            if (!path) return;
-
-            // Try to use sound pool first if initialized
+            // Use sound pool if available
             if (this.poolsInitialized) {
                 const pool = this.soundPools.get(name);
                 if (pool && pool.length > 0) {
                     const audio = pool.find(a => a.paused) || pool[0];
-                    audio.currentTime = 0;
-                    audio.volume = this.sfxVolume * this.masterVolume;
-                    audio.play().catch(() => {});
+                    if (audio.paused) {  // Only reset and play if it's paused
+                        audio.currentTime = 0;
+                        audio.volume = this.sfxVolume * this.masterVolume;
+                        audio.play().catch(() => {});
+                    }
                     return;
                 }
             }
             
-            // Fallback to creating new audio if pool is empty or doesn't exist
-            const audio = new Audio(path);
-            const effectiveVolume = this.sfxVolume * this.masterVolume;
-            audio.volume = effectiveVolume;
+            // Fallback with simpler logic
+            const path = this.sounds[name];
+            if (!path) return;
             
+            // Limit the number of active sounds per type
             if (!this.activeSounds[name]) {
                 this.activeSounds[name] = [];
+            } else if (this.activeSounds[name].length >= 2) {
+                // Don't create more than 2 instances of the same sound
+                return;
             }
+            
+            const audio = new Audio(path);
+            audio.volume = this.sfxVolume * this.masterVolume;
             this.activeSounds[name].push(audio);
             
             audio.addEventListener('ended', () => {
-                if (this.activeSounds[name]) {
-                    const index = this.activeSounds[name].indexOf(audio);
-                    if (index !== -1) {
-                        this.activeSounds[name].splice(index, 1);
-                    }
+                const index = this.activeSounds[name].indexOf(audio);
+                if (index !== -1) {
+                    this.activeSounds[name].splice(index, 1);
                 }
             });
             
             audio.play().catch(() => {});
         } catch (error) {
-            // Silent error handling for performance
+            // Silent error handling
         }
     }
     

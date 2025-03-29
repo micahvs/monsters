@@ -710,7 +710,6 @@
             }
         };
     </script>
-    <!-- Add at the end of the file, just before </body> -->
     <script>
         // Sound initialization status
         document.addEventListener('click', function() {
@@ -719,33 +718,6 @@
                 console.log('Audio manager is available globally');
             } else {
                 console.warn('Audio manager is not available globally yet');
-            }
-        });
-    </script>
-
-    <!-- Sound System Check -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log("SOUND CHECK: DOM content loaded");
-        });
-
-        // Listen for clicks and test sound system
-        document.addEventListener('click', function() {
-            console.log("SOUND CHECK: User clicked - checking audio manager");
-            
-            // Check if audio manager exists
-            if (window.audioManager) {
-                console.log("SOUND CHECK: Audio manager found:", window.audioManager);
-                
-                // Try to play a sound
-                try {
-                    window.audioManager.playSound('engine_rev');
-                    console.log("SOUND CHECK: Attempted to play engine_rev sound");
-                } catch (e) {
-                    console.error("SOUND CHECK: Error playing sound:", e);
-                }
-            } else {
-                console.warn("SOUND CHECK: No audio manager available yet");
             }
         });
     </script>
