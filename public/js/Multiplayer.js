@@ -369,8 +369,8 @@ export default class Multiplayer {
                                 this.game.handleRemoteProjectileHit = function(sourceId, damage) {
                                     console.log(`Visual-only hit effect from ${sourceId}`);
                                     // Play hit sound
-                                    if (window.soundManager) {
-                                        window.soundManager.playSound('vehicle_hit', this.truck?.position);
+                                    if (window.audioManager) {
+                                        window.audioManager.playSound('vehicle_hit', this.truck?.position);
                                     } else if (window.SoundFX) {
                                         window.SoundFX.play('vehicle_hit');
                                     }
@@ -415,8 +415,8 @@ export default class Multiplayer {
                                 }
                                 
                                 // Sound effects
-                                if (window.soundManager) {
-                                    window.soundManager.playSound('vehicle_hit', this.game.truck?.position);
+                                if (window.audioManager) {
+                                    window.audioManager.playSound('vehicle_hit', this.game.truck?.position);
                                 } else if (window.SoundFX) {
                                     window.SoundFX.play('vehicle_hit');
                                 }
@@ -1676,8 +1676,8 @@ export default class Multiplayer {
                 this.showDamageEffect(impactPoint);
                 
                 // Play hit sound
-                if (window.soundManager) {
-                    window.soundManager.playSound('vehicle_hit');
+                if (window.audioManager) {
+                    window.audioManager.playSound('vehicle_hit', this.game.truck?.position);
                 } else if (window.SoundFX) {
                     window.SoundFX.play('vehicle_hit');
                 }

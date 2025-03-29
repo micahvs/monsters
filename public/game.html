@@ -599,176 +599,122 @@
             z-index: 101;
         }
 
-        /* Unified Audio Panel Styles */
-        #audio-panel {
+        /* Audio Panel Styles */
+        .audio-panel {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 300px;
+            bottom: 10px;
+            left: 10px;
             background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #ff00ff;
-            border-radius: 8px;
-            color: #00ffff;
-            font-family: 'Orbitron', sans-serif;
+            border: 2px solid #00c7ff;
+            border-radius: 10px;
+            color: white;
+            width: 300px;
             z-index: 1000;
-            box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
-            overflow: hidden;
-            transition: all 0.3s ease;
+            padding: 10px;
+            box-shadow: 0 0 15px rgba(0, 199, 255, 0.5);
         }
         
         .audio-panel-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
-            background: linear-gradient(90deg, #ff00ff, #9900ff);
-            cursor: pointer;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #00c7ff;
+            padding-bottom: 5px;
         }
         
-        .audio-panel-title {
-            font-weight: bold;
-            font-size: 16px;
-            color: #ffffff;
-            text-shadow: 0 0 5px rgba(255, 0, 255, 0.8);
+        #current-track-name {
+            font-family: "Orbitron", sans-serif;
+            font-size: 14px;
+            color: #00c7ff;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 200px;
         }
         
-        #audio-panel-toggle {
-            background: none;
+        .audio-toggle-btn {
+            background: transparent;
             border: none;
+            color: #00c7ff;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .audio-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .control-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .control-btn {
+            background: rgba(0, 199, 255, 0.2);
+            border: 1px solid #00c7ff;
+            border-radius: 5px;
             color: white;
             cursor: pointer;
-            padding: 0;
-            font-size: 14px;
+            padding: 5px 10px;
+            transition: all 0.2s;
         }
         
-        .audio-panel-content {
-            padding: 15px;
-            max-height: 300px;
-            transition: max-height 0.3s ease;
+        .control-btn:hover {
+            background: rgba(0, 199, 255, 0.4);
         }
         
-        .audio-panel-content.collapsed {
-            max-height: 0;
-            padding: 0 15px;
-            overflow: hidden;
-        }
-        
-        .audio-control-group {
-            margin-bottom: 15px;
-        }
-        
-        .audio-control-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 14px;
-            color: #00ffff;
-        }
-        
-        .volume-control {
+        .slider-container {
             display: flex;
             align-items: center;
             gap: 10px;
         }
         
+        .slider-icon {
+            font-size: 14px;
+            width: 20px;
+            text-align: center;
+        }
+        
         .volume-slider {
             flex-grow: 1;
-            height: 8px;
+            height: 6px;
             -webkit-appearance: none;
-            background: #222;
-            border-radius: 4px;
-            overflow: hidden;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
         }
         
         .volume-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 15px;
-            height: 15px;
+            appearance: none;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            background: #ff00ff;
+            background: #00c7ff;
             cursor: pointer;
-            box-shadow: 0 0 5px rgba(255, 0, 255, 0.8);
-            border: 2px solid #ffffff;
         }
         
         .volume-slider::-moz-range-thumb {
-            width: 15px;
-            height: 15px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            background: #ff00ff;
+            background: #00c7ff;
             cursor: pointer;
-            box-shadow: 0 0 5px rgba(255, 0, 255, 0.8);
-            border: 2px solid #ffffff;
         }
         
-        .volume-slider::-webkit-slider-runnable-track {
-            height: 8px;
-            background: linear-gradient(90deg, #ff00ff, #00ffff);
-            border-radius: 4px;
+        .audio-panel.collapsed .audio-controls {
+            display: none;
         }
-        
-        .music-controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 10px;
-        }
-        
-        .audio-button {
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid #ff00ff;
-            border-radius: 5px;
-            color: #ffffff;
-            width: 35px;
-            height: 35px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 0 5px rgba(255, 0, 255, 0.5);
-        }
-        
-        .audio-button:hover {
-            background: rgba(255, 0, 255, 0.3);
-            box-shadow: 0 0 10px rgba(255, 0, 255, 0.8);
-        }
-        
-        .audio-button.muted {
-            color: #666;
-            border-color: #666;
-        }
-        
-        .current-track {
-            margin-top: 15px;
-            padding: 8px;
-            background: rgba(0, 0, 0, 0.5);
-            border-radius: 4px;
-            font-size: 12px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            text-align: center;
-            border: 1px solid rgba(255, 0, 255, 0.3);
-        }
-        
-        /* Audio buttons when volume is zero */
-        .audio-button.volume-zero i.fa-volume-up::before {
-            content: "\f026"; /* fa-volume-mute */
-        }
-        
-        /* Collapsible functionality */
-        #audio-panel.collapsed .audio-panel-content {
-            max-height: 0;
-            padding-top: 0;
-            padding-bottom: 0;
-            overflow: hidden;
-        }
-        
-        #audio-panel.collapsed #audio-panel-toggle i.fa-chevron-up::before {
-            content: "\f078"; /* fa-chevron-down */
-        }
-
-        /* Weapon HUD styles */
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -880,74 +826,47 @@
     <div id="chat-status-container">CHAT</div>
     
     <!-- Unified Audio Controls Panel -->
-    <div id="audio-panel">
+    <audio id="backgroundMusic" preload="auto"></audio>
+
+    <div id="audio-panel" class="audio-panel">
         <div class="audio-panel-header">
-            <div class="audio-panel-title">AUDIO</div>
-            <button id="audio-panel-toggle" title="Toggle audio panel">
-                <i class="fas fa-chevron-up"></i>
-            </button>
+            <span id="current-track-name">No track</span>
+            <button id="audio-panel-toggle" class="audio-toggle-btn"><i class="fas fa-chevron-up"></i></button>
         </div>
-        <div class="audio-panel-content">
-            <!-- Master Volume -->
-            <div class="audio-control-group">
-                <label for="master-volume">MASTER</label>
-                <div class="volume-control">
-                    <button id="master-mute" class="audio-button" title="Mute master volume">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <input type="range" id="master-volume" min="0" max="100" value="100" class="volume-slider" title="Master volume">
+        
+        <div class="audio-controls">
+            <div class="control-group music-controls">
+                <div class="control-buttons">
+                    <button id="music-prev" class="control-btn"><i class="fas fa-backward"></i></button>
+                    <button id="music-play" class="control-btn"><i class="fas fa-play"></i></button>
+                    <button id="music-next" class="control-btn"><i class="fas fa-forward"></i></button>
+                    <button id="music-mute" class="control-btn"><i class="fas fa-music"></i></button>
+                </div>
+                <div class="slider-container">
+                    <span class="slider-icon"><i class="fas fa-music"></i></span>
+                    <input type="range" id="music-volume" min="0" max="100" value="30" class="volume-slider">
                 </div>
             </div>
             
-            <!-- Music Controls -->
-            <div class="audio-control-group">
-                <label for="music-volume">MUSIC</label>
-                <div class="volume-control">
-                    <button id="music-mute" class="audio-button" title="Mute music">
-                        <i class="fas fa-music"></i>
-                    </button>
-                    <input type="range" id="music-volume" min="0" max="100" value="30" class="volume-slider" title="Music volume">
-                </div>
-                <div class="music-controls">
-                    <button id="music-prev" class="audio-button" title="Previous track">
-                        <i class="fas fa-step-backward"></i>
-                    </button>
-                    <button id="music-play" class="audio-button" title="Play/Pause music">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <button id="music-next" class="audio-button" title="Next track">
-                        <i class="fas fa-step-forward"></i>
-                    </button>
+            <div class="control-group sfx-controls">
+                <div class="slider-container">
+                    <button id="sfx-mute" class="control-btn"><i class="fas fa-volume-up"></i></button>
+                    <input type="range" id="sfx-volume" min="0" max="100" value="70" class="volume-slider">
                 </div>
             </div>
             
-            <!-- Sound Effects Controls -->
-            <div class="audio-control-group">
-                <label for="sfx-volume">SFX</label>
-                <div class="volume-control">
-                    <button id="sfx-mute" class="audio-button" title="Mute sound effects">
-                        <i class="fas fa-volume-up"></i>
-                    </button>
-                    <input type="range" id="sfx-volume" min="0" max="100" value="70" class="volume-slider" title="Sound effects volume">
+            <div class="control-group master-controls">
+                <div class="slider-container">
+                    <button id="master-mute" class="control-btn"><i class="fas fa-volume-up"></i></button>
+                    <input type="range" id="master-volume" min="0" max="100" value="100" class="volume-slider">
                 </div>
-            </div>
-            
-            <!-- Current Track Display -->
-            <div class="current-track">
-                <div id="current-track-name">No Track Playing</div>
             </div>
         </div>
     </div>
 
-    <!-- Audio Element (hidden) -->
-    <audio id="backgroundMusic" preload="auto">
-        <source src="/music/pattern_bar_live_part00.mp3" type="audio/mpeg">
-    </audio>
-
     <!-- Scripts -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script type="module" src="js/main.js"></script>
-    <script src="js/music-player.js"></script>
     <script>
         // Update debug info
         window.updateDebugInfo = function(position) {
@@ -1262,8 +1181,8 @@
                     const volume = parseInt(sfxVolumeSlider.value) / 100;
                     
                     // Apply to SoundManager if available
-                    if (window.soundManager) {
-                        window.soundManager.setSFXVolume(volume);
+                    if (window.audioManager) {
+                        window.audioManager.setSFXVolume(volume);
                     }
                     
                     // Also apply to SoundFX system
@@ -1290,8 +1209,8 @@
                     localStorage.setItem('monsterTruckAudioSettings', JSON.stringify(settings));
                     
                     // Apply to SoundManager
-                    if (window.soundManager) {
-                        window.soundManager.setSFXMuted(isMuted);
+                    if (window.audioManager) {
+                        window.audioManager.setSFXMuted(isMuted);
                     }
                     
                     // Also apply to SoundFX system
@@ -1327,10 +1246,10 @@
         // Sound initialization status
         document.addEventListener('click', function() {
             console.log('User interaction detected - audio should be enabled now');
-            if (window.soundManager) {
-                console.log('Sound manager is available globally');
+            if (window.audioManager) {
+                console.log('Audio manager is available globally');
             } else {
-                console.warn('Sound manager is not available globally yet');
+                console.warn('Audio manager is not available globally yet');
             }
         });
     </script>
@@ -1343,21 +1262,21 @@
 
         // Listen for clicks and test sound system
         document.addEventListener('click', function() {
-            console.log("SOUND CHECK: User clicked - checking sound manager");
+            console.log("SOUND CHECK: User clicked - checking audio manager");
             
-            // Check if sound manager exists
-            if (window.soundManager) {
-                console.log("SOUND CHECK: Sound manager found:", window.soundManager);
+            // Check if audio manager exists
+            if (window.audioManager) {
+                console.log("SOUND CHECK: Audio manager found:", window.audioManager);
                 
                 // Try to play a sound
                 try {
-                    window.soundManager.playSound('engine_rev');
+                    window.audioManager.playSound('engine_rev');
                     console.log("SOUND CHECK: Attempted to play engine_rev sound");
                 } catch (e) {
                     console.error("SOUND CHECK: Error playing sound:", e);
                 }
             } else {
-                console.warn("SOUND CHECK: No sound manager available yet");
+                console.warn("SOUND CHECK: No audio manager available yet");
             }
         });
     </script>

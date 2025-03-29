@@ -669,21 +669,17 @@ export class MonsterTruck {
         // Acceleration and braking
         if (accelerating) {
             this.speed = Math.min(this.speed + this.acceleration, this.maxSpeed);
-            // Play engine rev sound when accelerating
-            if (window.soundManager) {
-                console.log("MonsterTruck: Playing engine_rev sound");
-                window.soundManager.playSound('engine_rev');
-            } else {
-                console.warn("MonsterTruck: No sound manager available for engine_rev");
+            // Only play sound at strategic moments, not every frame
+            if (window.audioManager && (!this._lastAccelSound || performance.now() - this._lastAccelSound > 500)) {
+                this._lastAccelSound = performance.now();
+                window.audioManager.playSound('engine_rev');
             }
         } else if (braking) {
             this.speed = Math.max(this.speed - this.brakingForce, -this.maxSpeed * 0.5);
-            // Play engine deceleration sound when braking
-            if (window.soundManager) {
-                console.log("MonsterTruck: Playing engine_deceleration sound");
-                window.soundManager.playSound('engine_deceleration');
-            } else {
-                console.warn("MonsterTruck: No sound manager available for engine_deceleration");
+            // Only play sound at strategic moments, not every frame
+            if (window.audioManager && (!this._lastBrakeSound || performance.now() - this._lastBrakeSound > 500)) {
+                this._lastBrakeSound = performance.now();
+                window.audioManager.playSound('engine_deceleration');
             }
         } else {
             // Natural deceleration
@@ -691,28 +687,26 @@ export class MonsterTruck {
             
             // Check if the vehicle is almost stopped (idle)
             if (Math.abs(this.speed) < 0.05) {
-                // Play engine idle sound when the vehicle is not moving
-                if (window.soundManager) {
-                    console.log("MonsterTruck: Playing engine_idle sound - vehicle at rest");
-                    window.soundManager.playSound('engine_idle');
-                } else {
-                    console.warn("MonsterTruck: No sound manager available for engine_idle");
+                // Only play idle sound occasionally
+                if (window.audioManager && (!this._lastIdleSound || performance.now() - this._lastIdleSound > 2000)) {
+                    this._lastIdleSound = performance.now();
+                    window.audioManager.playSound('engine_idle');
                 }
             } 
             // Play engine deceleration sound during natural deceleration if speed is significant
-            else if (Math.abs(this.speed) > 0.1 && window.soundManager) {
-                console.log("MonsterTruck: Playing engine_deceleration sound for natural deceleration");
-                window.soundManager.playSound('engine_deceleration');
+            else if (Math.abs(this.speed) > 0.1 && window.audioManager && 
+                    (!this._lastDecelSound || performance.now() - this._lastDecelSound > 800)) {
+                this._lastDecelSound = performance.now();
+                window.audioManager.playSound('engine_deceleration');
             }
         }
         
-        // Check if we just started moving (transition from idle to moving)
+        // State transition: Idle -> Moving (only play sound once when starting to move)
         const isMoving = Math.abs(this.speed) >= 0.05;
-        if (!wasMoving && isMoving && window.soundManager) {
-            // Stop idle sound when starting to move
-            console.log("MonsterTruck: Vehicle starting to move - transitioning from idle to rev");
-            // Start engine rev sound as we begin to move
-            window.soundManager.playSound('engine_rev');
+        if (!wasMoving && isMoving && window.audioManager && 
+            (!this._lastStartSound || performance.now() - this._lastStartSound > 500)) {
+            this._lastStartSound = performance.now();
+            window.audioManager.playSound('engine_rev');
         }
         
         // Turning (more effective at lower speeds)
@@ -733,7 +727,6 @@ export class MonsterTruck {
         
         // VALIDATION: Check for NaN values in direction and speed
         if (isNaN(direction.x) || isNaN(direction.z) || isNaN(this.speed)) {
-            console.warn("NaN values detected in movement calculation! Resetting values.");
             direction.set(0, 0, 1);
             this.resetMovementState();
         }
@@ -747,7 +740,6 @@ export class MonsterTruck {
         
         // VALIDATION: Final check for position validity
         if (isNaN(this.body.position.x) || isNaN(this.body.position.y) || isNaN(this.body.position.z)) {
-            console.warn("NaN values detected in truck position! Resetting position.");
             this.body.position.set(0, 0.5, 0);
             this.resetMovementState();
         }
@@ -870,9 +862,8 @@ export class MonsterTruck {
         this.ammo--;
         
         // Play weapon fire sound if projectiles were created (successful shot)
-        if (projectile && window.soundManager) {
-            console.log("Game: Playing weapon_fire sound");
-            window.soundManager.playSound('weapon_fire');
+        if (projectile && window.audioManager) {
+            window.audioManager.playSound('weapon_fire');
         }
     }
     

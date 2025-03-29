@@ -101,19 +101,22 @@ The Monster Truck game is a 3D vehicle combat game built with Three.js that feat
 - Use event-based communication between components
 - Optimize update loops for better performance
 
-### 7. music-player.js
+### 7. AudioManager.js
 
-**Purpose:** Manages background music playback.
+**Purpose:** Manages all audio functionality including background music and sound effects.
 
 **Key Features:**
 - Background music loading and playback
-- Track transition handling
-- Volume and mute controls
+- Sound effects management with pooling
+- Volume and mute controls for music, SFX, and master
+- Spatial audio support
+- Settings persistence
+- Mobile-compatible audio controls
 
 **Improvement Opportunities:**
-- Better integrate with main SoundManager
 - Improve error handling for failed track loading
 - Implement dynamic music system that responds to gameplay
+- Add more spatial audio effects
 
 ## Implementation Roadmap
 
