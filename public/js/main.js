@@ -514,22 +514,11 @@ class PowerUp {
         this.type = type;
         this.mesh = null;
         this.light = null;
-        this.particles = [];
         this.created = false;
         this.createdTime = Date.now();
-        this.floatOffset = Math.random() * Math.PI * 2;
-        this.rotationSpeed = {
-            x: (Math.random() - 0.5) * 0.03,
-            y: (Math.random() - 0.5) * 0.03,
-            z: (Math.random() - 0.5) * 0.03
-        };
-        this.pulsePhase = Math.random() * Math.PI * 2;
         
         // Create immediately
         this.create();
-        
-        // Add spawn effect
-        this.createSpawnEffect();
     }
     
     create() {
@@ -539,159 +528,41 @@ class PowerUp {
         this.mesh = new THREE.Object3D();
         this.mesh.position.copy(this.position);
         
-        // Create base geometry based on powerup type
-        let geometry;
+        // Simple geometry for all powerup types to improve performance
+        const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         let color;
-        let emissiveIntensity = 0.8;
         
+        // Set color based on type
         switch(this.type) {
             case 'SPEED_BOOST':
-                // Sleek aerodynamic shape for speed boost
-                geometry = new THREE.OctahedronGeometry(0.8, 2);
                 color = 0x00ff99;
-                emissiveIntensity = 1.0;
                 break;
             case 'REPAIR':
-                // Heart-like shape for repair
-                const heartShape = new THREE.Shape();
-                heartShape.moveTo(0, 0.5);
-                heartShape.bezierCurveTo(0, 0.8, 0.7, 0.8, 0.7, 0.5);
-                heartShape.bezierCurveTo(0.7, 0.2, 0, 0.2, 0, 0.5);
-                heartShape.bezierCurveTo(0, 0.2, -0.7, 0.2, -0.7, 0.5);
-                heartShape.bezierCurveTo(-0.7, 0.8, 0, 0.8, 0, 0.5);
-                
-                geometry = new THREE.ExtrudeGeometry(heartShape, {
-                    depth: 0.4,
-                    bevelEnabled: true,
-                    bevelSegments: 2,
-                    bevelSize: 0.1,
-                    bevelThickness: 0.1
-                });
-                geometry.scale(0.8, 0.8, 0.8);
                 color = 0xff3366;
                 break;
             case 'SHIELD':
-                // Energy shield shape
-                geometry = new THREE.TorusGeometry(0.8, 0.3, 16, 32);
                 color = 0xffcc00;
                 break;
             case 'AMMO':
-                // Create a custom bullet-like shape
-                const bulletGroup = new THREE.Group();
-                
-                // Bullet body
-                const bulletBody = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.2, 0.2, 0.8, 16),
-                    new THREE.MeshStandardMaterial({
-                        color: 0xcccccc,
-                        metalness: 1.0,
-                        roughness: 0.2
-                    })
-                );
-                
-                // Bullet tip
-                const bulletTip = new THREE.Mesh(
-                    new THREE.ConeGeometry(0.2, 0.4, 16),
-                    new THREE.MeshStandardMaterial({
-                        color: 0xff9900,
-                        metalness: 0.9,
-                        roughness: 0.2
-                    })
-                );
-                bulletTip.position.y = 0.6;
-                
-                bulletGroup.add(bulletBody);
-                bulletGroup.add(bulletTip);
-                bulletGroup.scale.set(1.2, 1.2, 1.2);
-                
-                // Use a box geometry as placeholder for collisions
-                geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-                geometry.visible = false;
-                
                 color = 0x00aaff;
-                
-                // Create the mesh with invisible collision geometry
-                const powerupMesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-                    color: color,
-                    emissive: color,
-                    emissiveIntensity: emissiveIntensity,
-                    roughness: 0.2,
-                    metalness: 0.8,
-                    transparent: true,
-                    opacity: 0.0 // Invisible
-                }));
-                
-                // Add the bullet model to our powerup mesh
-                powerupMesh.add(bulletGroup);
-                this.mesh.add(powerupMesh);
-                
-                // Add custom rotation for this special model
-                bulletGroup.rotation.x = Math.PI * 0.5;
-                
-                // Skip normal material creation since we have a custom model
-                this.scene.add(this.mesh);
-                this.created = true;
-                
-                // Add a point light to make it glow
-                this.light = new THREE.PointLight(color, 2.0, 8);
-                this.light.position.set(0, 0, 0);
-                this.mesh.add(this.light);
-                
-                // Add energy field effect
-                const energyField = new THREE.Mesh(
-                    new THREE.SphereGeometry(1.2, 16, 16),
-                    new THREE.MeshStandardMaterial({
-                        color: color,
-                        emissive: color,
-                        emissiveIntensity: 0.5,
-                        transparent: true,
-                        opacity: 0.2
-                    })
-                );
-                this.mesh.add(energyField);
-                this.energyField = energyField;
-                
-                return; // Skip standard material creation
-                
+                break;
             default:
-                geometry = new THREE.TetrahedronGeometry(0.8, 2);
                 color = 0xff00ff;
         }
         
-        // Create material with enhanced emissive properties for better visibility
-        const material = new THREE.MeshStandardMaterial({
+        // Create material with emissive properties
+        const material = new THREE.MeshBasicMaterial({
             color: color,
-            emissive: color,
-            emissiveIntensity: emissiveIntensity,
-            roughness: 0.2,
-            metalness: 0.8,
-            transparent: true,
-            opacity: 0.9
+            wireframe: true
         });
         
         const powerupMesh = new THREE.Mesh(geometry, material);
         this.mesh.add(powerupMesh);
         
-        // Add a point light to make it glow
-        this.light = new THREE.PointLight(color, 2.0, 8);
+        // Add a small light for visibility
+        this.light = new THREE.PointLight(color, 0.8, 5);
         this.light.position.set(0, 0, 0);
         this.mesh.add(this.light);
-        
-        // Add energy field effect (for all types except AMMO which has its own)
-        if (this.type !== 'AMMO') {
-            const energyField = new THREE.Mesh(
-                new THREE.SphereGeometry(1.2, 16, 16),
-                new THREE.MeshStandardMaterial({
-                    color: color,
-                    emissive: color,
-                    emissiveIntensity: 0.5,
-                    transparent: true,
-                    opacity: 0.2
-                })
-            );
-            this.mesh.add(energyField);
-            this.energyField = energyField;
-        }
         
         // Set initial position
         this.mesh.position.y = 2; // Slightly above ground
@@ -701,136 +572,18 @@ class PowerUp {
         this.created = true;
     }
     
-    createSpawnEffect() {
-        // Add dramatic spawn effect
-        const color = this.light ? this.light.color.getHex() : 0xffffff;
-        
-        // Create expanding ring
-        const ringGeometry = new THREE.RingGeometry(0.1, 0.2, 32);
-        const ringMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide
-        });
-        
-        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-        ring.position.copy(this.position);
-        ring.position.y = 0.1;
-        ring.rotation.x = Math.PI / 2;
-        this.scene.add(ring);
-        
-        // Add vertical light beam
-        const beamGeometry = new THREE.CylinderGeometry(0.1, 0.1, 10, 8, 1, true);
-        const beamMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.5,
-            side: THREE.DoubleSide
-        });
-        
-        const beam = new THREE.Mesh(beamGeometry, beamMaterial);
-        beam.position.copy(this.position);
-        beam.position.y = 5;
-        this.scene.add(beam);
-        
-        // Animate spawn effects
-        let spawnAge = 0;
-        const animateSpawn = () => {
-            spawnAge += 0.05;
-            
-            // Expand ring
-            ring.scale.set(1 + spawnAge * 3, 1 + spawnAge * 3, 1);
-            ring.material.opacity = Math.max(0, 0.8 - spawnAge * 0.8);
-            
-            // Shrink beam
-            beam.scale.y = Math.max(0.1, 1 - spawnAge * 0.5);
-            beam.material.opacity = Math.max(0, 0.5 - spawnAge * 0.5);
-            
-            if (spawnAge < 1) {
-                requestAnimationFrame(animateSpawn);
-            } else {
-                // Remove effects when animation is complete
-                this.scene.remove(ring);
-                this.scene.remove(beam);
-            }
-        };
-        
-        animateSpawn();
-    }
-    
     update(isFullUpdate = true) {
         if (!this.mesh) return;
         
         const now = Date.now();
         
-        // Make powerup use complex rotation on all axes
-        this.mesh.rotation.x += this.rotationSpeed.x;
-        this.mesh.rotation.y += this.rotationSpeed.y;
-        this.mesh.rotation.z += this.rotationSpeed.z;
+        // Simple floating animation
+        const floatHeight = Math.sin(now * 0.002) * 0.5;
+        this.mesh.position.y = 2 + floatHeight;
         
-        // Make powerup float up and down with a more complex motion
-        const floatOffset = Math.sin(now * 0.001 + this.floatOffset) * 0.5;
-        this.mesh.position.y = 2 + floatOffset;
-        
-        // Add some subtle horizontal drift
-        const driftX = Math.sin(now * 0.0005 + this.floatOffset * 2) * 0.1;
-        const driftZ = Math.cos(now * 0.0007 + this.floatOffset * 3) * 0.1;
-        this.mesh.position.x = this.position.x + driftX;
-        this.mesh.position.z = this.position.z + driftZ;
-        
-        // Pulse the light with a breathing effect
-        const pulseIntensity = 1.5 + Math.sin(now * 0.003 + this.pulsePhase) * 0.5;
-        if (this.light) {
-            this.light.intensity = pulseIntensity;
-            this.light.distance = 8 + Math.sin(now * 0.002) * 2;
-        }
-        
-        // Scale energy field for pulsing effect
-        if (this.energyField) {
-            const fieldScale = 1 + Math.sin(now * 0.002 + this.pulsePhase) * 0.1;
-            this.energyField.scale.set(fieldScale, fieldScale, fieldScale);
-        }
-        
-        // Only do particle effects on full update frames
-        if (isFullUpdate) {
-            // Occasionally emit particles (different for each powerup type)
-            if (Math.random() < 0.05) {
-                this.emitParticle();
-            }
-            
-            // Update existing particles
-            for (let i = this.particles.length - 1; i >= 0; i--) {
-                const particle = this.particles[i];
-                particle.life -= 0.02;
-                
-                if (particle.life <= 0) {
-                    this.scene.remove(particle.mesh);
-                    this.particles.splice(i, 1);
-                    continue;
-                }
-                
-                // Move particle
-                particle.mesh.position.x += particle.velocity.x;
-                particle.mesh.position.y += particle.velocity.y;
-                particle.mesh.position.z += particle.velocity.z;
-                
-                // Apply gravity if applicable
-                if (particle.useGravity) {
-                    particle.velocity.y -= 0.01;
-                }
-                
-                // Update opacity
-                if (particle.mesh.material) {
-                    particle.mesh.material.opacity = particle.life * particle.initialOpacity;
-                }
-                
-                // Special effect: Make speed boost particles trail
-                if (this.type === 'SPEED_BOOST' && Math.random() < 0.4) {
-                    this.createMiniTrail(particle.mesh.position.clone());
-                }
-            }
-        }
+        // Simple rotation
+        this.mesh.rotation.y += 0.02;
+        this.mesh.rotation.x += 0.01;
         
         // Check if powerup should despawn (after 30 seconds)
         if (now - this.createdTime > 30000) {
@@ -840,720 +593,11 @@ class PowerUp {
         return false; // Keep updating
     }
     
-    emitParticle() {
-        let geometry, material, velocity, life, useGravity;
-        const position = this.mesh.position.clone();
-        
-        // Get color from the powerup
-        const color = this.light ? this.light.color.clone() : new THREE.Color(0xffffff);
-        
-        // Customize particles based on powerup type
-        switch(this.type) {
-            case 'SPEED_BOOST':
-                // Speed boost emits energy trails
-                geometry = new THREE.SphereGeometry(0.1, 8, 8);
-                material = new THREE.MeshBasicMaterial({
-                    color: color,
-                    transparent: true,
-                    opacity: 0.7
-                });
-                
-                // Particles shoot downward and outward
-                const angle = Math.random() * Math.PI * 2;
-                const radius = 0.8;
-                position.x += Math.cos(angle) * radius;
-                position.z += Math.sin(angle) * radius;
-                
-                velocity = {
-                    x: Math.cos(angle) * 0.05,
-                    y: -0.05, // Trails downward
-                    z: Math.sin(angle) * 0.05
-                };
-                
-                life = 0.7;
-                useGravity = false;
-                break;
-                
-            case 'REPAIR':
-                // Repair emits healing particles that float upward
-                geometry = new THREE.SphereGeometry(0.08, 8, 8);
-                material = new THREE.MeshBasicMaterial({
-                    color: color,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                
-                // Position around powerup
-                const repairAngle = Math.random() * Math.PI * 2;
-                position.x += Math.cos(repairAngle) * 0.7;
-                position.z += Math.sin(repairAngle) * 0.7;
-                position.y -= 0.3; // Start slightly below
-                
-                velocity = {
-                    x: Math.cos(repairAngle) * 0.01,
-                    y: 0.03 + Math.random() * 0.02, // Float upward
-                    z: Math.sin(repairAngle) * 0.01
-                };
-                
-                life = 1.0;
-                useGravity = false;
-                break;
-                
-            case 'SHIELD':
-                // Shield emits orbital particles
-                geometry = new THREE.SphereGeometry(0.05 + Math.random() * 0.05, 8, 8);
-                material = new THREE.MeshBasicMaterial({
-                    color: color,
-                    transparent: true,
-                    opacity: 0.6 + Math.random() * 0.2
-                });
-                
-                // Position in orbit
-                const orbitAngle = Math.random() * Math.PI * 2;
-                const orbitRadius = 0.8 + Math.random() * 0.4;
-                position.x += Math.cos(orbitAngle) * orbitRadius;
-                position.z += Math.sin(orbitAngle) * orbitRadius;
-                position.y += Math.random() * 0.8 - 0.4;
-                
-                // Circular motion
-                const perpAngle = orbitAngle + Math.PI/2;
-                velocity = {
-                    x: Math.cos(perpAngle) * (0.03 + Math.random() * 0.02),
-                    y: (Math.random() - 0.5) * 0.01,
-                    z: Math.sin(perpAngle) * (0.03 + Math.random() * 0.02)
-                };
-                
-                life = 1.5;
-                useGravity = false;
-                break;
-                
-            case 'AMMO':
-                // Ammo emits metallic sparks
-                geometry = new THREE.SphereGeometry(0.03 + Math.random() * 0.03, 4, 4);
-                material = new THREE.MeshBasicMaterial({
-                    color: Math.random() < 0.5 ? 0xff9900 : 0xffcc00,
-                    transparent: true,
-                    opacity: 0.8
-                });
-                
-                // Position at bottom of powerup
-                position.y -= 0.4;
-                position.x += (Math.random() - 0.5) * 0.4;
-                position.z += (Math.random() - 0.5) * 0.4;
-                
-                // Spray upward with arc
-                velocity = {
-                    x: (Math.random() - 0.5) * 0.08,
-                    y: 0.05 + Math.random() * 0.08,
-                    z: (Math.random() - 0.5) * 0.08
-                };
-                
-                life = 0.8;
-                useGravity = true;
-                break;
-                
-            default:
-                // Default particles
-                geometry = new THREE.SphereGeometry(0.1, 8, 8);
-                material = new THREE.MeshBasicMaterial({
-                    color: color,
-                    transparent: true,
-                    opacity: 0.7
-                });
-                
-                // Random outward velocity
-                const defaultAngle = Math.random() * Math.PI * 2;
-                velocity = {
-                    x: Math.cos(defaultAngle) * 0.03,
-                    y: 0.02 + Math.random() * 0.03,
-                    z: Math.sin(defaultAngle) * 0.03
-                };
-                
-                life = 1.0;
-                useGravity = false;
-        }
-        
-        // Create the particle
-        const particleMesh = new THREE.Mesh(geometry, material);
-        particleMesh.position.copy(position);
-        
-        // Add to scene and tracking
-        this.scene.add(particleMesh);
-        this.particles.push({
-            mesh: particleMesh,
-            velocity: velocity,
-            life: life,
-            initialOpacity: material.opacity,
-            useGravity: useGravity
-        });
-    }
-    
-    createMiniTrail(position) {
-        // Speed boost special effect: tiny trail particles
-        const geometry = new THREE.SphereGeometry(0.02, 4, 4);
-        const material = new THREE.MeshBasicMaterial({
-            color: 0x88ffcc,
-            transparent: true,
-            opacity: 0.5
-        });
-        
-        const trail = new THREE.Mesh(geometry, material);
-        trail.position.copy(position);
-        this.scene.add(trail);
-        
-        // Fade out quickly
-        let trailLife = 0.5;
-        
-        const updateTrail = () => {
-            trailLife -= 0.1;
-            trail.material.opacity = trailLife * 0.5;
-            
-            if (trailLife <= 0) {
-                this.scene.remove(trail);
-                return;
-            }
-            
-            requestAnimationFrame(updateTrail);
-        };
-        
-        updateTrail();
-    }
-    
     createPickupEffect() {
-        if (!this.mesh) return;
-        
-        // Get powerup position and color for effect
-        const position = this.mesh.position.clone();
-        const color = this.light ? this.light.color.getHex() : 0xffffff;
-        
-        // Create specialized pickup effects based on powerup type
-        switch(this.type) {
-            case 'SPEED_BOOST':
-                this.createSpeedBoostEffect(position, color);
-                break;
-                
-            case 'REPAIR':
-                this.createRepairEffect(position, color);
-                break;
-                
-            case 'SHIELD':
-                this.createShieldEffect(position, color);
-                break;
-                
-            case 'AMMO':
-                this.createAmmoEffect(position, color);
-                break;
-                
-            default:
-                this.createDefaultEffect(position, color);
+        // Just create a basic effect using the simplified method
+        if (this.scene.game && this.scene.game.createSimpleEffect) {
+            this.scene.game.createSimpleEffect(this.mesh.position.clone(), this.light.color, 15);
         }
-    }
-    
-    createSpeedBoostEffect(position, color) {
-        // Create speed lines shooting outward
-        const particleCount = 30;
-        const particles = [];
-        
-        // Flash of light
-        const flash = new THREE.PointLight(color, 3, 15);
-        flash.position.copy(position);
-        this.scene.add(flash);
-        
-        // Speed ring expanding outward
-        const ringGeometry = new THREE.RingGeometry(0.5, 0.7, 32);
-        const ringMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.8,
-            side: THREE.DoubleSide
-        });
-        
-        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-        ring.position.copy(position);
-        ring.rotation.x = Math.PI / 2;
-        this.scene.add(ring);
-        
-        // Create streaking particles
-        for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.BoxGeometry(0.05, 0.05, 0.2 + Math.random() * 0.3);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.7
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position at center
-            particle.position.copy(position);
-            
-            // Set outward velocity
-            const angle = Math.random() * Math.PI * 2;
-            const speed = 0.2 + Math.random() * 0.3;
-            const velocity = {
-                x: Math.cos(angle) * speed,
-                y: (Math.random() - 0.3) * 0.1, // Mostly horizontal
-                z: Math.sin(angle) * speed
-            };
-            
-            // Point in direction of travel
-            particle.lookAt(position.clone().add(new THREE.Vector3(velocity.x, velocity.y, velocity.z)));
-            
-            this.scene.add(particle);
-            particles.push({
-                mesh: particle,
-                velocity: velocity
-            });
-        }
-        
-        // Animate effects
-        let effectLife = 1.0;
-        const animateEffect = () => {
-            effectLife -= 0.04;
-            
-            if (effectLife <= 0) {
-                // Clean up
-                this.scene.remove(flash);
-                this.scene.remove(ring);
-                particles.forEach(p => this.scene.remove(p.mesh));
-                return;
-            }
-            
-            // Update flash
-            flash.intensity = effectLife * 3;
-            
-            // Expand and fade ring
-            ring.scale.set(1 + (1 - effectLife) * 5, 1 + (1 - effectLife) * 5, 1);
-            ring.material.opacity = effectLife * 0.8;
-            
-            // Update particles
-            particles.forEach(p => {
-                p.mesh.position.x += p.velocity.x;
-                p.mesh.position.y += p.velocity.y;
-                p.mesh.position.z += p.velocity.z;
-                
-                // Stretch as they travel
-                p.mesh.scale.z = 1 + (1 - effectLife) * 2;
-                
-                // Fade out
-                p.mesh.material.opacity = effectLife * 0.7;
-            });
-            
-            requestAnimationFrame(animateEffect);
-        };
-        
-        animateEffect();
-    }
-    
-    createRepairEffect(position, color) {
-        // Create healing particles floating upward
-        const particleCount = 25;
-        const particles = [];
-        
-        // Create healing cross shape helper function
-        const createHealingCross = (pos, size, angle) => {
-            const group = new THREE.Group();
-            
-            // Horizontal bar
-            const hBar = new THREE.Mesh(
-                new THREE.BoxGeometry(size, size/5, size/5),
-                new THREE.MeshBasicMaterial({ color: color })
-            );
-            
-            // Vertical bar
-            const vBar = new THREE.Mesh(
-                new THREE.BoxGeometry(size/5, size, size/5),
-                new THREE.MeshBasicMaterial({ color: color })
-            );
-            
-            group.add(hBar);
-            group.add(vBar);
-            
-            // Position and rotate
-            group.position.copy(pos);
-            group.rotation.z = angle;
-            
-            return group;
-        };
-        
-        // Add healing ring pulsing outward
-        const ringGeometry = new THREE.RingGeometry(0.2, 0.4, 32);
-        const ringMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide
-        });
-        
-        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-        ring.position.copy(position);
-        ring.rotation.x = Math.PI / 2;
-        this.scene.add(ring);
-        
-        // Add healing crosses
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const distance = 1.0;
-            const crossPos = new THREE.Vector3(
-                position.x + Math.cos(angle) * distance,
-                position.y,
-                position.z + Math.sin(angle) * distance
-            );
-            
-            const cross = createHealingCross(crossPos, 0.5, Math.random() * Math.PI);
-            cross.rotation.x = Math.PI / 2; // Lie flat
-            this.scene.add(cross);
-            
-            particles.push({
-                mesh: cross,
-                initialY: crossPos.y,
-                angle: angle,
-                distance: distance,
-                phase: Math.random() * Math.PI * 2
-            });
-        }
-        
-        // Add healing glow
-        const glow = new THREE.PointLight(color, 2, 10);
-        glow.position.copy(position);
-        this.scene.add(glow);
-        
-        // Animate healing effect
-        let effectLife = 1.0;
-        const animateEffect = () => {
-            effectLife -= 0.015; // Slower fade for healing effect
-            
-            if (effectLife <= 0) {
-                // Clean up
-                this.scene.remove(glow);
-                this.scene.remove(ring);
-                particles.forEach(p => this.scene.remove(p.mesh));
-                return;
-            }
-            
-            // Pulse glow
-            glow.intensity = 2 + Math.sin(effectLife * 20) * 1;
-            
-            // Expand and pulse ring
-            ring.scale.set(1 + (1 - effectLife) * 3, 1 + (1 - effectLife) * 3, 1);
-            ring.material.opacity = effectLife * (0.5 + Math.sin(effectLife * 20) * 0.3);
-            
-            // Move crosses in a spiral pattern
-            particles.forEach((p, i) => {
-                // Decrease distance over time (spiral inward)
-                p.distance = Math.max(0.2, p.distance * 0.98);
-                
-                // Rotate around center point
-                p.angle += 0.02;
-                
-                // Update position
-                p.mesh.position.x = position.x + Math.cos(p.angle) * p.distance;
-                p.mesh.position.z = position.z + Math.sin(p.angle) * p.distance;
-                
-                // Float upward
-                p.mesh.position.y = p.initialY + (1 - effectLife) * 3;
-                
-                // Spin
-                p.mesh.rotation.y += 0.05;
-                
-                // Fade out
-                p.mesh.children.forEach(child => {
-                    child.material.opacity = effectLife;
-                });
-            });
-            
-            requestAnimationFrame(animateEffect);
-        };
-        
-        animateEffect();
-    }
-    
-    createShieldEffect(position, color) {
-        // Create expanding shield bubble
-        const bubbleGeometry = new THREE.SphereGeometry(1.5, 32, 32);
-        const bubbleMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.5,
-            side: THREE.DoubleSide,
-            wireframe: true
-        });
-        
-        const bubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
-        bubble.position.copy(position);
-        this.scene.add(bubble);
-        
-        // Add solid bubble inside
-        const innerBubbleGeometry = new THREE.SphereGeometry(1.3, 32, 32);
-        const innerBubbleMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.2,
-            side: THREE.DoubleSide
-        });
-        
-        const innerBubble = new THREE.Mesh(innerBubbleGeometry, innerBubbleMaterial);
-        bubble.add(innerBubble);
-        
-        // Add energy rings
-        const rings = [];
-        for (let i = 0; i < 3; i++) {
-            const ringGeometry = new THREE.RingGeometry(1.5, 1.7, 32);
-            const ringMaterial = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.7,
-                side: THREE.DoubleSide
-            });
-            
-            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-            
-            // Position with different rotations
-            ring.rotation.x = Math.random() * Math.PI;
-            ring.rotation.y = Math.random() * Math.PI;
-            
-            bubble.add(ring);
-            rings.push(ring);
-        }
-        
-        // Add central flash
-        const flash = new THREE.PointLight(color, 3, 15);
-        flash.position.copy(position);
-        this.scene.add(flash);
-        
-        // Animate shield effect
-        let effectLife = 1.0;
-        const animateEffect = () => {
-            effectLife -= 0.02;
-            
-            if (effectLife <= 0) {
-                // Clean up
-                this.scene.remove(bubble);
-                this.scene.remove(flash);
-                return;
-            }
-            
-            // Expand bubbles
-            const expandFactor = 1 + (1 - effectLife) * 2;
-            bubble.scale.set(expandFactor, expandFactor, expandFactor);
-            
-            // Rotate rings
-            rings.forEach((ring, i) => {
-                ring.rotation.x += 0.01 * (i + 1);
-                ring.rotation.y += 0.02 * (i + 1);
-                ring.rotation.z += 0.015 * (i + 1);
-            });
-            
-            // Fade out
-            bubble.material.opacity = effectLife * 0.5;
-            innerBubble.material.opacity = effectLife * 0.2;
-            rings.forEach(ring => {
-                ring.material.opacity = effectLife * 0.7;
-            });
-            
-            // Flash fades faster
-            flash.intensity = effectLife * 3;
-            
-            requestAnimationFrame(animateEffect);
-        };
-        
-        animateEffect();
-    }
-    
-    createAmmoEffect(position, color) {
-        // Create explosive ammo effect
-        const particleCount = 40;
-        const particles = [];
-        
-        // Create metal fragments
-        for (let i = 0; i < particleCount; i++) {
-            const size = 0.05 + Math.random() * 0.1;
-            let geometry;
-            
-            // Mix of different fragment shapes
-            const shapeType = Math.floor(Math.random() * 3);
-            switch(shapeType) {
-                case 0:
-                    geometry = new THREE.TetrahedronGeometry(size);
-                    break;
-                case 1:
-                    geometry = new THREE.BoxGeometry(size, size, size);
-                    break;
-                default:
-                    geometry = new THREE.OctahedronGeometry(size, 0);
-            }
-            
-            // Metallic material with random shades
-            const material = new THREE.MeshStandardMaterial({
-                color: Math.random() < 0.5 ? 0xcccccc : 0x888888,
-                metalness: 0.8,
-                roughness: 0.2,
-                transparent: true,
-                opacity: 0.9
-            });
-            
-            const fragment = new THREE.Mesh(geometry, material);
-            fragment.position.copy(position);
-            
-            // Random velocity in all directions
-            const angle = Math.random() * Math.PI * 2;
-            const elevation = Math.random() * Math.PI - Math.PI/2;
-            const speed = 0.1 + Math.random() * 0.2;
-            
-            const velocity = {
-                x: Math.cos(angle) * Math.cos(elevation) * speed,
-                y: Math.sin(elevation) * speed,
-                z: Math.sin(angle) * Math.cos(elevation) * speed
-            };
-            
-            // Random rotation
-            const rotation = {
-                x: (Math.random() - 0.5) * 0.2,
-                y: (Math.random() - 0.5) * 0.2,
-                z: (Math.random() - 0.5) * 0.2
-            };
-            
-            this.scene.add(fragment);
-            particles.push({
-                mesh: fragment,
-                velocity: velocity,
-                rotation: rotation
-            });
-        }
-        
-        // Add explosion flash
-        const flash = new THREE.PointLight(color, 3, 15);
-        flash.position.copy(position);
-        this.scene.add(flash);
-        
-        // Add orange explosion flash
-        const explosion = new THREE.PointLight(0xff6600, 2, 10);
-        explosion.position.copy(position);
-        this.scene.add(explosion);
-        
-        // Animate ammo effect
-        let effectLife = 1.0;
-        const animateEffect = () => {
-            effectLife -= 0.03;
-            
-            if (effectLife <= 0) {
-                // Clean up
-                this.scene.remove(flash);
-                this.scene.remove(explosion);
-                particles.forEach(p => this.scene.remove(p.mesh));
-                return;
-            }
-            
-            // Update flash
-            flash.intensity = effectLife * 3;
-            
-            // Explosion fades in then out
-            const explosionIntensity = Math.sin((1 - effectLife) * Math.PI) * 2;
-            explosion.intensity = explosionIntensity;
-            
-            // Update fragments
-            particles.forEach(p => {
-                // Apply velocity
-                p.mesh.position.x += p.velocity.x;
-                p.mesh.position.y += p.velocity.y;
-                p.mesh.position.z += p.velocity.z;
-                
-                // Apply gravity
-                p.velocity.y -= 0.01;
-                
-                // Rotate fragments
-                p.mesh.rotation.x += p.rotation.x;
-                p.mesh.rotation.y += p.rotation.y;
-                p.mesh.rotation.z += p.rotation.z;
-                
-                // Fade out
-                p.mesh.material.opacity = effectLife * 0.9;
-            });
-            
-            requestAnimationFrame(animateEffect);
-        };
-        
-        animateEffect();
-    }
-    
-    createDefaultEffect(position, color) {
-        // Generic particle explosion
-        const particleCount = 20;
-        const particles = [];
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.1 + Math.random() * 0.1, 8, 8);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position around pickup
-            const angle = Math.random() * Math.PI * 2;
-            const radius = Math.random() * 0.5;
-            particle.position.set(
-                position.x + Math.cos(angle) * radius,
-                position.y + Math.random() * 1,
-                position.z + Math.sin(angle) * radius
-            );
-            
-            // Set velocity - outward
-            const speed = 0.1 + Math.random() * 0.1;
-            const velocity = {
-                x: Math.cos(angle) * speed,
-                y: Math.random() * 0.1,
-                z: Math.sin(angle) * speed
-            };
-            
-            this.scene.add(particle);
-            particles.push({
-                mesh: particle,
-                velocity: velocity
-            });
-        }
-        
-        // Flash effect
-        const flash = new THREE.PointLight(color, 2, 10);
-        flash.position.copy(position);
-        this.scene.add(flash);
-        
-        // Animate effect
-        let effectLife = 1.0;
-        const animateEffect = () => {
-            effectLife -= 0.05;
-            
-            if (effectLife <= 0) {
-                // Remove effects
-                this.scene.remove(flash);
-                particles.forEach(p => this.scene.remove(p.mesh));
-                return;
-            }
-            
-            // Update flash
-            flash.intensity = effectLife * 2;
-            
-            // Update particles
-            particles.forEach(p => {
-                p.mesh.position.x += p.velocity.x;
-                p.mesh.position.y += p.velocity.y;
-                p.mesh.position.z += p.velocity.z;
-                
-                // Fade out
-                p.mesh.material.opacity = effectLife * 0.8;
-                
-                // Slow down over time
-                p.velocity.x *= 0.95;
-                p.velocity.y *= 0.95;
-                p.velocity.z *= 0.95;
-            });
-            
-            requestAnimationFrame(animateEffect);
-        };
-        
-        animateEffect();
     }
     
     removeFromScene() {
@@ -1561,14 +605,6 @@ class PowerUp {
             this.scene.remove(this.mesh);
             this.mesh = null;
         }
-        
-        // Clean up all particles
-        this.particles.forEach(particle => {
-            if (particle.mesh) {
-                this.scene.remove(particle.mesh);
-            }
-        });
-        this.particles = [];
     }
 }
 
@@ -1578,8 +614,8 @@ class Game {
         
         // Core initialization only
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-        this.camera.position.set(0, 800, 1600); // Adjusted for better view of regular arena with large turrets
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000); // Reduced far plane
+        this.camera.position.set(0, 800, 1600);
         this.renderer = null;
         this.truck = null;
         this.isInitialized = false;
@@ -1604,12 +640,17 @@ class Game {
         if (this.isMobile) {
             console.log("Mobile device detected - using performance settings");
             this.drawDistance = 300;
-            this.maxParticles = 20;
+            this.maxParticles = 10; // Reduced from 20
             this.shadowsEnabled = false;
+            this.effectsEnabled = false; // Disable all visual effects on mobile
+            
+            // Disable multiplayer on mobile for better performance
+            window.multiplayerEnabled = false;
         } else {
-            this.drawDistance = 2000;
-            this.maxParticles = 100;
+            this.drawDistance = 1000; // Reduced from 2000
+            this.maxParticles = 30; // Reduced from 100
             this.shadowsEnabled = true;
+            this.effectsEnabled = true;
         }
         
         // Essential controls only
@@ -1632,10 +673,10 @@ class Game {
         // Add turrets array
         this.turrets = [];
         
-        // Add powerups array
+        // Add powerups array - reduced spawn rate by 50%
         this.powerups = [];
         this.powerupSpawnTimer = 0;
-        this.powerupSpawnInterval = 300; // Spawn a powerup every 300 frames (about 5 seconds)
+        this.powerupSpawnInterval = 600; // Doubled from 300 (10 seconds instead of 5)
         
         // Performance monitoring
         this.fpsCounter = document.createElement('div');
@@ -1658,8 +699,49 @@ class Game {
         this.fpsUpdateInterval = 500; // Update FPS display every 500ms
         this.lastFpsUpdate = 0;
         
+        // Multiplayer initialization - only if enabled
+        if (window.multiplayerEnabled) {
+            // Add a toggle button to disable multiplayer if performance is poor
+            this.addMultiplayerToggle();
+        }
+        
         // Initialize the game
         this.init();
+    }
+
+    // Add a method to let users disable multiplayer if performance is poor
+    addMultiplayerToggle() {
+        const toggle = document.createElement('div');
+        toggle.id = 'multiplayer-toggle';
+        toggle.style.position = 'fixed';
+        toggle.style.bottom = '10px';
+        toggle.style.left = '10px';
+        toggle.style.backgroundColor = 'rgba(0,0,0,0.6)';
+        toggle.style.padding = '5px 10px';
+        toggle.style.color = '#fff';
+        toggle.style.fontFamily = 'monospace';
+        toggle.style.fontSize = '12px';
+        toggle.style.zIndex = '1000';
+        toggle.style.cursor = 'pointer';
+        toggle.style.borderRadius = '5px';
+        toggle.textContent = '🌐 Multiplayer: ON - Click to toggle';
+        toggle.style.border = '1px solid #00ffff';
+        
+        toggle.addEventListener('click', () => {
+            window.multiplayerEnabled = !window.multiplayerEnabled;
+            toggle.textContent = window.multiplayerEnabled ? 
+                '🌐 Multiplayer: ON - Click to toggle' : 
+                '🌐 Multiplayer: OFF - Click to toggle';
+            toggle.style.border = window.multiplayerEnabled ?
+                '1px solid #00ffff' : '1px solid #ff0000';
+                
+            // Show notification
+            this.showNotification(window.multiplayerEnabled ? 
+                'Multiplayer enabled - restart needed' : 
+                'Multiplayer disabled - performance will improve');
+        });
+        
+        document.body.appendChild(toggle);
     }
 
     initObjectPools() {
@@ -2392,6 +1474,24 @@ class Game {
             if (this.fps < 30) {
                 this.maxParticles = Math.max(10, this.maxParticles - 5);
                 console.log("Reducing effects due to low FPS:", this.maxParticles);
+                
+                // Severe performance issues - disable additional features
+                if (this.fps < 20) {
+                    if (this.shadowsEnabled) {
+                        console.log("Low FPS - disabling shadows");
+                        this.shadowsEnabled = false;
+                        this.updateRendererSettings();
+                    }
+                    if (window.multiplayerEnabled) {
+                        console.log("Low FPS - disabling multiplayer");
+                        window.multiplayerEnabled = false;
+                        this.showNotification("Multiplayer disabled due to low performance");
+                        if (document.getElementById('multiplayer-toggle')) {
+                            document.getElementById('multiplayer-toggle').textContent = '🌐 Multiplayer: OFF (auto)';
+                            document.getElementById('multiplayer-toggle').style.border = '1px solid #ff0000';
+                        }
+                    }
+                }
             }
         }
         
@@ -2417,85 +1517,26 @@ class Game {
             this.renderer.render(this.scene, this.camera);
         }
     }
-    
-    updatePooledObjects(deltaTime) {
-        // Update all active particles
-        const particlePool = this.objectPools.pools.get('particles');
-        if (particlePool) {
-            for (let i = particlePool.active.length - 1; i >= 0; i--) {
-                const particle = particlePool.active[i];
-                const active = particle.update(deltaTime);
-                
-                if (!active) {
-                    // Return to pool when done
-                    particle.hide();
-                    this.objectPools.release('particles', particle);
-                }
-            }
-        }
+
+    updateRendererSettings() {
+        if (!this.renderer) return;
         
-        // Update all active projectiles
-        const projectilePool = this.objectPools.pools.get('projectiles');
-        if (projectilePool) {
-            for (let i = projectilePool.active.length - 1; i >= 0; i--) {
-                const projectile = projectilePool.active[i];
-                const active = projectile.update(deltaTime);
-                
-                if (!active) {
-                    // Return to pool when done
-                    projectile.hide();
-                    this.objectPools.release('projectiles', projectile);
-                } else {
-                    // Check for projectile collisions
-                    this.checkProjectileCollisions(projectile);
-                }
-            }
-        }
-    }
-    
-    checkProjectileCollisions(projectile) {
-        // Skip if projectile is no longer active
-        if (!projectile.alive) return;
-        
-        // Check collision with truck if projectile is from enemy
-        if (projectile.source !== 'player' && this.truck) {
-            const distance = projectile.mesh.position.distanceTo(this.truck.position);
-            if (distance < 2.5) {  // Hit if within truck radius
-                // Apply damage to player
-                this.applyDamage(projectile.damage);
-                
-                // Disable projectile
-                projectile.alive = false;
-                projectile.hide();
-                
-                // Create impact effect at hit position
-                this.createProjectileImpact(projectile.mesh.position.clone());
-                
-                return;
-            }
-        }
-        
-        // Other collision checks (walls, obstacles, etc.)
-        // These already exist in your code elsewhere
-    }
-    
-    createProjectileImpact(position) {
-        // Get particles from pool
-        const particles = [];
-        const particleCount = this.isMobile ? 5 : 15;
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particle = this.objectPools.get('particles');
-            if (particle) {
-                particle.reset(position, 0xff5500);
-                particles.push(particle);
-            }
+        // Apply shadow settings
+        this.renderer.shadowMap.enabled = this.shadowsEnabled;
+        if (this.shadowsEnabled) {
+            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         }
     }
 
     update(deltaTime = 1/60) {
+        // Skip update if game over
+        if (this.isGameOver) return;
+        
         // Basic update for truck movement
         if (!this.truck) return;
+        
+        // Throttle updates for better performance
+        const updateAll = this.frameCount % 2 === 0; // Update non-essential items at half rate
         
         // Process keyboard input for more realistic driving
         const acceleration = 0.008; // Balanced between original 0.01 and slower 0.006
@@ -2800,20 +1841,28 @@ class Game {
             }
         }
         
-        // Update turrets
-        this.updateTurrets();
-        
-        // Update powerups
-        this.updatePowerups();
-        
-        // Check for powerup spawning
-        this.powerupSpawnTimer++;
-        if (this.powerupSpawnTimer >= this.powerupSpawnInterval) {
-            this.spawnRandomPowerup();
-            this.powerupSpawnTimer = 0;
+        // Only update turrets when needed (based on distance and visibility)
+        if (updateAll) {
+            // Update turrets
+            this.updateTurrets();
         }
         
-        // Check for projectile hits
+        // Only update powerups when needed
+        if (updateAll) {
+            // Update powerups with throttled frequency
+            this.updatePowerups();
+            
+            // Check for powerup spawning
+            this.powerupSpawnTimer++;
+            if (this.powerupSpawnTimer >= this.powerupSpawnInterval) {
+                this.spawnRandomPowerup();
+                this.powerupSpawnTimer = 0;
+            }
+        }
+        
+        // Core updates that run every frame
+        
+        // Check for projectile hits - critical gameplay element
         this.checkProjectileHits();
         
         // Check for player projectile hits on turrets
@@ -2933,84 +1982,11 @@ class Game {
     }
 
     showCollisionEffect(position) {
-        // Create particles for collision
-        const particleCount = 15;
-        const particles = [];
+        // Create particles for collision - simplified
+        this.createSimpleEffect(position, 0xffffff, 8);
         
-        for (let i = 0; i < particleCount; i++) {
-            // Create a particle
-            const size = Math.random() * 0.5 + 0.2;
-            const geometry = new THREE.SphereGeometry(size, 8, 8);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0xffffff,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const particle = new THREE.Mesh(geometry, material);
-            
-            // Position at collision point
-            particle.position.set(
-                position.x + (Math.random() - 0.5) * 2,
-                position.y + Math.random() * 3,
-                position.z + (Math.random() - 0.5) * 2
-            );
-            
-            // Add velocity
-            particle.userData = {
-                velocity: new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.3,
-                    Math.random() * 0.5,
-                    (Math.random() - 0.5) * 0.3
-                ),
-                life: 1.0
-            };
-            
-            this.scene.add(particle);
-            particles.push(particle);
-        }
-        
-        // Animate particles
-        const animateParticles = () => {
-            let allDead = true;
-            
-            for (let i = 0; i < particles.length; i++) {
-                const particle = particles[i];
-                
-                // Update position
-                particle.position.x += particle.userData.velocity.x;
-                particle.position.y += particle.userData.velocity.y;
-                particle.position.z += particle.userData.velocity.z;
-                
-                // Apply gravity
-                particle.userData.velocity.y -= 0.02;
-                
-                // Update life and opacity
-                particle.userData.life -= 0.02;
-                if (particle.material) {
-                    particle.material.opacity = particle.userData.life;
-                }
-                
-                // Check if still alive
-                if (particle.userData.life > 0) {
-                    allDead = false;
-                } else {
-                    // Remove dead particles
-                    this.scene.remove(particle);
-                }
-            }
-            
-            // Continue animation if particles are still alive
-            if (!allDead) {
-                requestAnimationFrame(animateParticles);
-            }
-        };
-        
-        // Start animation
-        animateParticles();
-        
-        // Shake camera for effect
-        this.shakeCamera(0.5);
+        // Shake camera for effect - reduced intensity
+        this.shakeCamera(0.3);
     }
 
     flashScreen(color) {
@@ -3120,9 +2096,9 @@ class Game {
         // Create turrets at random positions in the arena
         const arenaSize = 600; // Keep original arena size (not 10x larger)
         const minDistanceFromCenter = 120; // Increased minimum distance for better spacing
-        const numTurrets = 8; // Number of turrets to create
+        const numTurrets = 4; // REDUCED from 8 to 4 for better performance
         
-        // Define turret types
+        // Define turret types - simplified to just two types for better performance
         const turretTypes = [
             {
                 name: "Standard",
@@ -3131,9 +2107,9 @@ class Game {
                 warningColor: 0xffff00,
                 health: 5,
                 damage: 10,
-                fireRate: 120, // 2 seconds between shots (was 60)
-                projectileSpeed: 3, // Scale projectile speed appropriately 
-                rotationSpeed: 0.015 // Slow rotation speed
+                fireRate: 180, // 3 seconds between shots (increased for performance)
+                projectileSpeed: 3,
+                rotationSpeed: 0.015
             },
             {
                 name: "Heavy",
@@ -3142,20 +2118,9 @@ class Game {
                 warningColor: 0xbbbb00,
                 health: 8,
                 damage: 20,
-                fireRate: 180, // 3 seconds between shots (was 120)
-                projectileSpeed: 2.5, // Scale projectile speed appropriately
-                rotationSpeed: 0.008 // Very slow rotation for heavy turrets
-            },
-            {
-                name: "Rapid",
-                color: 0x888888,
-                activeColor: 0xff3333,
-                warningColor: 0xffff33,
-                health: 3,
-                damage: 5,
-                fireRate: 90, // 1.5 seconds between shots (was 30)
-                projectileSpeed: 3.5, // Scale projectile speed appropriately
-                rotationSpeed: 0.02 // Slightly faster rotation for rapid turrets
+                fireRate: 240, // 4 seconds between shots (increased for performance)
+                projectileSpeed: 2.5,
+                rotationSpeed: 0.008
             }
         ];
         
@@ -3169,15 +2134,15 @@ class Game {
             
             const position = new THREE.Vector3(x, 0, z);
             
-            // Select random turret type
+            // Select random turret type - just two options now
             const typeIndex = Math.floor(Math.random() * turretTypes.length);
             const turretType = turretTypes[typeIndex];
             
             // Create turret with type
             const turret = new Turret(position, this.scene, turretType);
             
-            // Add random activation delay (2-7 seconds)
-            turret.activationDelay = Math.floor(Math.random() * 300) + 120; // 120-420 frames (2-7 seconds)
+            // Add random activation delay (4-10 seconds) - longer delays for better performance
+            turret.activationDelay = Math.floor(Math.random() * 360) + 240; // 240-600 frames (4-10 seconds)
             
             this.turrets.push(turret);
         }
@@ -3367,6 +2332,11 @@ class Game {
 
     // Powerup methods
     spawnRandomPowerup() {
+        // Limit maximum number of powerups for performance
+        if (this.powerups.length >= 3) {
+            return; // Skip spawning if we already have enough powerups
+        }
+        
         // Define arena boundaries
         const arenaSize = 600; // 300 units from center in each direction
         
@@ -3395,9 +2365,14 @@ class Game {
     }
     
     updatePowerups() {
-        // Performance optimization: Only run full updates at 30fps (every other frame)
-        this._powerupUpdateFrame = !this._powerupUpdateFrame;
-        const isFullUpdate = this._powerupUpdateFrame;
+        // Performance optimization: Only run full updates at 15fps (every 4th frame)
+        this._powerupUpdateCounter = (this._powerupUpdateCounter || 0) + 1;
+        const isFullUpdate = this._powerupUpdateCounter % 4 === 0;
+        
+        // Update only if needed
+        if (!isFullUpdate && this.powerups.length === 0) {
+            return; // Skip update if no powerups and not a full update frame
+        }
         
         // Update and remove expired powerups
         for (let i = this.powerups.length - 1; i >= 0; i--) {
@@ -3738,6 +2713,108 @@ class Game {
         
         animateParticle();
     }
+
+    // Simplified particle creation - used by various effects
+    createSimpleParticle(position, color, size = 0.2, lifetime = 1.0) {
+        if (!this.effectsEnabled) return null; // Skip if effects disabled
+        
+        // Use object pool instead of creating new particles
+        const particle = this.objectPools.get('particles');
+        if (particle) {
+            particle.reset(position, color || 0xff00ff);
+            return particle;
+        }
+        return null;
+    }
+
+    // Replace complex effect methods with this simplified version
+    createSimpleEffect(position, color, count = 10) {
+        if (!this.effectsEnabled) return; // Skip if effects disabled
+        
+        // Limit particle count based on performance settings
+        count = Math.min(count, this.maxParticles);
+        
+        // Create limited number of particles
+        for (let i = 0; i < count; i++) {
+            this.createSimpleParticle(position, color);
+        }
+    }
+
+    // Add back the updatePooledObjects method
+    updatePooledObjects(deltaTime) {
+        // Update all active particles
+        const particlePool = this.objectPools.pools.get('particles');
+        if (particlePool) {
+            for (let i = particlePool.active.length - 1; i >= 0; i--) {
+                const particle = particlePool.active[i];
+                const active = particle.update(deltaTime);
+                
+                if (!active) {
+                    // Return to pool when done
+                    particle.hide();
+                    this.objectPools.release('particles', particle);
+                }
+            }
+        }
+        
+        // Update all active projectiles
+        const projectilePool = this.objectPools.pools.get('projectiles');
+        if (projectilePool) {
+            for (let i = projectilePool.active.length - 1; i >= 0; i--) {
+                const projectile = projectilePool.active[i];
+                const active = projectile.update(deltaTime);
+                
+                if (!active) {
+                    // Return to pool when done
+                    projectile.hide();
+                    this.objectPools.release('projectiles', projectile);
+                } else {
+                    // Check for projectile collisions
+                    this.checkProjectileCollisions(projectile);
+                }
+            }
+        }
+    }
+
+    checkProjectileCollisions(projectile) {
+        // Skip if projectile is no longer active
+        if (!projectile.alive) return;
+        
+        // Check collision with truck if projectile is from enemy
+        if (projectile.source !== 'player' && this.truck) {
+            const distance = projectile.mesh.position.distanceTo(this.truck.position);
+            if (distance < 2.5) {  // Hit if within truck radius
+                // Apply damage to player
+                this.applyDamage(projectile.damage);
+                
+                // Disable projectile
+                projectile.alive = false;
+                projectile.hide();
+                
+                // Create impact effect at hit position
+                this.createProjectileImpact(projectile.mesh.position.clone());
+                
+                return;
+            }
+        }
+        
+        // Other collision checks (walls, obstacles, etc.)
+        // These already exist in your code elsewhere
+    }
+
+    createProjectileImpact(position) {
+        // Get particles from pool
+        const particles = [];
+        const particleCount = this.isMobile ? 5 : 15;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const particle = this.objectPools.get('particles');
+            if (particle) {
+                particle.reset(position, 0xff5500);
+                particles.push(particle);
+            }
+        }
+    }
 }
 
 // Implement a preloader
@@ -3779,6 +2856,10 @@ window.addEventListener('load', () => {
     console.log("Window loaded, initializing preloader");
     const loadingElement = document.getElementById('loadingScreen');
     
+    // Disable multiplayer by default - this is critical for performance
+    window.multiplayerEnabled = false;
+    console.log("Multiplayer disabled by default for better performance");
+    
     const preloader = new AssetPreloader(() => {
         if (loadingElement) loadingElement.style.display = 'none';
         console.log("Assets preloaded, creating game");
@@ -3786,18 +2867,11 @@ window.addEventListener('load', () => {
     });
     
     // Preload key assets
-    // Audio files
+    // Audio files - only load essential sounds
     preloader.loadAudio('sounds/engine_rev.mp3');
-    preloader.loadAudio('sounds/engine_idle.mp3');
-    preloader.loadAudio('sounds/engine_deceleration.mp3');
-    preloader.loadAudio('sounds/weapon_fire.mp3');
-    preloader.loadAudio('sounds/suspension_bounce.mp3');
-    preloader.loadAudio('sounds/tire_screech.mp3');
-    preloader.loadAudio('sounds/tire_dirt.mp3');
-    preloader.loadAudio('sounds/vehicle_hit.mp3');
-    preloader.loadAudio('sounds/vehicle_explosion.mp3');
-    preloader.loadAudio('sounds/powerup_pickup.mp3');
-    preloader.loadAudio('sounds/powerup_activate.mp3');
+    preloader.loadAudio('sounds/weapon_fire.mp3'); 
+    
+    // Other sounds will be loaded on demand to improve startup time
     
     // If there are no assets to load, call complete immediately
     if (preloader.assetsToLoad === 0) {
