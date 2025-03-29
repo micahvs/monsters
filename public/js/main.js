@@ -59,24 +59,23 @@ const TRUCK_SPECS = {
 
 class Projectile {
     constructor(position, direction, speed, damage, source) {
-        const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8)
+        const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 6) // Reduced segments from 8 to 6
         geometry.rotateX(Math.PI / 2);
         
         const projectileColor = source === 'player' ? 0xff00ff : 0xff0000
-        const material = new THREE.MeshPhongMaterial({
+        // Changed to MeshBasicMaterial from MeshPhongMaterial
+        const material = new THREE.MeshBasicMaterial({
             color: new THREE.Color(projectileColor),
-            emissive: new THREE.Color(projectileColor),
-            emissiveIntensity: 1,
             transparent: true,
-            opacity: 0.8,
-            shininess: 30
+            opacity: 0.8
         })
         
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.position.copy(position);
         
-        this.light = new THREE.PointLight(projectileColor, 0.5, 3);
-        this.light.position.copy(position);
+        // Remove point light for better performance
+        // this.light = new THREE.PointLight(projectileColor, 0.5, 3);
+        // this.light.position.copy(position);
         
         this.direction = direction.normalize();
         this.speed = speed;
@@ -95,18 +94,21 @@ class Projectile {
         // Update position with higher speed
         const movement = this.direction.clone().multiplyScalar(this.speed);
         this.mesh.position.add(movement);
-        this.light.position.copy(this.mesh.position);
+        // No light to update
+        // this.light.position.copy(this.mesh.position);
         
         this.lifespan--;
         if (this.lifespan <= 0) this.alive = false;
         
-        // Add trail effect
-        this.createTrail();
+        // Only create trail on some frames to reduce overhead
+        if (Math.random() < 0.3) { // 30% chance to create trail
+            this.createTrail();
+        }
     }
 
     createTrail() {
-        // Create particle trail
-        const trailGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+        // Create simpler particle trail
+        const trailGeometry = new THREE.SphereGeometry(0.05, 4, 2); // Reduced segments
         const trailMaterial = new THREE.MeshBasicMaterial({
             color: this.source === 'player' ? 0xff00ff : 0xff0000,
             transparent: true,
@@ -115,13 +117,10 @@ class Projectile {
         const trail = new THREE.Mesh(trailGeometry, trailMaterial)
         trail.position.copy(this.mesh.position);
         
-        // Fade out and remove trail particles
+        // Fade out and remove trail particles - simplified
         setTimeout(() => {
-            trail.material.opacity -= 0.1;
-            if (trail.material.opacity <= 0) {
-                trail.parent.remove(trail);
-            }
-        }, 50);
+            if (trail.parent) trail.parent.remove(trail);
+        }, 100); // Reduced from 50 + fading to just 100ms then remove
         
         return trail;
     }
@@ -136,13 +135,14 @@ class Turret {
         health: 5,
         damage: 10,
         fireRate: 60,
-        projectileSpeed: 0.3
+        projectileSpeed: 0.3,
+        scale: 15 // Added default scale
     }) {
         // Save type
         this.type = type;
         
-        // Apply 10x scaling factor
-        const turretScale = 10;
+        // Apply scale factor - use type.scale or default to 15 (1.5x the original 10)
+        const turretScale = type.scale || 15;
         
         // Create turret base - adjust size based on type
         const baseScale = type.name === "Heavy" ? 1.3 : (type.name === "Rapid" ? 0.8 : 1);
@@ -152,10 +152,10 @@ class Turret {
             1 * turretScale, 
             8
         );
-        const baseMaterial = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color(type.color),
-            shininess: 30
-        })
+        // Use MeshBasicMaterial instead of MeshPhongMaterial for better performance
+        const baseMaterial = new THREE.MeshBasicMaterial({ 
+            color: new THREE.Color(type.color)
+        });
         this.base = new THREE.Mesh(baseGeometry, baseMaterial);
         this.base.position.copy(position);
         
@@ -176,10 +176,10 @@ class Turret {
             gunGeometry = new THREE.BoxGeometry(0.3 * turretScale, 0.3 * turretScale, 2 * turretScale);
         }
         
-        const gunMaterial = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color(type.color),
-            shininess: 30
-        })
+        // Use MeshBasicMaterial instead of MeshPhongMaterial for better performance
+        const gunMaterial = new THREE.MeshBasicMaterial({ 
+            color: new THREE.Color(type.color)
+        });
         this.gun = new THREE.Mesh(gunGeometry, gunMaterial);
         this.gun.position.y = 0.5 * turretScale;
         this.gun.position.z = 0.5 * turretScale;
@@ -327,7 +327,8 @@ class Turret {
         
         // Add projectile meshes to scene
         this.scene.add(projectile.mesh);
-        this.scene.add(projectile.light);
+        // No light to add
+        // this.scene.add(projectile.light);
         
         // Add to our tracked projectiles
         this.projectiles.push(projectile);
@@ -346,7 +347,8 @@ class Turret {
             // Remove dead projectiles
             if (!projectile.alive) {
                 this.scene.remove(projectile.mesh);
-                this.scene.remove(projectile.light);
+                // No light to remove
+                // this.scene.remove(projectile.light);
                 this.projectiles.splice(i, 1);
                 i--;
             }
@@ -385,7 +387,8 @@ class Turret {
         // Remove all projectiles
         for (const projectile of this.projectiles) {
             this.scene.remove(projectile.mesh);
-            this.scene.remove(projectile.light);
+            // No light to remove
+            // this.scene.remove(projectile.light);
         }
         
         // Remove turret
@@ -614,8 +617,8 @@ class Game {
         
         // Core initialization only
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000); // Reduced far plane
-        this.camera.position.set(0, 800, 1600);
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000); // Increased far plane for larger arena
+        this.camera.position.set(0, 1600, 3200); // Doubled camera distance for 2x arena
         this.renderer = null;
         this.truck = null;
         this.isInitialized = false;
@@ -639,18 +642,26 @@ class Game {
         // Enable lower quality settings for mobile
         if (this.isMobile) {
             console.log("Mobile device detected - using performance settings");
-            this.drawDistance = 300;
-            this.maxParticles = 10; // Reduced from 20
+            this.drawDistance = 600; // Doubled for larger arena
+            this.maxParticles = 10;
             this.shadowsEnabled = false;
-            this.effectsEnabled = false; // Disable all visual effects on mobile
+            this.effectsEnabled = false;
+            this.gridEnabled = false;
             
             // Disable multiplayer on mobile for better performance
             window.multiplayerEnabled = false;
         } else {
-            this.drawDistance = 1000; // Reduced from 2000
-            this.maxParticles = 30; // Reduced from 100
-            this.shadowsEnabled = true;
+            this.drawDistance = 2000; // Doubled for larger arena
+            this.maxParticles = 30;
+            this.shadowsEnabled = false; // Disabled shadows by default
             this.effectsEnabled = true;
+            this.gridEnabled = true;
+        }
+        
+        // Performance mode flag - default to higher performance
+        window.lowPerformanceMode = localStorage.getItem('lowPerformanceMode') === 'true' || false;
+        if (window.lowPerformanceMode) {
+            this.applyLowPerformanceMode();
         }
         
         // Essential controls only
@@ -705,6 +716,9 @@ class Game {
             this.addMultiplayerToggle();
         }
         
+        // Add performance toggle
+        this.addPerformanceToggle();
+        
         // Initialize the game
         this.init();
     }
@@ -742,6 +756,86 @@ class Game {
         });
         
         document.body.appendChild(toggle);
+    }
+
+    // Add performance toggle method
+    addPerformanceToggle() {
+        const toggle = document.createElement('div');
+        toggle.id = 'performance-toggle';
+        toggle.style.position = 'fixed';
+        toggle.style.bottom = '40px';
+        toggle.style.left = '10px';
+        toggle.style.backgroundColor = 'rgba(0,0,0,0.6)';
+        toggle.style.padding = '5px 10px';
+        toggle.style.color = '#fff';
+        toggle.style.fontFamily = 'monospace';
+        toggle.style.fontSize = '12px';
+        toggle.style.zIndex = '1000';
+        toggle.style.cursor = 'pointer';
+        toggle.style.borderRadius = '5px';
+        toggle.textContent = window.lowPerformanceMode ? 
+            '⚙️ Low Quality Mode' : '⚙️ High Quality Mode';
+        toggle.style.border = window.lowPerformanceMode ?
+            '1px solid #00ff00' : '1px solid #ff00ff';
+        
+        toggle.addEventListener('click', () => {
+            window.lowPerformanceMode = !window.lowPerformanceMode;
+            localStorage.setItem('lowPerformanceMode', window.lowPerformanceMode);
+            
+            toggle.textContent = window.lowPerformanceMode ? 
+                '⚙️ Low Quality Mode' : '⚙️ High Quality Mode';
+            toggle.style.border = window.lowPerformanceMode ?
+                '1px solid #00ff00' : '1px solid #ff00ff';
+                
+            // Apply changes immediately
+            if (window.lowPerformanceMode) {
+                this.applyLowPerformanceMode();
+                this.showNotification('Low quality mode enabled - better performance');
+            } else {
+                this.applyHighPerformanceMode();
+                this.showNotification('High quality mode enabled - better visuals');
+            }
+        });
+        
+        document.body.appendChild(toggle);
+    }
+
+    // Method to apply low performance mode
+    applyLowPerformanceMode() {
+        // Disable shadows
+        this.shadowsEnabled = false;
+        
+        // Remove grid helper if it exists
+        if (this.gridHelper) {
+            this.scene.remove(this.gridHelper);
+            this.gridHelper = null;
+        }
+        
+        // Limit particles and effects
+        this.maxParticles = 10;
+        this.effectsEnabled = false;
+        
+        // Update renderer settings
+        this.updateRendererSettings();
+    }
+
+    // Method to apply high performance mode
+    applyHighPerformanceMode() {
+        // Keep shadows disabled as requested
+        this.shadowsEnabled = false;
+        
+        // Add grid helper back if it was removed
+        if (!this.gridHelper && this.gridEnabled) {
+            this.gridHelper = new THREE.GridHelper(1560, 20); // 2x size, reduced divisions
+            this.scene.add(this.gridHelper);
+        }
+        
+        // Increase particles limit
+        this.maxParticles = 30;
+        this.effectsEnabled = true;
+        
+        // Update renderer settings
+        this.updateRendererSettings();
     }
 
     initObjectPools() {
@@ -872,29 +966,28 @@ class Game {
                 }
                 
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.shadowMap.enabled = true;
-                
-                // Performance optimizations
-                // Reduce shadow map size for better performance
-                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                // Disable shadow maps completely as requested
+                this.renderer.shadowMap.enabled = false;
                 
                 // Adjust pixel ratio for performance
                 const pixelRatio = window.devicePixelRatio;
                 this.renderer.setPixelRatio(Math.min(pixelRatio, 2)); // Cap at 2x for performance
                 
                 // Improve color rendering with current THREE.js settings
-                this.renderer.outputColorSpace = THREE.SRGBColorSpace; // Instead of outputEncoding
+                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
                 this.renderer.toneMappingExposure = 1.0;
-                // Note: physicallyCorrectLights is deprecated; modern THREE.js uses physically correct lighting by default
             } catch (rendererError) {
                 console.error("Failed to create renderer:", rendererError);
                 throw rendererError;
             }
             
+            // Add fog for distance culling
+            this.scene.fog = new THREE.Fog(0x120023, 1000, 1800);
+            
             // Set up camera
             try {
-                this.camera.position.set(0, 800, 1600);
+                this.camera.position.set(0, 1600, 3200); // Keep the 2x distance for 2x arena
                 this.camera.lookAt(0, 0, 0);
             } catch (cameraError) {
                 console.error("Failed to configure camera:", cameraError);
@@ -905,39 +998,25 @@ class Game {
             try {
                 // Modern lighting setup for better color rendering
                 // Main ambient light provides base illumination
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); // Increased intensity since we removed directional lights
                 this.scene.add(ambientLight);
                 
-                // Main directional light with shadows
+                // Main directional light WITHOUT shadows
                 const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
                 directionalLight.position.set(50, 200, 100);
-                directionalLight.castShadow = true;
-                
-                // Optimize shadow resolution - reduce from 1024 to improve performance
-                directionalLight.shadow.mapSize.width = 512;
-                directionalLight.shadow.mapSize.height = 512;
-                
-                // Optimize shadow camera frustum
-                directionalLight.shadow.camera.near = 10;
-                directionalLight.shadow.camera.far = 500;
-                directionalLight.shadow.camera.left = -200;
-                directionalLight.shadow.camera.right = 200;
-                directionalLight.shadow.camera.top = 200;
-                directionalLight.shadow.camera.bottom = -200;
-                
-                // Improve shadow quality vs performance
-                directionalLight.shadow.bias = -0.001;
-                
+                directionalLight.castShadow = false; // Explicitly disable shadows
                 this.scene.add(directionalLight);
                 
                 // Add some colored rim lighting for visual interest
                 const pinkLight = new THREE.DirectionalLight(0xff00ff, 0.3);
                 pinkLight.position.set(-100, 50, -100);
+                pinkLight.castShadow = false; // Explicitly disable shadows
                 this.scene.add(pinkLight);
                 
                 // Blue backlight for cyberpunk feel
                 const blueLight = new THREE.DirectionalLight(0x0088ff, 0.3);
                 blueLight.position.set(100, 20, -100);
+                blueLight.castShadow = false; // Explicitly disable shadows
                 this.scene.add(blueLight);
             } catch (lightingError) {
                 console.error("Failed to add lighting:", lightingError);
@@ -1017,85 +1096,77 @@ class Game {
     createArena() {
         console.log("Creating arena...");
         
+        // Arena is now 2x larger (doubled from 780 to 1560)
+        const arenaSize = 1560;
+        
         // Create ground with fewer segments for performance
-        const groundGeometry = new THREE.PlaneGeometry(780, 780, 1, 1); // Reduce segment count to minimum
-        const groundMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x333333,
-            roughness: 0.8,
-            metalness: 0.2
+        const groundGeometry = new THREE.PlaneGeometry(arenaSize, arenaSize, 1, 1);
+        const groundMaterial = new THREE.MeshBasicMaterial({ // Changed from MeshStandardMaterial to MeshBasicMaterial
+            color: 0x333333
         });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
+        ground.receiveShadow = false; // Disabled shadows
         this.scene.add(ground);
-        console.log("Ground added to scene");
-
-        // Create walls
-        const wallMaterial = new THREE.MeshBasicMaterial({ // Use MeshBasicMaterial instead of Standard for better performance
+        
+        // Create walls - now 50% shorter (height reduced from 100 to 50)
+        const wallMaterial = new THREE.MeshBasicMaterial({
             color: 0x666666
         });
+        
+        // Arena half size is now 780 (doubled from 390)
+        const wallHalfSize = arenaSize / 2;
+        const wallHeight = 50; // 50% shorter walls
 
         // North wall
         const northWall = new THREE.Mesh(
-            new THREE.BoxGeometry(780, 100, 10, 1, 1, 1), // Add segment parameters to minimize polygons
+            new THREE.BoxGeometry(arenaSize, wallHeight, 10, 1, 1, 1),
             wallMaterial
         );
-        northWall.position.set(0, 50, -390);
-        northWall.castShadow = false; // Disable shadow casting for less important elements
-        northWall.receiveShadow = true;
+        northWall.position.set(0, wallHeight/2, -wallHalfSize);
+        northWall.castShadow = false;
+        northWall.receiveShadow = false;
         this.scene.add(northWall);
         
         // South wall
         const southWall = new THREE.Mesh(
-            new THREE.BoxGeometry(780, 100, 10, 1, 1, 1),
+            new THREE.BoxGeometry(arenaSize, wallHeight, 10, 1, 1, 1),
             wallMaterial
         );
-        southWall.position.set(0, 50, 390);
+        southWall.position.set(0, wallHeight/2, wallHalfSize);
         southWall.castShadow = false;
-        southWall.receiveShadow = true;
+        southWall.receiveShadow = false;
         this.scene.add(southWall);
         
         // East wall
         const eastWall = new THREE.Mesh(
-            new THREE.BoxGeometry(10, 100, 780, 1, 1, 1),
+            new THREE.BoxGeometry(10, wallHeight, arenaSize, 1, 1, 1),
             wallMaterial
         );
-        eastWall.position.set(390, 50, 0);
+        eastWall.position.set(wallHalfSize, wallHeight/2, 0);
         eastWall.castShadow = false;
-        eastWall.receiveShadow = true;
+        eastWall.receiveShadow = false;
         this.scene.add(eastWall);
         
         // West wall
         const westWall = new THREE.Mesh(
-            new THREE.BoxGeometry(10, 100, 780, 1, 1, 1),
+            new THREE.BoxGeometry(10, wallHeight, arenaSize, 1, 1, 1),
             wallMaterial
         );
-        westWall.position.set(-390, 50, 0);
+        westWall.position.set(-wallHalfSize, wallHeight/2, 0);
         westWall.castShadow = false;
-        westWall.receiveShadow = true;
+        westWall.receiveShadow = false;
         this.scene.add(westWall);
         
-        // Add grid helper for reference - reduce divisions for better performance
-        const gridHelper = new THREE.GridHelper(780, 39); // Halve the number of grid divisions
-        this.scene.add(gridHelper);
-        
-        // Add arena lighting - single, optimized point light
-        const arenaLight = new THREE.PointLight(0xffffff, 1, 1000);
-        arenaLight.position.set(0, 200, 0);
-        
-        // Optimize arena light shadow settings
-        arenaLight.castShadow = true;
-        arenaLight.shadow.mapSize.width = 512;  // Reduced from default 1024
-        arenaLight.shadow.mapSize.height = 512; // Reduced from default 1024
-        this.scene.add(arenaLight);
-        
-        // Only use a corner light if not on mobile
-        if (!this.isMobile) {
-            const cornerLight = new THREE.PointLight(0xffffff, 0.5, 500);
-            cornerLight.position.set(520, 100, 520);
-            cornerLight.castShadow = false; // Disable shadow casting for additional lights
-            this.scene.add(cornerLight);
+        // Add grid helper with reduced divisions only if in high performance mode and grid enabled
+        if (!window.lowPerformanceMode && this.gridEnabled) {
+            this.gridHelper = new THREE.GridHelper(arenaSize, 20); // Reduced from 39 to 20 divisions
+            this.scene.add(this.gridHelper);
         }
+        
+        // Simple arena lighting - use hemisphere light instead of point lights
+        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+        this.scene.add(hemisphereLight);
         
         // Store wall references for collision detection
         this.walls = {
@@ -1103,7 +1174,7 @@ class Game {
             south: southWall,
             east: eastWall,
             west: westWall,
-            halfSize: 390,
+            halfSize: wallHalfSize,
             thickness: 10
         };
         console.log("Arena creation complete");
@@ -1112,15 +1183,14 @@ class Game {
     createSimpleTruck() {
         console.log("Creating simplified truck");
         
-        // Create a basic box for the truck
-        const truckGeometry = new THREE.BoxGeometry(2.5, 1.25, 3.75);
-        const truckMaterial = new THREE.MeshPhongMaterial({ 
+        // Double the truck dimensions (2x bigger)
+        const truckGeometry = new THREE.BoxGeometry(5, 2.5, 7.5); // 2x the original dimensions
+        const truckMaterial = new THREE.MeshBasicMaterial({ // Changed to MeshBasicMaterial for performance
             color: 0xff00ff,
-            shininess: 30,
             wireframe: false
         });
         this.truck = new THREE.Mesh(truckGeometry, truckMaterial);
-        this.truck.position.set(0, 1, 0);
+        this.truck.position.set(0, 2, 0); // Adjusted height for 2x size
         this.scene.add(this.truck);
         
         // Add basic properties
@@ -1132,39 +1202,38 @@ class Game {
     }
 
     addWheelsToTruck() {
-        // Create wheels
-        const wheelGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 32);
+        // Create wheels - 2x bigger
+        const wheelGeometry = new THREE.CylinderGeometry(1, 1, 0.8, 16); // Simplified from 32 to 16 segments
         wheelGeometry.rotateX(Math.PI / 2); // Rotate to align with truck
         
-        const wheelMaterial = new THREE.MeshPhongMaterial({
-            color: 0x333333,
-            shininess: 80
+        const wheelMaterial = new THREE.MeshBasicMaterial({ // Changed to MeshBasicMaterial
+            color: 0x333333
         });
         
-        // Create and position 4 wheels
+        // Create and position 4 wheels - adjusted for 2x truck size
         this.wheels = [];
         
         // Front left
         const wheelFL = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheelFL.position.set(-1.21, -0.3, -1.1);
+        wheelFL.position.set(-2.4, -0.6, -2.2);
         this.truck.add(wheelFL);
         this.wheels.push(wheelFL);
         
         // Front right
         const wheelFR = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheelFR.position.set(1.1, -0.3, -1);
+        wheelFR.position.set(2.2, -0.6, -2);
         this.truck.add(wheelFR);
         this.wheels.push(wheelFR);
         
         // Rear left
         const wheelRL = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheelRL.position.set(-1.1, -0.3, 1);
+        wheelRL.position.set(-2.2, -0.6, 2);
         this.truck.add(wheelRL);
         this.wheels.push(wheelRL);
         
         // Rear right
         const wheelRR = new THREE.Mesh(wheelGeometry, wheelMaterial);
-        wheelRR.position.set(1.1, -0.3, 1);
+        wheelRR.position.set(2.2, -0.6, 2);
         this.truck.add(wheelRR);
         this.wheels.push(wheelRR);
     }
@@ -1638,7 +1707,7 @@ class Game {
         
         // Check for wall collisions before moving
         if (this.walls) {
-            const truckSize = 2.5; // Half width/length of truck for collision
+            const truckSize = 5; // Doubled from 2.5 for 2x truck size
             const wallHalfSize = this.walls.halfSize;
             const wallThickness = this.walls.thickness;
             let wallCollision = false;
@@ -1762,7 +1831,8 @@ class Game {
             const distance = this.truck.position.distanceTo(turret.base.position);
             
             // Collision distance (sum of truck radius and turret radius)
-            const collisionDistance = 2.75 + 10; // truck size + turret base radius (scaled)
+            // Original was 2.75 + 10, now we have 2x truck (5.5) and 1.5x turret (15)
+            const collisionDistance = 5.5 + 15; // 2x truck size + 1.5x turret base radius
             
             if (distance < collisionDistance) {
                 // Similar to wall collision, calculate bounce direction
@@ -2094,11 +2164,11 @@ class Game {
 
     createTurrets() {
         // Create turrets at random positions in the arena
-        const arenaSize = 600; // Keep original arena size (not 10x larger)
-        const minDistanceFromCenter = 120; // Increased minimum distance for better spacing
-        const numTurrets = 4; // REDUCED from 8 to 4 for better performance
+        const arenaSize = 1200; // 2x the original game area size
+        const minDistanceFromCenter = 240; // Adjusted for larger arena
+        const numTurrets = 4; // Keep the same number of turrets
         
-        // Define turret types - simplified to just two types for better performance
+        // Define turret types
         const turretTypes = [
             {
                 name: "Standard",
@@ -2107,9 +2177,10 @@ class Game {
                 warningColor: 0xffff00,
                 health: 5,
                 damage: 10,
-                fireRate: 180, // 3 seconds between shots (increased for performance)
-                projectileSpeed: 3,
-                rotationSpeed: 0.015
+                fireRate: 180,
+                projectileSpeed: 4.5, // Adjusted for larger arena
+                rotationSpeed: 0.015,
+                scale: 15 // 1.5x bigger (original was 10)
             },
             {
                 name: "Heavy",
@@ -2118,9 +2189,10 @@ class Game {
                 warningColor: 0xbbbb00,
                 health: 8,
                 damage: 20,
-                fireRate: 240, // 4 seconds between shots (increased for performance)
-                projectileSpeed: 2.5,
-                rotationSpeed: 0.008
+                fireRate: 240,
+                projectileSpeed: 3.75, // Adjusted for larger arena
+                rotationSpeed: 0.008,
+                scale: 15 // 1.5x bigger (original was 10)
             }
         ];
         
@@ -2134,15 +2206,15 @@ class Game {
             
             const position = new THREE.Vector3(x, 0, z);
             
-            // Select random turret type - just two options now
+            // Select random turret type
             const typeIndex = Math.floor(Math.random() * turretTypes.length);
             const turretType = turretTypes[typeIndex];
             
-            // Create turret with type
+            // Create turret with type - modified Turret class gets created below
             const turret = new Turret(position, this.scene, turretType);
             
-            // Add random activation delay (4-10 seconds) - longer delays for better performance
-            turret.activationDelay = Math.floor(Math.random() * 360) + 240; // 240-600 frames (4-10 seconds)
+            // Add random activation delay
+            turret.activationDelay = Math.floor(Math.random() * 360) + 240;
             
             this.turrets.push(turret);
         }
@@ -2191,8 +2263,8 @@ class Game {
                 // Calculate distance to player
                 const distance = projectile.mesh.position.distanceTo(this.truck.position);
                 
-                // If projectile hits player
-                if (distance < 2.2) { // Increased by 10% for larger truck
+                // If projectile hits player - 2x larger collision radius for 2x truck
+                if (distance < 4.4) { // Doubled from 2.2 for 2x truck
                     // Mark projectile as dead
                     projectile.alive = false;
                     
@@ -2217,7 +2289,7 @@ class Game {
                     this.shakeCamera(projectile.damage / 10);
                     
                     // Flash screen red
-                    this.flashScreen(0xff0000);
+                    this.flashScreen('rgba(255, 0, 0, 0.3)');
                 }
             }
         }
@@ -2244,8 +2316,8 @@ class Game {
                 // Get distance to turret
                 const distance = projectile.mesh.position.distanceTo(turret.base.position);
                 
-                // If hit - 10x larger hit radius
-                if (distance < 15) {
+                // If hit - 1.5x larger hit radius to match 1.5x larger turrets
+                if (distance < 22.5) { // 15 * 1.5 = 22.5
                     // Remove projectile
                     projectile.alive = false;
                     
@@ -2390,8 +2462,8 @@ class Game {
     checkPowerupCollection() {
         if (!this.truck) return;
         
-        // Define collection radius
-        const collectionRadius = 3;
+        // Define collection radius - doubled for 2x truck size
+        const collectionRadius = 6; // Doubled from 3
         
         // Check each powerup
         for (let i = this.powerups.length - 1; i >= 0; i--) {
