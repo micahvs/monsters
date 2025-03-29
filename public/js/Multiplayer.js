@@ -3,43 +3,21 @@ import { MonsterTruck } from './MonsterTruck.js';
 
 export default class Multiplayer {
     constructor(game) {
-        // First check for socket.io
-        if (typeof io === 'undefined') {
-            console.error('🎮 CRITICAL ERROR: Socket.io not loaded! Multiplayer will not work.');
-            this.game = game;
-            this.isConnected = false;
-            this.socket = null;
-            throw new Error('Socket.io not found - multiplayer initialization failed');
-        }
-
-        console.log('🎮 [Multiplayer] Constructor called with game instance:', !!game);
-        
         this.game = game;
-        this.isConnected = false;
         this.socket = null;
         this.players = new Map();
+        this.remoteProjectiles = new Map();
         this.localPlayerId = null;
-        this.updateInterval = null;
+        this.serverUrl = 'https://monster-truck-server.glitch.me';
+        this.fallbackUrl = 'https://monster-truck-stadium.fly.dev';
+        this.isConnecting = false;
+        this.isConnected = false;
+        this.isOfflineMode = false;
         this.lastUpdateTime = 0;
-        this.pendingProjectiles = [];
-        this.chatMessages = [];
-        this.isChatVisible = false;
-        this.updateRate = 50; // ms between updates
-        this.radarBlips = new Map(); // Store radar blips for each player
-        this.radarRange = 200; // Radar range in game units
+        this.throttleRate = 50; // ms between updates
+        this.playerColors = ['#ff00ff', '#00ffff', '#ffff00', '#00ff00', '#ff0000', '#0000ff'];
         
-        // Initialize chat UI
-        this.initChatUI();
-        
-        // Initialize radar UI
-        this.initRadarUI();
-        
-        // Bind methods
-        this.setupSocketEvents = this.setupSocketEvents.bind(this);
-        this.updatePlayerPositions = this.updatePlayerPositions.bind(this);
-        this.sendLocalPlayerUpdate = this.sendLocalPlayerUpdate.bind(this);
-        this.disconnect = this.disconnect.bind(this);
-        
+        // Connect to the server
         this.connect();
     }
     
@@ -549,25 +527,18 @@ export default class Multiplayer {
     
     startUpdates() {
         // Increase update rate for more responsive gameplay
-        this.updateRate = 30; // ms between updates (reduced from 50ms)
+        this.throttleRate = 30; // ms between updates (reduced from 50ms)
         
         // Start sending regular position updates
         this.updateInterval = setInterval(() => {
             if (this.isConnected && this.game.truck) {
                 this.sendLocalPlayerUpdate();
             }
-        }, this.updateRate);
-        
-        // Add keydown event listener for chat
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'c' || e.key === 'C') {
-                this.toggleChat();
-            }
-        });
+        }, this.throttleRate);
     }
     
     sendPlayerInfo() {
-        if (!this.socket || !this.game.truck) return;
+        if (!this.isConnected || !this.socket) return;
         
         const nickname = localStorage.getItem('monsterTruckNickname') || 'Player';
         const machineType = localStorage.getItem('monsterTruckType') || 'neonCrusher';
@@ -617,7 +588,7 @@ export default class Multiplayer {
         this.game.truck.userData.lastUpdateTime = now;
         
         // Only send updates if enough time has passed or there's significant change
-        if (now - this.lastUpdateTime > this.updateRate) {
+        if (now - this.lastUpdateTime > this.throttleRate) {
             this.lastUpdateTime = now;
             
             this.socket.emit('playerUpdate', {
@@ -872,13 +843,6 @@ export default class Multiplayer {
                 }
             }
             
-            // Remove radar blip
-            const blip = this.radarBlips.get(playerId);
-            if (blip) {
-                blip.remove();
-                this.radarBlips.delete(playerId);
-            }
-            
             // Remove from players list
             this.players.delete(playerId);
             
@@ -902,7 +866,7 @@ export default class Multiplayer {
             
             // Use a more responsive interpolation factor
             // This will make movement smoother and more responsive
-            const interpolationFactor = Math.min(1.0, timeSinceUpdate / (this.updateRate * 0.8));
+            const interpolationFactor = Math.min(1.0, timeSinceUpdate / (this.throttleRate * 0.8));
             
             // Apply some prediction for smoother movement
             let predictedPosition = player.targetPosition.clone();
@@ -921,7 +885,7 @@ export default class Multiplayer {
             
             // Interpolate rotation with improved smoothing
             // Use a slightly faster rotation interpolation for more responsive turning
-            const rotationFactor = Math.min(1.0, timeSinceUpdate / (this.updateRate * 0.6));
+            const rotationFactor = Math.min(1.0, timeSinceUpdate / (this.throttleRate * 0.6));
             player.truckMesh.rotation.y = player.lastRotation.y + 
                 (player.targetRotation.y - player.lastRotation.y) * rotationFactor;
             
@@ -1549,8 +1513,8 @@ export default class Multiplayer {
     }
     
     update() {
+        // Update remote player positions
         this.updatePlayerPositions();
-        this.updateRadar();
     }
     
     checkProjectileHits(projectile) {
@@ -1715,150 +1679,5 @@ export default class Multiplayer {
         if (this.chatContainer) {
             this.chatContainer.remove();
         }
-        
-        // Clean up radar blips
-        this.radarBlips.forEach(blip => blip.remove());
-        this.radarBlips.clear();
-    }
-    
-    // Initialize radar UI
-    initRadarUI() {
-        this.radarContainer = document.getElementById('radar-container');
-        this.radar = document.getElementById('radar');
-        this.radarPlayer = document.getElementById('radar-player');
-        
-        if (!this.radarContainer || !this.radar || !this.radarPlayer) {
-            console.error('Radar UI elements not found');
-            return;
-        }
-        
-        // Set radar styles
-        this.radar.style.position = 'relative';
-        this.radar.style.borderRadius = '50%';
-        this.radar.style.border = '2px solid rgba(255, 0, 255, 0.5)';
-        
-        // Add radar grid lines
-        const gridLine1 = document.createElement('div');
-        gridLine1.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: rgba(255, 0, 255, 0.3);
-            transform: translateY(-50%);
-        `;
-        
-        const gridLine2 = document.createElement('div');
-        gridLine2.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 50%;
-            width: 1px;
-            height: 100%;
-            background: rgba(255, 0, 255, 0.3);
-            transform: translateX(-50%);
-        `;
-        
-        const gridCircle = document.createElement('div');
-        gridCircle.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 50%;
-            height: 50%;
-            border-radius: 50%;
-            border: 1px solid rgba(255, 0, 255, 0.3);
-            transform: translate(-50%, -50%);
-        `;
-        
-        this.radar.appendChild(gridLine1);
-        this.radar.appendChild(gridLine2);
-        this.radar.appendChild(gridCircle);
-    }
-    
-    // Update radar with player positions
-    updateRadar() {
-        if (!this.radar || !this.game.truck) return;
-        
-        const localPlayerPos = this.game.truck.position;
-        const localPlayerRotation = this.game.truck.rotation.y;
-        
-        // Update each remote player on radar
-        this.players.forEach((player, playerId) => {
-            if (playerId === this.localPlayerId) return;
-            
-            // Get or create blip for this player
-            let blip = this.radarBlips.get(playerId);
-            if (!blip) {
-                blip = document.createElement('div');
-                blip.className = 'radar-blip';
-                blip.style.cssText = `
-                    position: absolute;
-                    width: 6px;
-                    height: 6px;
-                    background-color: ${player.color || '#00ffff'};
-                    border-radius: 50%;
-                    box-shadow: 0 0 5px ${player.color || '#00ffff'};
-                    transform: translate(-50%, -50%);
-                    pointer-events: none;
-                    z-index: 2;
-                `;
-                this.radar.appendChild(blip);
-                this.radarBlips.set(playerId, blip);
-            }
-            
-            // Calculate relative position (accounting for player rotation)
-            const dx = player.truckMesh.position.x - localPlayerPos.x;
-            const dz = player.truckMesh.position.z - localPlayerPos.z;
-            
-            // Rotate coordinates based on player's facing direction
-            const rotatedX = dx * Math.cos(-localPlayerRotation) - dz * Math.sin(-localPlayerRotation);
-            const rotatedZ = dx * Math.sin(-localPlayerRotation) + dz * Math.cos(-localPlayerRotation);
-            
-            // Scale to radar size
-            const radarRadius = this.radar.clientWidth / 2;
-            const radarX = (rotatedX / this.radarRange) * radarRadius;
-            const radarZ = (rotatedZ / this.radarRange) * radarRadius;
-            
-            // Calculate distance for scaling blip size (closer = larger)
-            const distance = Math.sqrt(dx * dx + dz * dz);
-            const isInRange = distance <= this.radarRange;
-            
-            // Position blip on radar (center is 50%, 50%)
-            if (isInRange) {
-                blip.style.display = 'block';
-                blip.style.left = `${50 + radarX / radarRadius * 100}%`;
-                blip.style.top = `${50 + radarZ / radarRadius * 100}%`;
-                
-                // Scale blip size based on distance (closer = larger)
-                const scaleFactor = Math.max(0.6, 1 - (distance / this.radarRange));
-                blip.style.transform = `translate(-50%, -50%) scale(${scaleFactor})`;
-                
-                // Add player name tooltip
-                blip.title = player.nickname;
-            } else {
-                // If player is out of radar range, position at edge of radar in correct direction
-                const angle = Math.atan2(rotatedZ, rotatedX);
-                const edgeX = Math.cos(angle) * radarRadius;
-                const edgeZ = Math.sin(angle) * radarRadius;
-                
-                blip.style.display = 'block';
-                blip.style.left = `${50 + edgeX / radarRadius * 100}%`;
-                blip.style.top = `${50 + edgeZ / radarRadius * 100}%`;
-                blip.style.transform = 'translate(-50%, -50%) scale(0.6)';
-                
-                // Add distance to tooltip
-                blip.title = `${player.nickname} (${Math.round(distance)}m)`;
-            }
-        });
-        
-        // Remove blips for players who have left
-        this.radarBlips.forEach((blip, playerId) => {
-            if (!this.players.has(playerId)) {
-                blip.remove();
-                this.radarBlips.delete(playerId);
-            }
-        });
     }
 }
