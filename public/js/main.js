@@ -1943,6 +1943,13 @@ class Game {
                 console.log("Game: Playing weapon_fire sound");
                 window.audioManager.playSound('weapon_fire');
             }
+            
+            // Notify multiplayer system of new projectiles for network sync
+            if (this.multiplayer && window.multiplayerEnabled && projectiles && projectiles.length > 0) {
+                projectiles.forEach(projectile => {
+                    this.multiplayer.sendProjectileCreated(projectile);
+                });
+            }
         }
         
         // Handle reload
@@ -2937,6 +2944,34 @@ class Game {
         }
     }
 
+    // Method to apply damage to the player
+    applyDamage(damage) {
+        // Reduce health by damage amount
+        this.health = Math.max(0, this.health - damage);
+        
+        // Update health display
+        const healthDiv = document.getElementById('health');
+        if (healthDiv) {
+            healthDiv.textContent = `HEALTH: ${this.health}%`;
+        }
+        
+        // Update health bar if using window.updateStatBars function
+        if (window.updateStatBars) {
+            window.updateStatBars(this.health, this.weapon?.ammo, this.weapon?.maxAmmo);
+        }
+        
+        // Flash screen red for visual feedback
+        this.flashScreen('rgba(255, 0, 0, 0.3)');
+        
+        // Shake camera for impact effect
+        this.shakeCamera(damage * 0.05);
+        
+        // Check if player died
+        if (this.health <= 0) {
+            this.gameOver();
+        }
+    }
+
     checkProjectileCollisions(projectile) {
         // Skip if projectile is no longer active
         if (!projectile.alive) return;
@@ -2955,6 +2990,19 @@ class Game {
                 // Create impact effect at hit position
                 this.createProjectileImpact(projectile.mesh.position.clone());
                 
+                return;
+            }
+        }
+        
+        // Check for hits on other players in multiplayer mode
+        if (this.multiplayer && window.multiplayerEnabled && projectile.source === 'player') {
+            // Pass the projectile to multiplayer component to check hits on remote players
+            const hitDetected = this.multiplayer.checkProjectileHits(projectile);
+            
+            // If a hit was detected, disable the projectile
+            if (hitDetected) {
+                projectile.alive = false;
+                projectile.hide();
                 return;
             }
         }
