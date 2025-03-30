@@ -646,19 +646,7 @@ class Game {
         this.powerupSpawnTimer = 0;
         this.powerupSpawnInterval = 600; // Doubled from 300 (10 seconds instead of 5)
         
-        // Performance monitoring
-        this.fpsCounter = document.createElement('div');
-        this.fpsCounter.id = 'fps-counter';
-        this.fpsCounter.style.position = 'fixed';
-        this.fpsCounter.style.top = '10px';
-        this.fpsCounter.style.right = '10px';
-        this.fpsCounter.style.backgroundColor = 'rgba(0,0,0,0.5)';
-        this.fpsCounter.style.color = '#0f0';
-        this.fpsCounter.style.padding = '5px';
-        this.fpsCounter.style.fontFamily = 'monospace';
-        this.fpsCounter.style.fontSize = '12px';
-        this.fpsCounter.style.zIndex = '1000';
-        document.body.appendChild(this.fpsCounter);
+  
         
         // FPS tracking
         this.lastTime = 0;
