@@ -152,7 +152,7 @@ class Turret {
             1 * turretScale, 
             8
         );
-        // Use MeshBasicMaterial instead of MeshPhongMaterial for better performance
+        // Use MeshBasicMaterial but with better color settings
         const baseMaterial = new THREE.MeshBasicMaterial({ 
             color: new THREE.Color(type.color)
         });
@@ -176,7 +176,7 @@ class Turret {
             gunGeometry = new THREE.BoxGeometry(0.3 * turretScale, 0.3 * turretScale, 2 * turretScale);
         }
         
-        // Use MeshBasicMaterial instead of MeshPhongMaterial for better performance
+        // Keep using MeshBasicMaterial for turrets as they don't need lighting and it's faster
         const gunMaterial = new THREE.MeshBasicMaterial({ 
             color: new THREE.Color(type.color)
         });
@@ -224,7 +224,8 @@ class Turret {
         // Handle activation delay
         if (!this.activated) {
             if (this.activationDelay > 0) {
-                this.activationDelay--;
+                // Reduce activation delay faster (decrement by 2 instead of 1)
+                this.activationDelay -= 2;
                 
                 // Change color to yellow when about to activate (last second)
                 if (this.activationDelay < 60) {
@@ -468,40 +469,42 @@ class PowerUp {
         const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
         let color;
         
-        // Set color based on type
+        // Set color based on type - make colors more vibrant
         switch(this.type) {
             case 'SPEED_BOOST':
-                color = 0x00ff99;
+                color = 0x00ffaa;  // Brighter green
                 break;
             case 'REPAIR':
-                color = 0xff3366;
+                color = 0xff3366;  // Keep pink
                 break;
             case 'SHIELD':
-                color = 0xffcc00;
+                color = 0xffdd00;  // Brighter yellow
                 break;
             case 'AMMO':
-                color = 0x00aaff;
+                color = 0x00ccff;  // Brighter blue
                 break;
             default:
-                color = 0xff00ff;
+                color = 0xff00ff;  // Magenta default
         }
         
-        // Create material with emissive properties
+        // Create material with emissive properties and make it more visible
         const material = new THREE.MeshBasicMaterial({
             color: color,
-            wireframe: true
+            wireframe: true,
+            transparent: true,
+            opacity: 0.9  // Increased from typical 0.8
         });
         
         const powerupMesh = new THREE.Mesh(geometry, material);
         this.mesh.add(powerupMesh);
         
-        // Add a small light for visibility
-        this.light = new THREE.PointLight(color, 0.8, 5);
+        // Add a stronger light for better visibility
+        this.light = new THREE.PointLight(color, 1.2, 8);  // Increased intensity from 0.8 to 1.2, range from 5 to 8
         this.light.position.set(0, 0, 0);
         this.mesh.add(this.light);
         
-        // Set initial position
-        this.mesh.position.y = 2; // Slightly above ground
+        // Set initial position slightly higher for better visibility
+        this.mesh.position.y = 3; // Raised from 2 to 3
         
         // Add to scene
         this.scene.add(this.mesh);
@@ -1052,19 +1055,21 @@ class Game {
         
         // Create ground with fewer segments for performance
         const groundGeometry = new THREE.PlaneGeometry(arenaSize, arenaSize, 1, 1);
-        const groundMaterial = new THREE.MeshPhongMaterial({ // Changed from MeshBasicMaterial back to MeshPhongMaterial
-            color: 0x333333,
-            shininess: 10
+        
+        // Use MeshBasicMaterial for floor for better performance and colors
+        const groundMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x222222 // Darker floor color, better contrast
         });
+        
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = false; // Disabled shadows
         this.scene.add(ground);
         
         // Create walls - now 50% shorter (height reduced from 100 to 50)
-        const wallMaterial = new THREE.MeshPhongMaterial({ // Changed from MeshBasicMaterial to MeshPhongMaterial
-            color: 0x666666,
-            shininess: 20
+        // Use MeshBasicMaterial for walls with more vibrant color
+        const wallMaterial = new THREE.MeshBasicMaterial({
+            color: 0x444488 // More interesting blue-grey color
         });
         
         // Arena half size is now 780 (doubled from 390)
@@ -2179,8 +2184,8 @@ class Game {
             // Create turret with type - modified Turret class gets created below
             const turret = new Turret(position, this.scene, turretType);
             
-            // Add random activation delay
-            turret.activationDelay = Math.floor(Math.random() * 360) + 240;
+            // Use shorter activation delay (120-240 frames instead of 240-600)
+            turret.activationDelay = Math.floor(Math.random() * 120) + 120;
             
             this.turrets.push(turret);
         }
