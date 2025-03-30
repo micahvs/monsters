@@ -1618,6 +1618,11 @@ class Game {
         // Update pooled objects (particles and projectiles)
         this.updatePooledObjects(deltaTime);
         
+        // Update multiplayer player positions every frame for smoother movement
+        if (this.multiplayer && window.multiplayerEnabled) {
+            this.multiplayer.interpolateRemotePlayers();
+        }
+        
         // Render the scene
         if (this.renderer && this.scene && this.camera) {
             // Apply frustum culling for better performance

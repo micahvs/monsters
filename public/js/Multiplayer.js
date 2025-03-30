@@ -523,7 +523,7 @@ export default class Multiplayer {
     
     startUpdates() {
         // Increase update rate for more responsive gameplay
-        this.throttleRate = 30; // ms between updates (reduced from 50ms)
+        this.throttleRate = 15; // ms between updates (reduced from 30ms for even faster updates)
         
         // Start sending regular position updates
         this.updateInterval = setInterval(() => {
@@ -605,6 +605,14 @@ export default class Multiplayer {
     sendProjectileCreated(projectile) {
         if (!this.isConnected || !this.socket) return;
         
+        console.log("Sending projectile to server:", projectile);
+        
+        // Make sure the projectile has all required properties
+        if (!projectile.mesh || !projectile.direction) {
+            console.error("Invalid projectile data:", projectile);
+            return;
+        }
+        
         this.socket.emit('playerShoot', {
             position: {
                 x: projectile.mesh.position.x,
@@ -617,7 +625,9 @@ export default class Multiplayer {
                 z: projectile.direction.z
             },
             speed: projectile.speed,
-            damage: projectile.damage
+            damage: projectile.damage,
+            // Add a unique ID for this projectile to track it
+            id: `${this.localPlayerId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
         });
     }
     
@@ -1532,18 +1542,18 @@ export default class Multiplayer {
             
             console.log(`⚾ Checking collision with player ${playerId}`);
             
-            // ULTRA-WIDE hitbox for maximum reliability
+            // EVEN LARGER hitbox for guaranteed hit detection - we'll make it absolutely massive
             const truckDimensions = {
-                width: 10.0,   // MASSIVELY increased for hit detection
-                length: 14.0,  // MASSIVELY increased for hit detection
-                height: 8.0    // MASSIVELY increased for hit detection
+                width: 20.0,   // MASSIVELY increased for hit detection
+                length: 25.0,  // MASSIVELY increased for hit detection
+                height: 15.0   // MASSIVELY increased for hit detection
             };
             
             // Create a larger bounding box to ensure hits register
             const truckBounds = {
                 minX: player.truckMesh.position.x - (truckDimensions.width / 2),
                 maxX: player.truckMesh.position.x + (truckDimensions.width / 2),
-                minY: player.truckMesh.position.y - 3.0, // Extended down more
+                minY: player.truckMesh.position.y - 5.0, // Extended down more
                 maxY: player.truckMesh.position.y + truckDimensions.height,
                 minZ: player.truckMesh.position.z - (truckDimensions.length / 2),
                 maxZ: player.truckMesh.position.z + (truckDimensions.length / 2)
@@ -1575,11 +1585,11 @@ export default class Multiplayer {
                     Math.pow(player.truckMesh.position.z - pos.z, 2)
                 );
                 
-                // If very close, count as a hit anyway (5 units is very generous)
-                if (distance < 5) {
+                // If very close, count as a hit anyway - MUCH bigger radius for guaranteed hits
+                if (distance < 15) {
                     console.log(`Near miss converted to hit! Distance: ${distance.toFixed(2)}`);
                     isHit = true;
-                } else if (distance < 20) {
+                } else if (distance < 30) {
                     console.log(`Near miss! Distance: ${distance.toFixed(2)}`);
                 }
             }
