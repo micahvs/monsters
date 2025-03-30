@@ -655,20 +655,8 @@ class Game {
         this.fpsUpdateInterval = 500; // Update FPS display every 500ms
         this.lastFpsUpdate = 0;
         
-        // Create FPS counter element
-        this.fpsCounter = document.createElement('div');
-        this.fpsCounter.id = 'fps-counter';
-        this.fpsCounter.style.position = 'fixed';
-        this.fpsCounter.style.top = '10px';
-        this.fpsCounter.style.right = '10px';
-        this.fpsCounter.style.backgroundColor = 'rgba(0,0,0,0.5)';
-        this.fpsCounter.style.color = '#fff';
-        this.fpsCounter.style.padding = '5px';
-        this.fpsCounter.style.fontFamily = 'monospace';
-        this.fpsCounter.style.fontSize = '12px';
-        this.fpsCounter.style.zIndex = '1000';
-        this.fpsCounter.textContent = 'FPS: 0';
-        document.body.appendChild(this.fpsCounter);
+        // FPS counter removed as requested
+        // We'll keep the FPS tracking logic for performance monitoring
         
         // Multiplayer initialization - only if enabled
         if (window.multiplayerEnabled) {
@@ -1587,10 +1575,9 @@ class Game {
         // FPS calculation
         this.frameCount++;
         
-        // Update FPS counter every interval
+        // Calculate FPS but don't display (counter removed as requested)
         if (now - this.lastFpsUpdate > this.fpsUpdateInterval) {
             this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
-            this.fpsCounter.textContent = `FPS: ${this.fps}`;
             this.lastFpsUpdate = now;
             this.frameCount = 0;
             
