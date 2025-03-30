@@ -1951,7 +1951,18 @@ class Game {
             
             // Notify multiplayer system of new projectiles for network sync
             if (this.multiplayer && window.multiplayerEnabled && projectiles && projectiles.length > 0) {
+                console.log("🚀 SHOOTING IN MULTIPLAYER MODE - sending projectiles:", projectiles.length);
+                
+                // Make sure projectiles have correct source
                 projectiles.forEach(projectile => {
+                    // Force source to be 'player' for reliable hit detection
+                    projectile.source = 'player';
+                    projectile.playerId = this.multiplayer.localPlayerId;
+                    
+                    // Ensure projectiles have enough damage to be visible
+                    projectile.damage = Math.max(projectile.damage || 20, 50);
+                    
+                    console.log("🚀 SENDING PROJECTILE TO MULTIPLAYER:", projectile);
                     this.multiplayer.sendProjectileCreated(projectile);
                 });
             }
@@ -3001,14 +3012,18 @@ class Game {
         
         // Check for hits on other players in multiplayer mode
         if (this.multiplayer && window.multiplayerEnabled && projectile.source === 'player') {
+            console.log("🎯 CHECKING PROJECTILE FOR MULTIPLAYER HITS:", projectile);
+            
             // Pass the projectile to multiplayer component to check hits on remote players
             const hitDetected = this.multiplayer.checkProjectileHits(projectile);
+            console.log("🎯 Hit detection result:", hitDetected);
             
             // If a hit was detected, disable the projectile
             if (hitDetected) {
+                console.log("🎯 HIT DETECTED! Destroying projectile");
                 projectile.alive = false;
                 projectile.hide();
-                return;
+                return true; // Signal that we processed a hit
             }
         }
         

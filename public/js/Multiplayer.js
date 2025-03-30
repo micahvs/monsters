@@ -522,8 +522,8 @@ export default class Multiplayer {
     }
     
     startUpdates() {
-        // Increase update rate for more responsive gameplay
-        this.throttleRate = 15; // ms between updates (reduced from 30ms for even faster updates)
+        // Ultra-frequent updates for maximum responsiveness
+        this.throttleRate = 5; // ms between updates (extreme frequency for maximum smoothness)
         
         // Start sending regular position updates
         this.updateInterval = setInterval(() => {
@@ -531,6 +531,8 @@ export default class Multiplayer {
                 this.sendLocalPlayerUpdate();
             }
         }, this.throttleRate);
+        
+        console.log("🚀 Starting position updates at extreme frequency:", this.throttleRate, "ms");
     }
     
     sendPlayerInfo() {
@@ -1514,17 +1516,26 @@ export default class Multiplayer {
         if (!projectile || !projectile.mesh || !this.isConnected) return false;
         
         // MISSION CRITICAL DEBUG LOGGING
-        console.log(`CHECKING PROJECTILE HITS: source=${projectile.source}, playerId=${projectile.playerId}, localId=${this.localPlayerId}`);
+        console.log(`⚠️⚠️⚠️ CHECKING PROJECTILE HITS: source=${projectile.source}, playerId=${projectile.playerId}, localId=${this.localPlayerId}`);
         
         // Add additional logging for players
-        console.log(`Total remote players to check: ${this.players.size}`);
+        console.log(`⚠️⚠️⚠️ Total remote players to check: ${this.players.size}`);
+        
+        // EMERGENCY DEBUG INFO
+        console.log("PROJECTILE DETAILED INFO:", {
+            position: projectile.mesh ? 
+                `${projectile.mesh.position.x.toFixed(2)}, ${projectile.mesh.position.y.toFixed(2)}, ${projectile.mesh.position.z.toFixed(2)}` : "NO MESH",
+            damage: projectile.damage,
+            source: projectile.source,
+            speed: projectile.speed
+        });
         
         // CRITICAL FIX: We must properly iterate the Map object
         let hitDetected = false;
         
         // Debug the players Map to ensure it's populated
         this.players.forEach((player, id) => {
-            console.log(`Player in map: id=${id}, has mesh=${!!player.truckMesh}`);
+            console.log(`⚠️ Player in map: id=${id}, has mesh=${!!player.truckMesh}`);
         });
         
         this.players.forEach((player, playerId) => {
@@ -1597,17 +1608,22 @@ export default class Multiplayer {
             if (isHit) {
                 console.log(`💥 DIRECT HIT on player ${playerId}!`);
                 
-                // Calculate damage - ensure at least 20 damage for reliability
-                const damage = projectile.damage || 20;
+                // Calculate damage - MUCH HIGHER damage for guaranteed effect
+                const damage = Math.max(projectile.damage || 20, 50); // At least 50 damage for visibility
                 
-                // CRITICAL FIX: Use multiple ways to send hit
+                // ULTRA AGGRESSIVE HIT HANDLING:
+                
                 // 1. Direct socket emission (most important)
-                console.log(`⚡ DIRECTLY sending hit: target=${playerId}, damage=${damage}`);
-                this.socket.emit('playerHit', {
-                    playerId: playerId,
-                    damage: damage,
-                    sourceId: this.localPlayerId
-                });
+                console.log(`⚡⚡⚡ DIRECTLY sending hit: target=${playerId}, damage=${damage}`);
+                
+                // Send the hit 3 times to ensure it gets through
+                for (let i = 0; i < 3; i++) {
+                    this.socket.emit('playerHit', {
+                        playerId: playerId,
+                        damage: damage,
+                        sourceId: this.localPlayerId
+                    });
+                }
                 
                 // 2. Also try the method approach as backup
                 try {
@@ -1626,6 +1642,24 @@ export default class Multiplayer {
                     });
                 } catch (err) {
                     console.error("Error sending direct hit message:", err);
+                }
+                
+                // 4. DIRECTLY MODIFY THE REMOTE PLAYER'S HEALTH
+                // This will show damage visually even if server sync fails
+                if (player.health !== undefined) {
+                    // Apply damage directly to the player object
+                    player.health = Math.max(0, player.health - damage);
+                    console.log(`💉 DIRECTLY modified remote player health: ${player.health}`);
+                    
+                    // Update visual if possible
+                    if (player.monsterTruck) {
+                        player.monsterTruck.health = player.health;
+                    }
+                    
+                    // If health depleted, create an explosion
+                    if (player.health <= 0) {
+                        this.showExplosion(player.truckMesh.position.clone());
+                    }
                 }
                 
                 // Create impact effect at hit position
