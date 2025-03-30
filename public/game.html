@@ -450,7 +450,7 @@
         .audio-panel {
             position: fixed;
             bottom: 70px;
-            left: 10px;
+            left: 260px;
             background: rgba(0, 0, 0, 0.8);
             border: 2px solid #00c7ff;
             border-radius: 10px;
@@ -563,11 +563,11 @@
             display: none;
         }
 
-        /* Fix any potential overlaps with the quality mode selector */
+        /* Quality Mode Selector (Only One) */
         #performance-toggle {
             position: fixed;
-            bottom: 20px;
-            left: 330px;
+            bottom: 10px;
+            left: 320px;
             background: rgba(0, 0, 0, 0.7);
             color: #00ffff;
             border: 2px solid #00ffff;
@@ -578,6 +578,25 @@
             pointer-events: auto;
             cursor: pointer;
             border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+        
+        /* Multiplayer Toggle */
+        #multiplayer-toggle {
+            position: fixed;
+            bottom: 50px;
+            left: 320px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            padding: 6px 12px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            z-index: 101;
+            pointer-events: auto;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
@@ -600,13 +619,13 @@
     <!-- Game Canvas -->
     <canvas id="game"></canvas>
 
-    <!-- Player Info - Top Left -->
+    <!-- Player Info - Top Left (Score Display Only) -->
     <div id="player-info" class="ui-panel">
         <div id="playerName">PLAYER</div>
         <div id="score">SCORE: 0</div>
     </div>
     
-    <!-- Game Stats - Top Right -->
+    <!-- Game Stats - Top Right (Health & Ammo with Bars) -->
     <div id="game-stats" class="ui-panel">
         <div id="health">HEALTH: 100%</div>
         <div class="stat-bar">
@@ -685,8 +704,11 @@
         </div>
     </div>
 
-    <!-- Add a performance toggle button to the HTML if it's not already there -->
-    <div id="performance-toggle" style="display:none;">⚙️ High Quality Mode</div>
+    <!-- Quality Mode Selector (Only One) -->
+    <div id="performance-toggle">⚙️ High Quality Mode</div>
+    
+    <!-- Multiplayer Toggle -->
+    <div id="multiplayer-toggle">🌐 Multiplayer: ON - Click to toggle</div>
 
     <!-- Scripts -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
@@ -741,17 +763,6 @@
             } else {
                 console.warn('Audio manager is not available globally yet');
             }
-        });
-    </script>
-    <script>
-        // Show performance toggle if it exists in the game
-        document.addEventListener('DOMContentLoaded', function() {
-            // Set a small timeout to ensure the game has initialized
-            setTimeout(() => {
-                if (window.game && document.getElementById('performance-toggle')) {
-                    document.getElementById('performance-toggle').style.display = 'block';
-                }
-            }, 2000);
         });
     </script>
 </body>
