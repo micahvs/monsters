@@ -1333,161 +1333,82 @@ export default class Multiplayer {
     }
     
     showDamageEffect(position) {
-        if (!this.game.scene) return;
+        if (!this.game.scene || !this.game.effectsEnabled) return;
         
-        // Create a burst of red particles at the damage point
-        const particleCount = 10;
-        const particles = [];
+        // Create limited particles using the game's particle system
+        const particleCount = Math.min(5, this.game.maxParticles); // Reduced count
         
         for (let i = 0; i < particleCount; i++) {
-            // Create particle
-            const size = Math.random() * 0.2 + 0.1;
-            const particleGeometry = new THREE.SphereGeometry(size, 8, 8);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff0000,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position at hit point, slightly offset
-            particle.position.set(
-                position.x + (Math.random() - 0.5) * 2,
-                position.y + Math.random() * 2,
-                position.z + (Math.random() - 0.5) * 2
+            const particle = this.game.createSimpleParticle(
+                new THREE.Vector3(
+                    position.x + (Math.random() - 0.5) * 2,
+                    position.y + Math.random() * 2,
+                    position.z + (Math.random() - 0.5) * 2
+                ),
+                0xff0000,
+                Math.random() * 0.2 + 0.1
             );
             
-            // Random velocity
-            const velocity = {
-                x: (Math.random() - 0.5) * 0.2,
-                y: Math.random() * 0.2 + 0.1,
-                z: (Math.random() - 0.5) * 0.2
-            };
-            
-            particle.userData = {
-                velocity: velocity,
-                life: 1.0
-            };
-            
-            this.game.scene.add(particle);
-            particles.push(particle);
+            if (particle) {
+                // Set velocity - will be handled by central update
+                particle.velocity = {
+                    x: (Math.random() - 0.5) * 0.2,
+                    y: Math.random() * 0.2 + 0.1,
+                    z: (Math.random() - 0.5) * 0.2
+                };
+                particle.life = 1.0;
+            }
         }
-        
-        // Animate and remove particles
-        const animateParticles = () => {
-            let allDead = true;
-            
-            for (let i = 0; i < particles.length; i++) {
-                const particle = particles[i];
-                
-                if (particle.userData.life > 0) {
-                    // Update position
-                    particle.position.x += particle.userData.velocity.x;
-                    particle.position.y += particle.userData.velocity.y;
-                    particle.position.z += particle.userData.velocity.z;
-                    
-                    // Apply gravity
-                    particle.userData.velocity.y -= 0.01;
-                    
-                    // Reduce life
-                    particle.userData.life -= 0.05;
-                    particle.material.opacity = particle.userData.life;
-                    
-                    allDead = false;
-                } else if (particle.parent) {
-                    // Remove dead particles
-                    this.game.scene.remove(particle);
-                }
-            }
-            
-            if (!allDead) {
-                requestAnimationFrame(animateParticles);
-            }
-        };
-        
-        animateParticles();
+        // No more standalone animation loop - will be handled by game's update cycle
     }
     
     showExplosion(position) {
-        if (!this.game.scene) return;
+        if (!this.game.scene || !this.game.effectsEnabled) return;
         
         // Delegate to game's explosion effect if available
         if (this.game.createExplosion) {
             this.game.createExplosion(position);
         } else {
-            // Create a larger explosion effect
-            const explosionLight = new THREE.PointLight(0xff5500, 3, 20);
+            // Create a simple light
+            const explosionLight = new THREE.PointLight(0xff5500, 2, 15);
             explosionLight.position.copy(position);
             explosionLight.position.y += 2;
             this.game.scene.add(explosionLight);
             
-            // Create explosion particles
-            const particleCount = 30;
-            const particles = [];
+            // Auto-remove light after 1 second
+            setTimeout(() => {
+                this.game.scene.remove(explosionLight);
+            }, 1000);
+            
+            // Create particles with game's system
+            const particleCount = Math.min(15, this.game.maxParticles);
             
             for (let i = 0; i < particleCount; i++) {
-                const size = Math.random() * 0.5 + 0.2;
-                const particleGeometry = new THREE.SphereGeometry(size, 8, 8);
-                const particleMaterial = new THREE.MeshBasicMaterial({
-                    color: i % 2 === 0 ? 0xff5500 : 0xffff00,
-                    transparent: true,
-                    opacity: 1
-                });
+                const size = Math.random() * 0.4 + 0.2;
+                const color = i % 2 === 0 ? 0xff5500 : 0xffff00;
                 
-                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-                particle.position.copy(position);
-                particle.position.y += 2;
+                const particle = this.game.createSimpleParticle(
+                    new THREE.Vector3(
+                        position.x + (Math.random() - 0.5) * 3,
+                        position.y + Math.random() * 3 + 1,
+                        position.z + (Math.random() - 0.5) * 3
+                    ),
+                    color,
+                    size,
+                    0.8 + Math.random() * 0.4 // Longer lifetime
+                );
                 
-                // Random velocity
-                const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 0.3 + 0.1;
-                particle.userData = {
-                    velocity: {
+                if (particle) {
+                    // Stronger explosion velocity
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 0.25 + 0.1;
+                    particle.velocity = {
                         x: Math.cos(angle) * speed,
-                        y: Math.random() * 0.3 + 0.2,
+                        y: Math.random() * 0.25 + 0.15,
                         z: Math.sin(angle) * speed
-                    },
-                    life: 1.0
-                };
-                
-                this.game.scene.add(particle);
-                particles.push(particle);
-            }
-            
-            // Animate explosion
-            let explosionLife = 60;
-            const animateExplosion = () => {
-                explosionLife--;
-                
-                if (explosionLife > 0) {
-                    // Update light
-                    explosionLight.intensity = explosionLife / 20;
-                    
-                    // Update particles
-                    for (const particle of particles) {
-                        particle.position.x += particle.userData.velocity.x;
-                        particle.position.y += particle.userData.velocity.y;
-                        particle.position.z += particle.userData.velocity.z;
-                        
-                        // Apply gravity
-                        particle.userData.velocity.y -= 0.01;
-                        
-                        // Fade out
-                        particle.material.opacity = explosionLife / 60;
-                    }
-                    
-                    requestAnimationFrame(animateExplosion);
-                } else {
-                    // Remove light and particles
-                    this.game.scene.remove(explosionLight);
-                    for (const particle of particles) {
-                        this.game.scene.remove(particle);
-                    }
+                    };
                 }
-            };
-            
-            animateExplosion();
+            }
         }
     }
     

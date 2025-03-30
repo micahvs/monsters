@@ -414,98 +414,31 @@ class Turret {
     }
     
     createRespawnEffect() {
-        // Create a flash effect
+        // Create a simple flash effect
         const flashColor = this.type.color;
-        const flashLight = new THREE.PointLight(flashColor, 3, 30);
+        const flashLight = new THREE.PointLight(flashColor, 2, 20);
         flashLight.position.copy(this.base.position);
         flashLight.position.y += 5;
         this.scene.add(flashLight);
         
-        // Create particles
-        const particles = [];
-        const particleCount = 20;
+        // Auto-remove light after flash
+        setTimeout(() => {
+            this.scene.remove(flashLight);
+        }, 1000);
         
-        for (let i = 0; i < particleCount; i++) {
-            const particleGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-            const particleMaterial = new THREE.MeshBasicMaterial({
-                color: flashColor,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-            
-            // Position above turret
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 2 + Math.random() * 8;
-            
-            particle.position.set(
-                this.base.position.x + Math.cos(angle) * radius,
-                this.base.position.y + 15 + Math.random() * 5,
-                this.base.position.z + Math.sin(angle) * radius
-            );
-            
-            // Add velocity
-            const speed = 0.15 + Math.random() * 0.1;
-            particle.userData = {
-                velocity: new THREE.Vector3(
-                    0,
-                    -speed * 2, // Falling down
-                    0
+        // Create particles using game's particle system if available
+        if (this.scene.game && this.scene.game.createSimpleEffect) {
+            // Create a burst of particles at the turret position
+            this.scene.game.createSimpleEffect(
+                new THREE.Vector3(
+                    this.base.position.x,
+                    this.base.position.y + 10,
+                    this.base.position.z
                 ),
-                rotationSpeed: {
-                    x: (Math.random() - 0.5) * 0.1,
-                    y: (Math.random() - 0.5) * 0.1,
-                    z: (Math.random() - 0.5) * 0.1
-                }
-            };
-            
-            this.scene.add(particle);
-            particles.push(particle);
+                flashColor,
+                15
+            );
         }
-        
-        // Animate effect
-        let effectTime = 1.0;
-        const animateEffect = () => {
-            effectTime -= 0.02;
-            
-            if (effectTime <= 0) {
-                // Remove light
-                this.scene.remove(flashLight);
-                
-                // Remove particles
-                particles.forEach(p => this.scene.remove(p));
-                return;
-            }
-            
-            // Update light
-            flashLight.intensity = effectTime * 3;
-            
-            // Update particles
-            particles.forEach(p => {
-                // Update position
-                p.position.x += p.userData.velocity.x;
-                p.position.y += p.userData.velocity.y;
-                p.position.z += p.userData.velocity.z;
-                
-                // Rotate particle
-                p.rotation.x += p.userData.rotationSpeed.x;
-                p.rotation.y += p.userData.rotationSpeed.y;
-                p.rotation.z += p.userData.rotationSpeed.z;
-                
-                // Fade out
-                p.material.opacity = effectTime * 0.8;
-                
-                // Accelerate fall as they get closer to turret
-                if (p.position.y < this.base.position.y + 10) {
-                    p.userData.velocity.y *= 1.05;
-                }
-            });
-            
-            requestAnimationFrame(animateEffect);
-        };
-        
-        animateEffect();
     }
 }
 
@@ -617,11 +550,16 @@ class Game {
         
         // Core initialization only
         this.scene = new THREE.Scene();
+        this.scene.game = this; // Add reference to the game instance
+        
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000); // Increased far plane for larger arena
         this.camera.position.set(0, 1600, 3200); // Doubled camera distance for 2x arena
         this.renderer = null;
         this.truck = null;
         this.isInitialized = false;
+        
+        // Disable debug by default
+        this.debugMode = false;
         
         // Initialize audio manager with camera
         if (!window.audioManager) {
@@ -629,6 +567,9 @@ class Game {
             window.audioManager = new AudioManager(this.camera);
         }
         this.audioManager = window.audioManager; // Always use the global instance
+        
+        // Create shared geometries for better performance
+        this.sharedParticleGeometry = new THREE.SphereGeometry(1, 8, 6); // Higher quality than before
         
         // Initialize object pool manager for better performance
         this.objectPools = new ObjectPoolManager();
@@ -841,13 +782,15 @@ class Game {
     initObjectPools() {
         // Create particle pool
         this.objectPools.createPool('particles', () => {
-            const geometry = new THREE.SphereGeometry(0.2, 4, 4);
-            const material = new THREE.MeshBasicMaterial({
+            // Use shared geometry instead of creating new ones each time
+            const material = new THREE.MeshPhongMaterial({
                 color: 0xff00ff,
+                emissive: 0xff00ff,
+                emissiveIntensity: 0.5,
                 transparent: true,
                 opacity: 0.8
             });
-            const mesh = new THREE.Mesh(geometry, material);
+            const mesh = new THREE.Mesh(this.sharedParticleGeometry, material);
             mesh.visible = false;
             this.scene.add(mesh);
             return {
@@ -856,7 +799,9 @@ class Game {
                     this.mesh.visible = true;
                     this.mesh.position.copy(position);
                     this.mesh.material.color.set(color || 0xff00ff);
+                    this.mesh.material.emissive.set(color || 0xff00ff);
                     this.mesh.material.opacity = 0.8;
+                    this.mesh.scale.set(0.2, 0.2, 0.2); // Scale the shared geometry
                     this.life = 1.0;
                     this.velocity = new THREE.Vector3(
                         (Math.random() - 0.5) * 0.5,
@@ -998,23 +943,23 @@ class Game {
             try {
                 // Modern lighting setup for better color rendering
                 // Main ambient light provides base illumination
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); // Increased intensity since we removed directional lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Increased from 0.7 for better visibility
                 this.scene.add(ambientLight);
                 
                 // Main directional light WITHOUT shadows
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased from 1.0
                 directionalLight.position.set(50, 200, 100);
                 directionalLight.castShadow = false; // Explicitly disable shadows
                 this.scene.add(directionalLight);
                 
                 // Add some colored rim lighting for visual interest
-                const pinkLight = new THREE.DirectionalLight(0xff00ff, 0.3);
+                const pinkLight = new THREE.DirectionalLight(0xff00ff, 0.4); // Increased from 0.3
                 pinkLight.position.set(-100, 50, -100);
                 pinkLight.castShadow = false; // Explicitly disable shadows
                 this.scene.add(pinkLight);
                 
                 // Blue backlight for cyberpunk feel
-                const blueLight = new THREE.DirectionalLight(0x0088ff, 0.3);
+                const blueLight = new THREE.DirectionalLight(0x0088ff, 0.4); // Increased from 0.3
                 blueLight.position.set(100, 20, -100);
                 blueLight.castShadow = false; // Explicitly disable shadows
                 this.scene.add(blueLight);
@@ -1091,6 +1036,12 @@ class Game {
                 console.error("Couldn't display error message:", e);
             }
         }
+        
+        try {
+            this.initializeDebugHelpers();
+        } catch (debugError) {
+            console.error("Failed to initialize debug helpers:", debugError);
+        }
     }
 
     createArena() {
@@ -1101,8 +1052,9 @@ class Game {
         
         // Create ground with fewer segments for performance
         const groundGeometry = new THREE.PlaneGeometry(arenaSize, arenaSize, 1, 1);
-        const groundMaterial = new THREE.MeshBasicMaterial({ // Changed from MeshStandardMaterial to MeshBasicMaterial
-            color: 0x333333
+        const groundMaterial = new THREE.MeshPhongMaterial({ // Changed from MeshBasicMaterial back to MeshPhongMaterial
+            color: 0x333333,
+            shininess: 10
         });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
@@ -1110,8 +1062,9 @@ class Game {
         this.scene.add(ground);
         
         // Create walls - now 50% shorter (height reduced from 100 to 50)
-        const wallMaterial = new THREE.MeshBasicMaterial({
-            color: 0x666666
+        const wallMaterial = new THREE.MeshPhongMaterial({ // Changed from MeshBasicMaterial to MeshPhongMaterial
+            color: 0x666666,
+            shininess: 20
         });
         
         // Arena half size is now 780 (doubled from 390)
@@ -1185,9 +1138,11 @@ class Game {
         
         // Double the truck dimensions (2x bigger)
         const truckGeometry = new THREE.BoxGeometry(5, 2.5, 7.5); // 2x the original dimensions
-        const truckMaterial = new THREE.MeshBasicMaterial({ // Changed to MeshBasicMaterial for performance
+        const truckMaterial = new THREE.MeshPhongMaterial({ // Changed back to MeshPhongMaterial for better lighting
             color: 0xff00ff,
-            wireframe: false
+            emissive: 0x330033,
+            shininess: 30,
+            specular: 0xffffff
         });
         this.truck = new THREE.Mesh(truckGeometry, truckMaterial);
         this.truck.position.set(0, 2, 0); // Adjusted height for 2x size
@@ -1206,8 +1161,9 @@ class Game {
         const wheelGeometry = new THREE.CylinderGeometry(1, 1, 0.8, 16); // Simplified from 32 to 16 segments
         wheelGeometry.rotateX(Math.PI / 2); // Rotate to align with truck
         
-        const wheelMaterial = new THREE.MeshBasicMaterial({ // Changed to MeshBasicMaterial
-            color: 0x333333
+        const wheelMaterial = new THREE.MeshPhongMaterial({ // Changed back to MeshPhongMaterial
+            color: 0x333333,
+            shininess: 30
         });
         
         // Create and position 4 wheels - adjusted for 2x truck size
@@ -1245,6 +1201,11 @@ class Game {
         window.addEventListener('keydown', (e) => {
             if (this.keys.hasOwnProperty(e.key)) {
                 this.keys[e.key] = true;
+            }
+            
+            // Add shortcut for debug mode toggle (F9)
+            if (e.key === 'F9') {
+                this.toggleDebugMode();
             }
         });
         
@@ -1584,6 +1545,11 @@ class Game {
             
             // Render only if active
             this.renderer.render(this.scene, this.camera);
+        }
+        
+        // Update debug info if enabled
+        if (this.debugMode && this.debugPanel) {
+            this.updateDebugInfo();
         }
     }
 
@@ -2794,6 +2760,9 @@ class Game {
         const particle = this.objectPools.get('particles');
         if (particle) {
             particle.reset(position, color || 0xff00ff);
+            // Scale the shared geometry instead of creating new ones
+            particle.mesh.scale.set(size, size, size);
+            particle.life = lifetime;
             return particle;
         }
         return null;
@@ -2819,10 +2788,26 @@ class Game {
         if (particlePool) {
             for (let i = particlePool.active.length - 1; i >= 0; i--) {
                 const particle = particlePool.active[i];
-                const active = particle.update(deltaTime);
                 
+                // Apply physics once per frame in a centralized location
+                if (particle.mesh && particle.velocity) {
+                    particle.mesh.position.x += particle.velocity.x;
+                    particle.mesh.position.y += particle.velocity.y;
+                    particle.mesh.position.z += particle.velocity.z;
+                    
+                    // Apply gravity
+                    particle.velocity.y -= 0.01;
+                    
+                    // Update opacity/lifetime
+                    if (particle.life !== undefined) {
+                        particle.life -= deltaTime * 0.5;
+                        particle.mesh.material.opacity = Math.max(0, particle.life);
+                    }
+                }
+                
+                // Check if particle should be removed
+                const active = particle.life > 0;
                 if (!active) {
-                    // Return to pool when done
                     particle.hide();
                     this.objectPools.release('particles', particle);
                 }
@@ -2885,6 +2870,152 @@ class Game {
                 particle.reset(position, 0xff5500);
                 particles.push(particle);
             }
+        }
+    }
+
+    initializeDebugHelpers() {
+        // Only create debug visuals when debug mode is on
+        if (this.debugMode) {
+            // Add debug stats panel
+            const statsPanel = document.createElement('div');
+            statsPanel.id = 'debug-panel';
+            statsPanel.style.position = 'fixed';
+            statsPanel.style.top = '70px';
+            statsPanel.style.right = '10px';
+            statsPanel.style.backgroundColor = 'rgba(0,0,0,0.7)';
+            statsPanel.style.color = '#00ff00';
+            statsPanel.style.padding = '8px';
+            statsPanel.style.fontFamily = 'monospace';
+            statsPanel.style.fontSize = '11px';
+            statsPanel.style.zIndex = '1000';
+            statsPanel.innerHTML = `
+                <div id="debug-memory">Memory: 0 MB</div>
+                <div id="debug-particles">Particles: 0</div>
+                <div id="debug-drawcalls">Draw calls: 0</div>
+            `;
+            document.body.appendChild(statsPanel);
+            this.debugPanel = statsPanel;
+            
+            // Create grid helper with fine divisions if debug is on
+            if (this.gridEnabled) {
+                this.gridHelper = new THREE.GridHelper(1560, 20);
+                this.scene.add(this.gridHelper);
+            }
+            
+            // Enable verbose console output
+            this.enableDebugLogs();
+        } else {
+            // Limit console.log if not in debug mode
+            if (!this._originalConsoleLog) {
+                this._originalConsoleLog = console.log;
+                console.log = function() {
+                    // Only log errors and warnings
+                    if (arguments[0] && typeof arguments[0] === 'string' && 
+                        (arguments[0].includes('ERROR') || 
+                         arguments[0].includes('Warning') || 
+                         arguments[0].includes('CRITICAL'))) {
+                        this._originalConsoleLog.apply(console, arguments);
+                    }
+                }.bind(this);
+            }
+            
+            // Only create minimal grid helper in non-debug mode
+            if (this.gridEnabled && !window.lowPerformanceMode) {
+                this.gridHelper = new THREE.GridHelper(1560, 10); // Fewer divisions in normal mode
+                this.scene.add(this.gridHelper);
+            }
+        }
+    }
+
+    enableDebugLogs() {
+        if (this._originalConsoleLog) {
+            console.log = this._originalConsoleLog;
+        }
+    }
+
+    updateDebugInfo() {
+        if (!this.debugPanel) return;
+        
+        // Update memory usage
+        const memoryElem = document.getElementById('debug-memory');
+        if (memoryElem && window.performance && window.performance.memory) {
+            const memoryUsed = Math.round(window.performance.memory.usedJSHeapSize / (1024 * 1024));
+            const memoryTotal = Math.round(window.performance.memory.totalJSHeapSize / (1024 * 1024));
+            memoryElem.textContent = `Memory: ${memoryUsed}/${memoryTotal} MB`;
+        }
+        
+        // Update particle count
+        const particleElem = document.getElementById('debug-particles');
+        if (particleElem && this.objectPools && this.objectPools.pools) {
+            const particlePool = this.objectPools.pools.get('particles');
+            const particleCount = particlePool ? particlePool.active.length : 0;
+            particleElem.textContent = `Particles: ${particleCount}/${this.maxParticles}`;
+        }
+        
+        // Update draw calls info
+        const drawCallsElem = document.getElementById('debug-drawcalls');
+        if (drawCallsElem && this.renderer) {
+            drawCallsElem.textContent = `Draw calls: ${this.renderer.info.render.calls}`;
+        }
+    }
+
+    toggleDebugMode() {
+        this.debugMode = !this.debugMode;
+        
+        // Update UI based on debug state
+        if (this.debugMode) {
+            this.enableDebugLogs();
+            
+            // Create debug panel if not exists
+            if (!this.debugPanel) {
+                const statsPanel = document.createElement('div');
+                statsPanel.id = 'debug-panel';
+                statsPanel.style.position = 'fixed';
+                statsPanel.style.top = '70px';
+                statsPanel.style.right = '10px';
+                statsPanel.style.backgroundColor = 'rgba(0,0,0,0.7)';
+                statsPanel.style.color = '#00ff00';
+                statsPanel.style.padding = '8px';
+                statsPanel.style.fontFamily = 'monospace';
+                statsPanel.style.fontSize = '11px';
+                statsPanel.style.zIndex = '1000';
+                statsPanel.innerHTML = `
+                    <div id="debug-memory">Memory: 0 MB</div>
+                    <div id="debug-particles">Particles: 0</div>
+                    <div id="debug-drawcalls">Draw calls: 0</div>
+                `;
+                document.body.appendChild(statsPanel);
+                this.debugPanel = statsPanel;
+            } else {
+                this.debugPanel.style.display = 'block';
+            }
+            
+            // Create/show grid if not exists
+            if (!this.gridHelper && this.gridEnabled) {
+                this.gridHelper = new THREE.GridHelper(1560, 20);
+                this.scene.add(this.gridHelper);
+            } else if (this.gridHelper) {
+                this.gridHelper.visible = true;
+            }
+            
+            this.showNotification('Debug mode enabled');
+        } else {
+            // Hide debug UI
+            if (this.debugPanel) {
+                this.debugPanel.style.display = 'none';
+            }
+            
+            // Hide grid
+            if (this.gridHelper) {
+                this.gridHelper.visible = false;
+            }
+            
+            // Restore console behavior
+            if (this._originalConsoleLog) {
+                console.log = this._originalConsoleLog;
+            }
+            
+            this.showNotification('Debug mode disabled');
         }
     }
 }
