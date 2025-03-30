@@ -600,6 +600,9 @@ class Game {
             this.shadowsEnabled = false; // Disabled shadows by default
             this.effectsEnabled = true;
             this.gridEnabled = true;
+            
+            // Enable multiplayer by default on desktop
+            window.multiplayerEnabled = true;
         }
         
         // Performance mode flag - default to higher performance
@@ -3065,8 +3068,8 @@ window.addEventListener('load', () => {
     const loadingElement = document.getElementById('loadingScreen');
     
     // Disable multiplayer by default - this is critical for performance
-    window.multiplayerEnabled = false;
-    console.log("Multiplayer disabled by default for better performance");
+    window.multiplayerEnabled = localStorage.getItem('monsterTruckMultiplayer') === 'false' ? false : true;
+    console.log("Multiplayer enabled by default for better gameplay experience");
     
     const preloader = new AssetPreloader(() => {
         if (loadingElement) loadingElement.style.display = 'none';

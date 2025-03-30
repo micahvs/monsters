@@ -13,8 +13,16 @@ const allowedOrigins = [
     "https://monsters-kappa.vercel.app",
     "https://monsters-micahvs.vercel.app",
     "https://monsters-drab.vercel.app",
+    "https://monster-truck-game.vercel.app",
+    "https://monster-truck-stadium.fly.dev",
     "http://localhost:3000",
-    "http://localhost:5000"
+    "http://localhost:5000",
+    "http://localhost:8080",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5000", 
+    "http://127.0.0.1:8080",
+    "http://192.168.1.100:3000",
+    "file://"
 ];
 
 // Enable CORS with specific origins

@@ -8,8 +8,8 @@ export default class Multiplayer {
         this.players = new Map();
         this.remoteProjectiles = new Map();
         this.localPlayerId = null;
-        this.serverUrl = 'https://monster-truck-server.glitch.me';
-        this.fallbackUrl = 'https://monster-truck-stadium.fly.dev';
+        this.serverUrl = 'https://monster-truck-stadium.fly.dev';
+        this.fallbackUrl = 'http://localhost:3000';
         this.isConnecting = false;
         this.isConnected = false;
         this.isOfflineMode = false;
@@ -33,12 +33,8 @@ export default class Multiplayer {
             // Initialize socket with better error handling
             console.log('🎮 [Multiplayer] Creating socket with options');
             
-            // Define server URLs - primary and fallback
-            const primaryServer = 'https://monster-truck-game-server.fly.dev';
-            const fallbackServer = 'https://monster-truck-stadium.herokuapp.com'; // fallback option
-            
-            // First try the primary server
-            this.socket = io(primaryServer, {
+            // Use the primary server URL
+            this.socket = io(this.serverUrl, {
                 withCredentials: true,
                 transports: ['websocket', 'polling'],
                 timeout: 10000,
@@ -65,7 +61,7 @@ export default class Multiplayer {
                 
                 // Try fallback server
                 console.log('🎮 [Multiplayer] Trying fallback server...');
-                this.socket = io(fallbackServer, {
+                this.socket = io(this.fallbackUrl, {
                     withCredentials: true,
                     transports: ['websocket', 'polling'],
                     timeout: 10000,
