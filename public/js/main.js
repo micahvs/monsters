@@ -662,6 +662,10 @@ class Game {
         if (window.multiplayerEnabled) {
             // Add a toggle button to disable multiplayer if performance is poor
             this.addMultiplayerToggle();
+            
+            // Initialize the multiplayer system
+            this.multiplayer = new Multiplayer(this);
+            console.log("Multiplayer system initialized:", this.multiplayer);
         }
         
         // Add performance toggle
