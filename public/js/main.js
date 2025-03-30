@@ -2953,8 +2953,55 @@ class Game {
                     projectile.hide();
                     this.objectPools.release('projectiles', projectile);
                 } else {
-                    // Check for projectile collisions
-                    this.checkProjectileCollisions(projectile);
+                    // DAMAGE GUARANTEE: Check for projectile collisions
+                    // Check 4 positions along the projectile path to ensure hits aren't missed
+                    let hitDetected = this.checkProjectileCollisions(projectile);
+                    
+                    // Only do additional checks if no hit was detected and we're in multiplayer
+                    if (!hitDetected && this.multiplayer && window.multiplayerEnabled && projectile.source === 'player') {
+                        // Store original position
+                        const originalPos = projectile.mesh.position.clone();
+                        
+                        // Check points both ahead and behind to catch fast-moving projectiles
+                        // This ensures we don't miss hits due to position updates
+                        const checkPoints = [
+                            // Behind current position (in case we passed through a target)
+                            new THREE.Vector3(
+                                originalPos.x - projectile.direction.x * 5,
+                                originalPos.y - projectile.direction.y * 5,
+                                originalPos.z - projectile.direction.z * 5
+                            ),
+                            // Ahead of current position (to catch hits before they happen)
+                            new THREE.Vector3(
+                                originalPos.x + projectile.direction.x * 5,
+                                originalPos.y + projectile.direction.y * 5,
+                                originalPos.z + projectile.direction.z * 5
+                            ),
+                            // Further ahead (to catch hits that would happen in the next frame)
+                            new THREE.Vector3(
+                                originalPos.x + projectile.direction.x * 10,
+                                originalPos.y + projectile.direction.y * 10,
+                                originalPos.z + projectile.direction.z * 10
+                            )
+                        ];
+                        
+                        // Check each point
+                        for (let j = 0; j < checkPoints.length; j++) {
+                            // Temporarily move projectile to check position
+                            projectile.mesh.position.copy(checkPoints[j]);
+                            
+                            // Check for hits at this position
+                            if (this.checkProjectileCollisions(projectile)) {
+                                hitDetected = true;
+                                break;
+                            }
+                        }
+                        
+                        // Restore original position if no hit was detected
+                        if (!hitDetected) {
+                            projectile.mesh.position.copy(originalPos);
+                        }
+                    }
                 }
             }
         }
@@ -3014,11 +3061,55 @@ class Game {
         if (this.multiplayer && window.multiplayerEnabled && projectile.source === 'player') {
             console.log("🎯 CHECKING PROJECTILE FOR MULTIPLAYER HITS:", projectile);
             
-            // Pass the projectile to multiplayer component to check hits on remote players
-            const hitDetected = this.multiplayer.checkProjectileHits(projectile);
-            console.log("🎯 Hit detection result:", hitDetected);
+            // ULTRA-AGGRESSIVE APPROACH: Always check at least once for every projectile
+            // First, let the multiplayer component check for hits normally
+            let hitDetected = this.multiplayer.checkProjectileHits(projectile);
+            console.log("🎯 Regular hit detection result:", hitDetected);
             
-            // If a hit was detected, disable the projectile
+            // If no hit was detected normally, do a secondary check with each player directly
+            if (!hitDetected && this.multiplayer.players && this.multiplayer.players.size > 0) {
+                console.log("🎯 SECONDARY CHECK - Force checking nearby players");
+                
+                // Get all other players
+                this.multiplayer.players.forEach((player, playerId) => {
+                    // Skip our own player
+                    if (playerId === this.multiplayer.localPlayerId) return;
+                    
+                    // Skip players without meshes
+                    if (!player.truckMesh) return;
+                    
+                    // Check if projectile is somewhat close to this player (VERY generous distance)
+                    const distance = projectile.mesh.position.distanceTo(player.truckMesh.position);
+                    console.log(`🎯 Distance to player ${playerId}: ${distance}`);
+                    
+                    // GUARANTEED HIT: If projectile is within 30 units, force a hit
+                    if (distance < 30) {
+                        console.log(`🎯 FORCE HIT on player ${playerId}! Distance: ${distance}`);
+                        
+                        // Apply massive damage directly
+                        const damage = 50;
+                        player.health = Math.max(0, player.health - damage);
+                        
+                        if (player.monsterTruck) {
+                            player.monsterTruck.health = player.health;
+                        }
+                        
+                        // Create visual effects
+                        this.multiplayer.showDamageEffect(player.truckMesh.position.clone());
+                        
+                        // Update health bar immediately
+                        this.multiplayer.updatePlayerHealthBar(player);
+                        
+                        // Set hit detected flag
+                        hitDetected = true;
+                        
+                        // Show notification
+                        this.multiplayer.showNotification(`Hit on ${player.nickname || 'opponent'}!`, 'success');
+                    }
+                });
+            }
+            
+            // If a hit was detected through either method, disable the projectile
             if (hitDetected) {
                 console.log("🎯 HIT DETECTED! Destroying projectile");
                 projectile.alive = false;

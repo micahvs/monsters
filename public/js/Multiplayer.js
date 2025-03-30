@@ -1234,13 +1234,13 @@ export default class Multiplayer {
     // HELPER METHODS
     
     createNicknameDisplay(nickname, color) {
-        // Create a text sprite for the nickname
+        // Create a larger canvas to include health bar
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         const displayColor = color || '#ff00ff';
         
         canvas.width = 256;
-        canvas.height = 64;
+        canvas.height = 90; // Increased height for health bar
         
         // Clear canvas
         context.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -1256,7 +1256,20 @@ export default class Multiplayer {
         context.textAlign = 'center';
         context.textBaseline = 'middle';
         context.fillStyle = displayColor;
-        context.fillText(nickname, canvas.width / 2, canvas.height / 2);
+        context.fillText(nickname, canvas.width / 2, canvas.height / 3);
+        
+        // Draw health bar background
+        context.fillStyle = 'rgba(255, 0, 0, 0.7)';
+        context.fillRect(20, canvas.height - 30, canvas.width - 40, 15);
+        
+        // Draw health bar foreground (full health initially)
+        context.fillStyle = 'rgba(0, 255, 0, 0.7)';
+        context.fillRect(20, canvas.height - 30, canvas.width - 40, 15);
+        
+        // Draw HEALTH text
+        context.font = 'bold 12px Arial';
+        context.fillStyle = 'white';
+        context.fillText('HEALTH', canvas.width / 2, canvas.height - 22);
         
         // Create texture from canvas
         const texture = new THREE.CanvasTexture(canvas);
@@ -1270,9 +1283,52 @@ export default class Multiplayer {
         
         // Create sprite
         const sprite = new THREE.Sprite(material);
-        sprite.scale.set(4, 1, 1);
+        sprite.scale.set(4, 1.5, 1); // Increased height scale
+        
+        // Store reference to canvas and context for updating health bar
+        sprite.userData = {
+            canvas,
+            context,
+            healthPercent: 100,
+            displayColor
+        };
         
         return sprite;
+    }
+    
+    // New method to update health bar display
+    updatePlayerHealthBar(player) {
+        if (!player || !player.nicknameDisplay || !player.nicknameDisplay.userData) return;
+        
+        const { canvas, context, displayColor } = player.nicknameDisplay.userData;
+        const healthPercent = Math.max(0, Math.min(100, (player.health / player.maxHealth) * 100));
+        
+        // Only update if health changed
+        if (healthPercent === player.nicknameDisplay.userData.healthPercent) return;
+        
+        player.nicknameDisplay.userData.healthPercent = healthPercent;
+        
+        // Redraw the health bar
+        // Clear the health bar area
+        context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        context.fillRect(19, canvas.height - 31, canvas.width - 38, 17);
+        
+        // Draw health bar background
+        context.fillStyle = 'rgba(255, 0, 0, 0.7)';
+        context.fillRect(20, canvas.height - 30, canvas.width - 40, 15);
+        
+        // Draw health bar foreground
+        const healthWidth = (canvas.width - 40) * (healthPercent / 100);
+        context.fillStyle = 'rgba(0, 255, 0, 0.7)';
+        context.fillRect(20, canvas.height - 30, healthWidth, 15);
+        
+        // Draw HEALTH text
+        context.font = 'bold 12px Arial';
+        context.fillStyle = 'white';
+        context.fillText(`${Math.floor(healthPercent)}%`, canvas.width / 2, canvas.height - 22);
+        
+        // Update the texture
+        player.nicknameDisplay.material.map.needsUpdate = true;
     }
     
     showNotification(message, type = 'info') {
@@ -1507,6 +1563,18 @@ export default class Multiplayer {
                 // Make nickname always face the camera
                 if (this.game.camera) {
                     player.nicknameDisplay.lookAt(this.game.camera.position);
+                }
+                
+                // Update health bar display
+                this.updatePlayerHealthBar(player);
+            }
+            
+            // Update truck damage visualizations if applicable
+            if (player.monsterTruck && typeof player.monsterTruck.update === 'function') {
+                try {
+                    player.monsterTruck.update();
+                } catch (err) {
+                    console.error("Error updating remote monster truck:", err);
                 }
             }
         });
