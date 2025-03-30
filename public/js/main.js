@@ -64,10 +64,12 @@ class Projectile {
         
         const projectileColor = source === 'player' ? 0xff00ff : 0xff0000
         // Changed to MeshBasicMaterial from MeshPhongMaterial
-        const material = new THREE.MeshBasicMaterial({
+        const material = new THREE.MeshPhongMaterial({
             color: new THREE.Color(projectileColor),
             transparent: true,
-            opacity: 0.8
+            opacity: 0.8,
+            emissive: projectileColor,
+            shininess: 10
         })
         
         this.mesh = new THREE.Mesh(geometry, material);
@@ -109,10 +111,12 @@ class Projectile {
     createTrail() {
         // Create simpler particle trail
         const trailGeometry = new THREE.SphereGeometry(0.05, 4, 2); // Reduced segments
-        const trailMaterial = new THREE.MeshBasicMaterial({
+        const trailMaterial = new THREE.MeshPhongMaterial({
             color: this.source === 'player' ? 0xff00ff : 0xff0000,
             transparent: true,
-            opacity: 0.5
+            opacity: 0.5,
+            emissive: this.source === 'player' ? 0xff00ff : 0xff0000,
+            shininess: 10
         })
         const trail = new THREE.Mesh(trailGeometry, trailMaterial)
         trail.position.copy(this.mesh.position);
@@ -153,8 +157,10 @@ class Turret {
             8
         );
         // Use MeshBasicMaterial but with better color settings
-        const baseMaterial = new THREE.MeshBasicMaterial({ 
-            color: new THREE.Color(type.color)
+        const baseMaterial = new THREE.MeshPhongMaterial({ 
+            color: new THREE.Color(type.color),
+            emissive: type.color,
+            shininess: 10
         });
         this.base = new THREE.Mesh(baseGeometry, baseMaterial);
         this.base.position.copy(position);
@@ -177,8 +183,10 @@ class Turret {
         }
         
         // Keep using MeshBasicMaterial for turrets as they don't need lighting and it's faster
-        const gunMaterial = new THREE.MeshBasicMaterial({ 
-            color: new THREE.Color(type.color)
+        const gunMaterial = new THREE.MeshPhongMaterial({ 
+            color: new THREE.Color(type.color),
+            emissive: type.color,
+            shininess: 10
         });
         this.gun = new THREE.Mesh(gunGeometry, gunMaterial);
         this.gun.position.y = 0.5 * turretScale;
@@ -488,11 +496,13 @@ class PowerUp {
         }
         
         // Create material with emissive properties and make it more visible
-        const material = new THREE.MeshBasicMaterial({
+        const material = new THREE.MeshPhongMaterial({
             color: color,
             wireframe: true,
             transparent: true,
-            opacity: 0.9  // Increased from typical 0.8
+            opacity: 0.9,  // Increased from typical 0.8
+            emissive: color,
+            shininess: 10
         });
         
         const powerupMesh = new THREE.Mesh(geometry, material);
@@ -1914,6 +1924,23 @@ class Game {
         
         // Check for powerup collection
         this.checkPowerupCollection();
+        
+        // Update multiplayer if enabled
+        if (this.multiplayer && window.multiplayerEnabled) {
+            this.multiplayer.update({
+                position: {
+                    x: this.truck.position.x,
+                    y: this.truck.position.y,
+                    z: this.truck.position.z
+                },
+                rotation: {
+                    y: this.truck.rotation.y
+                },
+                velocity: this.truck.velocity,
+                health: this.health,
+                maxHealth: this.maxHealth
+            });
+        }
     }
 
     animateWheelRoll(speed) {

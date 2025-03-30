@@ -1429,9 +1429,75 @@ export default class Multiplayer {
             .replace(/'/g, '&#039;');
     }
     
-    update() {
-        // Update remote player positions
-        this.updatePlayerPositions();
+    update(playerData) {
+        if (!this.isConnected || !this.socket || !this.game) return;
+        
+        // Store player data for the next update
+        if (!this.game.truck.userData) this.game.truck.userData = {};
+        
+        // Send player update to server if enough time has passed
+        const now = Date.now();
+        if (now - this.lastUpdateTime > this.throttleRate) {
+            this.lastUpdateTime = now;
+            
+            this.socket.emit('playerUpdate', {
+                position: playerData.position,
+                rotation: playerData.rotation,
+                velocity: {
+                    x: playerData.velocity * Math.sin(playerData.rotation.y),
+                    y: 0,
+                    z: playerData.velocity * Math.cos(playerData.rotation.y)
+                },
+                health: playerData.health
+            });
+        }
+        
+        // Update remote players' positions through interpolation
+        this.interpolateRemotePlayers();
+    }
+    
+    // Interpolate remote players' positions for smooth movement
+    interpolateRemotePlayers() {
+        if (!this.game.scene) return;
+        
+        const now = Date.now();
+        
+        // Update each remote player's position
+        this.players.forEach((player, id) => {
+            if (id === this.localPlayerId) return;
+            
+            // Skip if no mesh
+            if (!player.truckMesh) return;
+            
+            // Interpolation factor (0 to 1)
+            const timeSinceUpdate = (now - player.lastUpdateTime) / 1000;
+            const interpolationFactor = Math.min(1, timeSinceUpdate * 10); // 10 = speed factor
+            
+            // Interpolate position
+            player.truckMesh.position.lerpVectors(
+                player.lastPosition, 
+                player.targetPosition,
+                interpolationFactor
+            );
+            
+            // Interpolate rotation
+            player.truckMesh.rotation.y = player.lastRotation.y + 
+                (player.targetRotation.y - player.lastRotation.y) * interpolationFactor;
+                
+            // Update nickname position to follow the truck
+            if (player.nicknameDisplay) {
+                player.nicknameDisplay.position.set(
+                    player.truckMesh.position.x,
+                    player.truckMesh.position.y + 5, // Offset above truck
+                    player.truckMesh.position.z
+                );
+                
+                // Make nickname always face the camera
+                if (this.game.camera) {
+                    player.nicknameDisplay.lookAt(this.game.camera.position);
+                }
+            }
+        });
     }
     
     checkProjectileHits(projectile) {
