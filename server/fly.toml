@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for monster-truck-game-server on 2025-03-12T14:09:09-07:00
+# fly.toml app configuration file generated for monster-truck-stadium on 2025-03-12T14:09:09-07:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'monster-truck-game-server'
+app = 'monster-truck-stadium'
 primary_region = 'sea'
 
 [build]

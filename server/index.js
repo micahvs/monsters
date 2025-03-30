@@ -15,6 +15,7 @@ const allowedOrigins = [
     "https://monsters-drab.vercel.app",
     "https://monster-truck-game.vercel.app",
     "https://monster-truck-stadium.fly.dev",
+    "https://micahvs.github.io",
     "http://localhost:3000",
     "http://localhost:5000",
     "http://localhost:8080",
