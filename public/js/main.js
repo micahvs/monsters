@@ -709,8 +709,8 @@ class Game {
         toggle = document.createElement('div');
         toggle.id = 'multiplayer-toggle';
         toggle.style.position = 'fixed';
-        toggle.style.bottom = '50px';
-        toggle.style.left = '320px';
+        toggle.style.bottom = '160px';
+        toggle.style.left = '10px';
         toggle.style.backgroundColor = 'rgba(0,0,0,0.6)';
         toggle.style.padding = '5px 10px';
         toggle.style.color = '#fff';
@@ -784,8 +784,8 @@ class Game {
         toggle = document.createElement('div');
         toggle.id = 'performance-toggle';
         toggle.style.position = 'fixed';
-        toggle.style.bottom = '10px';
-        toggle.style.left = '320px';
+        toggle.style.bottom = '120px';
+        toggle.style.left = '10px';
         toggle.style.backgroundColor = 'rgba(0,0,0,0.6)';
         toggle.style.padding = '5px 10px';
         toggle.style.color = '#fff';
