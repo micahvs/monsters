@@ -682,11 +682,44 @@ class Game {
 
     // Add a method to let users disable multiplayer if performance is poor
     addMultiplayerToggle() {
-        const toggle = document.createElement('div');
+        // Check if the toggle already exists in HTML
+        let toggle = document.getElementById('multiplayer-toggle');
+        
+        // If toggle exists in HTML, just update it
+        if (toggle) {
+            // Update the initial state
+            toggle.textContent = window.multiplayerEnabled ? 
+                '🌐 Multiplayer: ON - Click to toggle' : 
+                '🌐 Multiplayer: OFF - Click to toggle';
+            toggle.style.border = window.multiplayerEnabled ?
+                '1px solid #00ffff' : '1px solid #ff0000';
+                
+            // Add event listener
+            toggle.addEventListener('click', () => {
+                window.multiplayerEnabled = !window.multiplayerEnabled;
+                toggle.textContent = window.multiplayerEnabled ? 
+                    '🌐 Multiplayer: ON - Click to toggle' : 
+                    '🌐 Multiplayer: OFF - Click to toggle';
+                toggle.style.border = window.multiplayerEnabled ?
+                    '1px solid #00ffff' : '1px solid #ff0000';
+                    
+                // Save preference to localStorage
+                localStorage.setItem('monsterTruckMultiplayer', window.multiplayerEnabled);
+                    
+                // Show notification
+                this.showNotification(window.multiplayerEnabled ? 
+                    'Multiplayer enabled - restart needed' : 
+                    'Multiplayer disabled - performance will improve');
+            });
+            return;
+        }
+        
+        // Only create a new toggle if it doesn't exist in HTML (fallback)
+        toggle = document.createElement('div');
         toggle.id = 'multiplayer-toggle';
         toggle.style.position = 'fixed';
-        toggle.style.bottom = '10px';
-        toggle.style.left = '10px';
+        toggle.style.bottom = '50px';
+        toggle.style.left = '320px';
         toggle.style.backgroundColor = 'rgba(0,0,0,0.6)';
         toggle.style.padding = '5px 10px';
         toggle.style.color = '#fff';
@@ -695,8 +728,11 @@ class Game {
         toggle.style.zIndex = '1000';
         toggle.style.cursor = 'pointer';
         toggle.style.borderRadius = '5px';
-        toggle.textContent = '🌐 Multiplayer: ON - Click to toggle';
-        toggle.style.border = '1px solid #00ffff';
+        toggle.textContent = window.multiplayerEnabled ? 
+            '🌐 Multiplayer: ON - Click to toggle' : 
+            '🌐 Multiplayer: OFF - Click to toggle';
+        toggle.style.border = window.multiplayerEnabled ?
+            '1px solid #00ffff' : '1px solid #ff0000';
         
         toggle.addEventListener('click', () => {
             window.multiplayerEnabled = !window.multiplayerEnabled;
@@ -705,6 +741,9 @@ class Game {
                 '🌐 Multiplayer: OFF - Click to toggle';
             toggle.style.border = window.multiplayerEnabled ?
                 '1px solid #00ffff' : '1px solid #ff0000';
+                
+            // Save preference to localStorage
+            localStorage.setItem('monsterTruckMultiplayer', window.multiplayerEnabled);
                 
             // Show notification
             this.showNotification(window.multiplayerEnabled ? 
@@ -717,11 +756,45 @@ class Game {
 
     // Add performance toggle method
     addPerformanceToggle() {
-        const toggle = document.createElement('div');
+        // Check if the toggle already exists in HTML
+        let toggle = document.getElementById('performance-toggle');
+        
+        // If toggle exists in HTML, just update it
+        if (toggle) {
+            // Update the initial state
+            toggle.textContent = window.lowPerformanceMode ? 
+                '⚙️ Low Quality Mode' : '⚙️ High Quality Mode';
+            toggle.style.border = window.lowPerformanceMode ?
+                '1px solid #00ff00' : '1px solid #ff00ff';
+                
+            // Add event listener
+            toggle.addEventListener('click', () => {
+                window.lowPerformanceMode = !window.lowPerformanceMode;
+                localStorage.setItem('lowPerformanceMode', window.lowPerformanceMode);
+                
+                toggle.textContent = window.lowPerformanceMode ? 
+                    '⚙️ Low Quality Mode' : '⚙️ High Quality Mode';
+                toggle.style.border = window.lowPerformanceMode ?
+                    '1px solid #00ff00' : '1px solid #ff00ff';
+                    
+                // Apply changes immediately
+                if (window.lowPerformanceMode) {
+                    this.applyLowPerformanceMode();
+                    this.showNotification('Low quality mode enabled - better performance');
+                } else {
+                    this.applyHighPerformanceMode();
+                    this.showNotification('High quality mode enabled - better visuals');
+                }
+            });
+            return;
+        }
+        
+        // Only create a new toggle if it doesn't exist in HTML (fallback)
+        toggle = document.createElement('div');
         toggle.id = 'performance-toggle';
         toggle.style.position = 'fixed';
-        toggle.style.bottom = '40px';
-        toggle.style.left = '10px';
+        toggle.style.bottom = '10px';
+        toggle.style.left = '320px';
         toggle.style.backgroundColor = 'rgba(0,0,0,0.6)';
         toggle.style.padding = '5px 10px';
         toggle.style.color = '#fff';
@@ -1533,10 +1606,12 @@ class Game {
                     if (window.multiplayerEnabled) {
                         console.log("Low FPS - disabling multiplayer");
                         window.multiplayerEnabled = false;
+                        localStorage.setItem('monsterTruckMultiplayer', false);
                         this.showNotification("Multiplayer disabled due to low performance");
-                        if (document.getElementById('multiplayer-toggle')) {
-                            document.getElementById('multiplayer-toggle').textContent = '🌐 Multiplayer: OFF (auto)';
-                            document.getElementById('multiplayer-toggle').style.border = '1px solid #ff0000';
+                        const toggleBtn = document.getElementById('multiplayer-toggle');
+                        if (toggleBtn) {
+                            toggleBtn.textContent = '🌐 Multiplayer: OFF (auto)';
+                            toggleBtn.style.border = '1px solid #ff0000';
                         }
                     }
                 }
