@@ -392,10 +392,33 @@ class Turret {
     }
 
     damage() {
+        // Log when turret is damaged
+        console.log(`Turret damaged! Health before: ${this.health}`);
+        
         this.health--;
+        console.log(`Turret health after: ${this.health}`);
+        
+        // Flash the turret red to show damage
+        if (this.base && this.base.material) {
+            const originalColor = this.base.material.color.clone();
+            this.base.material.color.setHex(0xff0000); // Red flash
+            
+            // Reset to original color after 100ms
+            setTimeout(() => {
+                if (this.base && this.base.material) {
+                    this.base.material.color.copy(originalColor);
+                }
+            }, 100);
+        }
+        
         if (this.health <= 0) {
+            console.log("Turret destroyed!");
             this.alive = false;
-            this.base.material.color.setHex(0x333333); // Darkened color when destroyed
+            
+            if (this.base && this.base.material) {
+                this.base.material.color.setHex(0x333333); // Darkened color when destroyed
+                this.base.material.emissive.setHex(0x000000); // Turn off glow
+            }
             
             // Store initial type and properties for respawn
             if (!this.respawning) {
@@ -404,9 +427,11 @@ class Turret {
                 this.originalType = { ...this.type }; // Store original type for respawn
                 this.originalHealth = this.type.health; // Store original health
                 
-                // Tilt to show destruction
-                this.base.rotation.x = Math.random() * 0.5 - 0.25;
-                this.base.rotation.z = Math.random() * 0.5 - 0.25;
+                // Tilt to show destruction more dramatically
+                if (this.base) {
+                    this.base.rotation.x = Math.random() * 0.8 - 0.4;
+                    this.base.rotation.z = Math.random() * 0.8 - 0.4;
+                }
             }
         }
     }
@@ -2209,11 +2234,29 @@ class Game {
     }
 
     showCollisionEffect(position) {
-        // Create particles for collision - simplified
-        this.createSimpleEffect(position, 0xffffff, 8);
+        // Create particles for collision with enhanced effect
+        this.createSimpleEffect(position, 0xff3300, 15); // Orange/red explosion
         
-        // Shake camera for effect - reduced intensity
-        this.shakeCamera(0.3);
+        // Add a flash effect by creating a temporary bright light
+        const flashLight = new THREE.PointLight(0xff3300, 2, 50);
+        flashLight.position.copy(position);
+        flashLight.position.y += 10; // Position light above the collision
+        this.scene.add(flashLight);
+        
+        // Remove the light after short duration
+        setTimeout(() => {
+            if (flashLight && this.scene) {
+                this.scene.remove(flashLight);
+            }
+        }, 100);
+        
+        // Shake camera for effect - moderate intensity
+        this.shakeCamera(0.5);
+        
+        // Play explosion sound if audio manager is available
+        if (window.audioManager) {
+            window.audioManager.playSound('vehicle_hit');
+        }
     }
 
     flashScreen(color) {
@@ -2378,12 +2421,18 @@ class Game {
     }
 
     updateTurrets() {
+        // Log turret count periodically
+        if (this.frameCount % 300 === 0) {
+            console.log(`Active turrets: ${this.turrets.filter(t => t && t.alive).length}/${this.turrets.length}`);
+        }
+        
         // Track if any turrets activated this frame
         let newActivations = 0;
         
         // Update each turret
         for (let i = 0; i < this.turrets.length; i++) {
             const turret = this.turrets[i];
+            if (!turret) continue;
             
             // Check if turret is about to activate
             const wasActive = turret.activated;
@@ -2391,11 +2440,19 @@ class Game {
             // Pass player position
             if (this.truck) {
                 turret.update(this.truck.position);
+                
+                // Debug: Log distance to closest turret for shooting guidance
+                if (i === 0 && this.frameCount % 60 === 0) {
+                    const distance = this.truck.position.distanceTo(turret.base.position);
+                    console.log(`Distance to nearest turret: ${distance.toFixed(1)} units`);
+                }
             }
             
             // Check if turret just activated
             if (!wasActive && turret.activated) {
                 newActivations++;
+                // Show notification when a turret activates to alert the player
+                this.showNotification('Turret activated!', 'warning');
             }
         }
         
@@ -2463,52 +2520,79 @@ class Game {
         
         // Get all active projectiles from the weapon
         const projectiles = this.weapon.projectiles;
+        if (!projectiles || !projectiles.length) return;
+        
+        // Log for debugging
+        console.log(`Checking ${projectiles.length} projectiles against ${this.turrets ? this.turrets.length : 0} turrets`);
         
         // Check each projectile
         for (let i = 0; i < projectiles.length; i++) {
             const projectile = projectiles[i];
             
+            // Skip invalid projectiles
+            if (!projectile || !projectile.mesh || !projectile.alive) continue;
+            
             // Check each turret
-            for (let j = 0; j < this.turrets.length; j++) {
-                const turret = this.turrets[j];
-                
-                // Skip dead turrets or turrets without a base
-                if (!turret || !turret.alive || !turret.base) continue;
-                
-                // Get distance to turret
-                const distance = projectile.mesh.position.distanceTo(turret.base.position);
-                
-                // If hit - 1.5x larger hit radius to match 1.5x larger turrets
-                if (distance < 22.5) { // 15 * 1.5 = 22.5
-                    // Remove projectile
-                    projectile.alive = false;
+            if (this.turrets && this.turrets.length > 0) {
+                for (let j = 0; j < this.turrets.length; j++) {
+                    const turret = this.turrets[j];
                     
-                    // Damage turret
-                    turret.damage();
+                    // Skip dead turrets or turrets without a base
+                    if (!turret || !turret.alive || !turret.base) continue;
                     
-                    // Create hit effect
-                    this.showCollisionEffect(projectile.mesh.position.clone());
+                    // Get distance to turret
+                    const distance = projectile.mesh.position.distanceTo(turret.base.position);
                     
-                    // If turret is destroyed, give player points
-                    if (!turret.alive) {
-                        // Add score based on turret type
-                        let scoreValue = 100; // Default score
+                    // Log for debugging
+                    if (distance < 50) {
+                        console.log(`Projectile near turret! Distance: ${distance.toFixed(2)}`);
+                    }
+                    
+                    // If hit - use larger hit radius (30 instead of 22.5) to make hitting easier
+                    if (distance < 30) {
+                        console.log(`HIT DETECTED! Turret ${j} hit by projectile ${i}`);
                         
-                        // Bonus score for harder turrets
-                        if (turret.type.name === "Heavy") {
-                            scoreValue = 200;
-                        } else if (turret.type.name === "Rapid") {
-                            scoreValue = 150;
+                        // Remove projectile
+                        projectile.alive = false;
+                        projectile.mesh.visible = false; // Ensure it disappears immediately
+                        
+                        // Damage turret
+                        turret.damage();
+                        console.log(`Turret health now: ${turret.health}`);
+                        
+                        // Create hit effect at the turret position for better visibility
+                        this.showCollisionEffect(turret.base.position.clone());
+                        
+                        // If turret is destroyed, give player points
+                        if (!turret.alive) {
+                            // Add score based on turret type
+                            let scoreValue = 100; // Default score
+                            
+                            // Bonus score for harder turrets
+                            if (turret.type && turret.type.name) {
+                                if (turret.type.name === "Heavy") {
+                                    scoreValue = 200;
+                                } else if (turret.type.name === "Rapid") {
+                                    scoreValue = 150;
+                                }
+                            }
+                            
+                            // Add score
+                            this.score += scoreValue;
+                            if (this.scoreDisplay) {
+                                this.scoreDisplay.textContent = `Score: ${this.score}`;
+                            }
+                            
+                            // Show notification with appropriate message
+                            const turretName = turret.type && turret.type.name ? turret.type.name : "Standard";
+                            this.showNotification(`${turretName} Turret destroyed! +${scoreValue} points`, 'success');
+                        } else {
+                            // Show hit notification even for non-destroying hits
+                            this.showNotification('Turret hit!', 'info');
                         }
                         
-                        // Add score
-                        this.score += scoreValue;
-                        if (this.scoreDisplay) {
-                            this.scoreDisplay.textContent = `Score: ${this.score}`;
-                        }
-                        
-                        // Show notification with appropriate message
-                        this.showNotification(`${turret.type.name} Turret destroyed! +${scoreValue} points`);
+                        // Break out of inner loop when hit detected
+                        break;
                     }
                 }
             }
