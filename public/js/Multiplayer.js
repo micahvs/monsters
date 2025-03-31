@@ -1607,9 +1607,8 @@ export default class Multiplayer {
         });
         
         this.players.forEach((player, playerId) => {
-            // Skip the local player and the player who fired the projectile
-            if (playerId === this.localPlayerId || 
-                (projectile.playerId && playerId === projectile.playerId)) {
+            // Skip only the local player - allow hits on other players
+            if (playerId === this.localPlayerId) {
                 return;
             }
             
