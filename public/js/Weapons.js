@@ -73,7 +73,7 @@ export class Weapon {
     
     shoot(position, direction, source = 'player') {
         if (this.cooldownTimer > 0 || this.ammo <= 0 || this.isReloading) {
-            return false; // Can't shoot
+            return null; // Can't shoot
         }
         
         // Set cooldown
@@ -82,15 +82,20 @@ export class Weapon {
         // Use ammo
         this.ammo--;
         
-        // Create projectiles
-        const projectiles = [];
+        // Acquire projectiles from the pool
+        const pooledProjectiles = [];
         
         for (let i = 0; i < this.type.projectilesPerShot; i++) {
+            const pooledProjectile = this.game.objectPools.acquire('projectiles');
+            if (!pooledProjectile) {
+                console.warn("Weapon.shoot: Failed to acquire projectile from pool.");
+                continue; // Skip if pool is exhausted
+            }
+
             let shotDirection = direction.clone();
             
             // Apply spread if needed
             if (this.type.spread > 0) {
-                // Add random deviation for spread weapons
                 const spreadX = (Math.random() - 0.5) * this.type.spread;
                 const spreadY = (Math.random() - 0.5) * this.type.spread * 0.5; // Less vertical spread
                 const spreadZ = (Math.random() - 0.5) * this.type.spread;
@@ -101,65 +106,39 @@ export class Weapon {
                 shotDirection.normalize();
             }
             
-            // Create projectile mesh
-            let geometry;
-            if (this.type.name === "Rockets") {
-                // Rocket shape
-                geometry = new THREE.ConeGeometry(this.type.projectileSize, this.type.projectileSize * 3, 8);
-                geometry.rotateX(Math.PI / 2); // Point forward
-            } else if (this.type.name === "Mines") {
-                // Mine shape
-                geometry = new THREE.SphereGeometry(this.type.projectileSize, 8, 8);
-            } else {
-                // Default shape (energy bolt)
-                geometry = new THREE.CylinderGeometry(this.type.projectileSize, this.type.projectileSize, this.type.projectileSize * 4, 8);
-                geometry.rotateX(Math.PI / 2);
-            }
-            
-            const material = new THREE.MeshPhongMaterial({
-                color: this.type.color,
-                emissive: this.type.color,
-                emissiveIntensity: 0.8,
-                transparent: true,
-                opacity: 0.8,
-                shininess: 30
-            });
-            
-            const projectile = new THREE.Mesh(geometry, material);
-            
-            // Position at slightly different points for multiple projectiles
-            const offsetX = this.type.projectilesPerShot > 1 ? (i - Math.floor(this.type.projectilesPerShot / 2)) * 0.2 : 0;
-            projectile.position.copy(position);
-            projectile.position.x += offsetX;
-            
-            // Set rotation to match direction
-            projectile.quaternion.setFromUnitVectors(
-                new THREE.Vector3(0, 0, 1),
-                shotDirection
+            // Configure the acquired projectile
+            pooledProjectile.setup(
+                position, 
+                shotDirection, 
+                this.type.speed, 
+                this.type.damage * this.damageMultiplier, 
+                this.type === WeaponTypes.MINES ? 600 : 100, // lifetime
+                source, 
+                this.type // Pass weapon type for visuals/behavior
             );
-            
-            // Add light for better visibility
-            const light = new THREE.PointLight(this.type.color, 0.8, 3);
-            projectile.add(light);
-            
-            // Add to scene
-            this.scene.add(projectile);
-            
-            // Add to projectiles array
-            const projectileData = {
-                mesh: projectile,
-                direction: shotDirection,
-                speed: this.type.speed,
-                damage: this.type.damage * this.damageMultiplier,
-                lifetime: this.type === WeaponTypes.MINES ? 600 : 100, // Longer lifetime for mines
-                source: source,
-                type: this.type,
-                armed: this.type === WeaponTypes.MINES ? false : true, // Mines start unarmed
-                armTimer: this.type === WeaponTypes.MINES ? 30 : 0 // Arm after 0.5 second
-            };
-            
-            projectiles.push(projectileData);
-            this.projectiles.push(projectileData);
+
+            // Specific setup for mines
+            if (this.type === WeaponTypes.MINES) {
+                pooledProjectile.armed = false;
+                pooledProjectile.armTimer = 30;
+            } else {
+                 pooledProjectile.armed = true;
+                 pooledProjectile.armTimer = 0;
+            }
+
+            // Ensure mesh is visible and positioned correctly
+            // Note: The pool's acquire/setup might handle scene add/visibility
+            pooledProjectile.mesh.position.copy(position);
+             // Offset for multiple projectiles
+            const offsetX = this.type.projectilesPerShot > 1 ? (i - Math.floor(this.type.projectilesPerShot / 2)) * 0.2 : 0;
+            pooledProjectile.mesh.position.x += offsetX;
+
+            // Update mesh appearance based on weapon type (assuming setup does this)
+            // pooledProjectile.updateAppearance(this.type); 
+
+            pooledProjectiles.push(pooledProjectile);
+            // REMOVED: Don't add to internal this.projectiles array
+            // this.projectiles.push(projectileData);
         }
         
         // Create muzzle flash based on weapon type
@@ -172,7 +151,8 @@ export class Weapon {
             this.startReload();
         }
         
-        return projectiles;
+        // Return the list of POOLED projectiles
+        return pooledProjectiles.length > 0 ? pooledProjectiles : null;
     }
     
     update() {

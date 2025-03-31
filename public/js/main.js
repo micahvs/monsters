@@ -58,78 +58,99 @@ const TRUCK_SPECS = {
 }
 
 class Projectile {
-    constructor(position, direction, speed, damage, source) {
-        const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 6) // Reduced segments from 8 to 6
+    // Constructor now only creates the mesh and sets default state
+    constructor(scene) { 
+        this.scene = scene; // Store scene reference
+        const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 6);
         geometry.rotateX(Math.PI / 2);
         
-        const projectileColor = source === 'player' ? 0xff00ff : 0x00ffff // Magenta for player, cyan for enemies
-        // Enhanced material for cyberpunk look
         const material = new THREE.MeshPhongMaterial({
-            color: new THREE.Color(projectileColor),
+            color: 0xff00ff,
+            emissive: 0xff00ff,
+            emissiveIntensity: 1,
             transparent: true,
-            opacity: 0.9,
-            emissive: projectileColor,
-            emissiveIntensity: 0.8,
-            shininess: 30
-        })
+            opacity: 0.8
+        });
         
         this.mesh = new THREE.Mesh(geometry, material);
+        this.mesh.visible = false; // Start invisible
+        this.scene.add(this.mesh); // Add mesh to scene once
+
+        this.alive = false; // Start inactive
+    }
+
+    // Setup method to configure/reset the projectile
+    setup(position, direction, speed, damage, lifetime, source, weaponType, playerId) {
         this.mesh.position.copy(position);
-        
-        // Remove point light for better performance
-        // this.light = new THREE.PointLight(projectileColor, 0.5, 3);
-        // this.light.position.copy(position);
-        
         this.direction = direction.normalize();
-        this.speed = speed;
-        this.damage = damage;
-        this.source = source;
+        this.speed = speed || 0.5;
+        this.damage = damage || 10;
+        this.source = source || 'player';
+        this.playerId = playerId || null; // Store the shooter's ID
+        this.weaponType = weaponType; // Store weapon type
+        this.lifetime = lifetime || 200;
         this.alive = true;
-        this.lifespan = 200;
-        
+        this.mesh.visible = true;
+
+        // Reset scale in case it was changed (e.g., trails)
+        this.mesh.scale.set(1, 1, 1);
+
+        // Update appearance based on source/type/color
+        this.updateAppearance(this.weaponType, source === 'remote' ? null : undefined);
+
+        // Set rotation to match direction
         this.mesh.quaternion.setFromUnitVectors(
             new THREE.Vector3(0, 0, 1),
             this.direction
         );
+        
+        return this;
     }
 
-    update() {
-        // Update position with higher speed
-        const movement = this.direction.clone().multiplyScalar(this.speed);
-        this.mesh.position.add(movement);
-        // No light to update
-        // this.light.position.copy(this.mesh.position);
-        
-        this.lifespan--;
-        if (this.lifespan <= 0) this.alive = false;
-        
-        // Only create trail on some frames to reduce overhead
-        if (Math.random() < 0.3) { // 30% chance to create trail
-            this.createTrail();
+    updateAppearance(weaponType, colorOverride = undefined) {
+        let projectileColor;
+        let geometry;
+
+        if (colorOverride) {
+            projectileColor = new THREE.Color(colorOverride);
+        } else if (weaponType) {
+            projectileColor = new THREE.Color(weaponType.color);
+        } else {
+            // Default colors based on source if no weapon type
+            projectileColor = this.source === 'player' ? new THREE.Color(0xff00ff) : new THREE.Color(0x00ffff);
         }
+
+        // Adjust geometry based on weapon type (optional, could reuse standard)
+        // For now, just update color/emissive
+        this.mesh.material.color.copy(projectileColor);
+        this.mesh.material.emissive.copy(projectileColor);
+        this.mesh.material.needsUpdate = true;
     }
 
-    createTrail() {
-        // Create simpler particle trail with cyberpunk colors
-        const trailGeometry = new THREE.SphereGeometry(0.05, 4, 2); // Reduced segments
-        const trailMaterial = new THREE.MeshPhongMaterial({
-            color: this.source === 'player' ? 0xff00ff : 0x00ffff, // Magenta for player, cyan for enemies
-            transparent: true,
-            opacity: 0.7,
-            emissive: this.source === 'player' ? 0xff00ff : 0x00ffff,
-            emissiveIntensity: 0.8,
-            shininess: 30
-        })
-        const trail = new THREE.Mesh(trailGeometry, trailMaterial)
-        trail.position.copy(this.mesh.position);
+    update(delta) { // Pass delta for potential frame-rate independent movement
+        if (!this.alive) return false;
         
-        // Fade out and remove trail particles - simplified
-        setTimeout(() => {
-            if (trail.parent) trail.parent.remove(trail);
-        }, 100); // Reduced from 50 + fading to just 100ms then remove
+        // Use delta in movement calculation if available
+        const effectiveSpeed = this.speed * (delta ? delta * 60 : 1); // Assume 60 FPS if delta is missing
+        const movement = this.direction.clone().multiplyScalar(effectiveSpeed);
+        this.mesh.position.add(movement);
         
-        return trail;
+        // Reduce lifetime
+        this.lifetime--;
+        if (this.lifetime <= 0) this.alive = false;
+        
+        return this.alive;
     }
+
+    hide() {
+        this.mesh.visible = false;
+        this.alive = false;
+        // Note: Pool manager will handle removing from scene if needed, 
+        // but we added mesh in constructor, so it stays unless explicitly removed.
+    }
+
+    // Old constructor logic removed/merged into setup
+    /* constructor(position, direction, speed, damage, source) { ... } */
 }
 
 class Turret {
@@ -840,63 +861,30 @@ class Game {
         
         // Create projectile pool
         this.objectPools.createPool('projectiles', () => {
+            // Create an instance of the Projectile class
+            const projectileInstance = new Projectile(this.scene); 
+            
+            // Return the instance. The object pool manager will store this.
+            // The instance already has mesh, reset (renamed setup), update, hide methods.
+            return projectileInstance;
+            
+            // REMOVED: Old plain object definition
+            /*
             const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
             geometry.rotateX(Math.PI / 2);
-            const material = new THREE.MeshPhongMaterial({
-                color: 0xff00ff,
-                emissive: 0xff00ff,
-                emissiveIntensity: 1,
-                transparent: true,
-                opacity: 0.8
-            });
+            const material = new THREE.MeshPhongMaterial(...);
             const mesh = new THREE.Mesh(geometry, material);
             mesh.visible = false;
             this.scene.add(mesh);
             
             return {
                 mesh: mesh,
-                reset: function(position, direction, speed, damage, source) {
-                    this.mesh.visible = true;
-                    this.mesh.position.copy(position);
-                    this.direction = direction.normalize();
-                    this.speed = speed || 0.5;
-                    this.damage = damage || 10;
-                    this.source = source || 'player';
-                    this.alive = true;
-                    this.lifespan = 200;
-                    
-                    // Set color based on source
-                    const projectileColor = source === 'player' ? 0xff00ff : 0xff0000;
-                    this.mesh.material.color.setHex(projectileColor);
-                    this.mesh.material.emissive.setHex(projectileColor);
-                    
-                    // Set rotation to match direction
-                    this.mesh.quaternion.setFromUnitVectors(
-                        new THREE.Vector3(0, 0, 1),
-                        this.direction
-                    );
-                    
-                    return this;
-                },
-                update: function(delta) {
-                    if (!this.alive) return false;
-                    
-                    // Update position with speed
-                    const movement = this.direction.clone().multiplyScalar(this.speed);
-                    this.mesh.position.add(movement);
-                    
-                    // Reduce lifespan
-                    this.lifespan--;
-                    if (this.lifespan <= 0) this.alive = false;
-                    
-                    return this.alive;
-                },
-                hide: function() {
-                    this.mesh.visible = false;
-                    this.alive = false;
-                }
+                reset: function(position, direction, speed, damage, source) { ... },
+                update: function(delta) { ... },
+                hide: function() { ... }
             };
-        }, 30);
+            */
+        }, 30); // Initial size of 30 projectiles in the pool
     }
 
     init() {

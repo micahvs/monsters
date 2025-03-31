@@ -986,7 +986,7 @@ export default class Multiplayer {
     createRemoteProjectile(projectileData) {
         // [Log] Confirm this function is called when server sends projectile data
         console.log("[MP-CreateRemoteProj] Received data for remote projectile:", projectileData);
-        if (!this.game.scene) return;
+        if (!this.game.scene || !this.game.objectPools) return;
         
         // Create a new projectile based on the remote data
         const direction = new THREE.Vector3(
@@ -1001,66 +1001,52 @@ export default class Multiplayer {
             projectileData.position.z
         );
         
+        // Acquire a projectile from the pool
+        const pooledProjectile = this.game.objectPools.acquire('projectiles');
+        if (!pooledProjectile) {
+            console.warn("Multiplayer.createRemoteProjectile: Failed to acquire projectile from pool.");
+            return;
+        }
+
+        // Configure the acquired projectile
+        // Note: We need to ensure the setup method can handle 'remote' source and potentially different visual cues.
+        pooledProjectile.setup(
+            position,
+            direction,
+            projectileData.speed || 2.0, // Use speed from server data
+            projectileData.damage || 20, // Use damage from server data
+            90, // Standard lifetime for remote projectiles for now
+            'remote', // Source is remote
+            null, // No specific weapon type for remote projectiles? Or determine based on damage/speed?
+            projectileData.playerId // Pass the original shooter's ID
+        );
+
+        // Update mesh color based on the shooter's color
+        const playerColor = this.players.get(projectileData.playerId)?.color || '#ff0000';
+        pooledProjectile.updateAppearance(null, playerColor); // Assuming updateAppearance can take color
+
+        // Ensure mesh is visible and positioned correctly (setup should handle this)
+        // pooledProjectile.mesh.position.copy(position);
+        // pooledProjectile.show(); 
+
+        // REMOVED: Manual creation and adding to game.projectiles array
+        /*
         // Use the game's existing projectile system
         if (this.game.projectiles) {
-            // Use a bigger, more visible projectile for better testing
-            const projectileGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-            
-            // Use player color or default to bright color for visibility
-            const playerColor = this.players.get(projectileData.playerId)?.color || '#ff0000';
-            const color = new THREE.Color(playerColor);
-            
-            // Make projectile slightly emissive for better visibility
-            const projectileMaterial = new THREE.MeshPhongMaterial({
-                color: color,
-                emissive: color,
-                emissiveIntensity: 1.0,
-                shininess: 30
-            });
-            
-            const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
-            projectileMesh.position.copy(position);
-            
-            // Set rotation to match direction
-            projectileMesh.lookAt(position.clone().add(direction));
-            
-            // Add to scene
-            this.game.scene.add(projectileMesh);
-            
-            // Add light to projectile for better visibility
-            const projectileLight = new THREE.PointLight(color, 1.0, 3);
-            projectileMesh.add(projectileLight);
-            
-            // CRITICAL FIX: Add to game's projectiles array with correct source and playerId
-            const remoteProjectile = {
-                mesh: projectileMesh,
-                direction: direction,
-                speed: projectileData.speed || 2.0,
-                damage: projectileData.damage || 20,
-                lifetime: 90,
-                source: 'remote',  // Always use 'remote' for remote players' projectiles
-                playerId: projectileData.playerId,  // Store the original player ID
-                update: function() { // Add update method for consistency with other projectiles
-                    // Update position based on direction and speed
-                    this.mesh.position.x += this.direction.x * this.speed;
-                    this.mesh.position.y += this.direction.y * this.speed;
-                    this.mesh.position.z += this.direction.z * this.speed;
-                    
-                    // Decrease lifetime
-                    this.lifetime--;
-                }
-            };
+           ... manual mesh creation ...
             
             // Add to the game's projectiles array
             this.game.projectiles.push(remoteProjectile);
-            
-            // Create muzzle flash effect
-            if (this.game.createMuzzleFlash) {
-                this.game.createMuzzleFlash(position, direction);
-            }
-            
-            console.log(`Created remote projectile from player ${projectileData.playerId} with source='remote'`);
+           ... 
         }
+        */
+
+        // Create muzzle flash effect (optional for remote)
+        // if (this.game.createMuzzleFlash) {
+        //     this.game.createMuzzleFlash(position, direction);
+        // }
+        
+        console.log(`Created remote pooled projectile from player ${projectileData.playerId} with source='remote'`);
     }
     
     updateTurrets(turretsData) {
