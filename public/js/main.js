@@ -620,11 +620,9 @@ class Game {
             window.multiplayerEnabled = true;
         }
         
-        // Performance mode flag - default to higher performance
-        window.lowPerformanceMode = localStorage.getItem('lowPerformanceMode') === 'true' || false;
-        if (window.lowPerformanceMode) {
-            this.applyLowPerformanceMode();
-        }
+        // Always use high quality mode
+        window.lowPerformanceMode = false;
+        this.applyHighPerformanceMode();
         
         // Essential controls only
         this.keys = {
@@ -673,8 +671,7 @@ class Game {
             console.log("Multiplayer system initialized:", this.multiplayer);
         }
         
-        // Add performance toggle
-        this.addPerformanceToggle();
+        // Performance toggle removed - always using high quality mode
         
         // Initialize the game
         this.init();
@@ -754,80 +751,10 @@ class Game {
         document.body.appendChild(toggle);
     }
 
-    // Add performance toggle method
+    // Performance toggle removed - always using high quality mode
     addPerformanceToggle() {
-        // Check if the toggle already exists in HTML
-        let toggle = document.getElementById('performance-toggle');
-        
-        // If toggle exists in HTML, just update it
-        if (toggle) {
-            // Update the initial state
-            toggle.textContent = window.lowPerformanceMode ? 
-                '⚙️ Low Quality Mode' : '⚙️ High Quality Mode';
-            toggle.style.border = window.lowPerformanceMode ?
-                '1px solid #00ff00' : '1px solid #ff00ff';
-                
-            // Add event listener
-            toggle.addEventListener('click', () => {
-                window.lowPerformanceMode = !window.lowPerformanceMode;
-                localStorage.setItem('lowPerformanceMode', window.lowPerformanceMode);
-                
-                toggle.textContent = window.lowPerformanceMode ? 
-                    '⚙️ Low Quality Mode' : '⚙️ High Quality Mode';
-                toggle.style.border = window.lowPerformanceMode ?
-                    '1px solid #00ff00' : '1px solid #ff00ff';
-                    
-                // Apply changes immediately
-                if (window.lowPerformanceMode) {
-                    this.applyLowPerformanceMode();
-                    this.showNotification('Low quality mode enabled - better performance');
-                } else {
-                    this.applyHighPerformanceMode();
-                    this.showNotification('High quality mode enabled - better visuals');
-                }
-            });
-            return;
-        }
-        
-        // Only create a new toggle if it doesn't exist in HTML (fallback)
-        toggle = document.createElement('div');
-        toggle.id = 'performance-toggle';
-        toggle.style.position = 'fixed';
-        toggle.style.bottom = '120px';
-        toggle.style.left = '10px';
-        toggle.style.backgroundColor = 'rgba(0,0,0,0.6)';
-        toggle.style.padding = '5px 10px';
-        toggle.style.color = '#fff';
-        toggle.style.fontFamily = 'monospace';
-        toggle.style.fontSize = '12px';
-        toggle.style.zIndex = '1000';
-        toggle.style.cursor = 'pointer';
-        toggle.style.borderRadius = '5px';
-        toggle.textContent = window.lowPerformanceMode ? 
-            '⚙️ Low Quality Mode' : '⚙️ High Quality Mode';
-        toggle.style.border = window.lowPerformanceMode ?
-            '1px solid #00ff00' : '1px solid #ff00ff';
-        
-        toggle.addEventListener('click', () => {
-            window.lowPerformanceMode = !window.lowPerformanceMode;
-            localStorage.setItem('lowPerformanceMode', window.lowPerformanceMode);
-            
-            toggle.textContent = window.lowPerformanceMode ? 
-                '⚙️ Low Quality Mode' : '⚙️ High Quality Mode';
-            toggle.style.border = window.lowPerformanceMode ?
-                '1px solid #00ff00' : '1px solid #ff00ff';
-                
-            // Apply changes immediately
-            if (window.lowPerformanceMode) {
-                this.applyLowPerformanceMode();
-                this.showNotification('Low quality mode enabled - better performance');
-            } else {
-                this.applyHighPerformanceMode();
-                this.showNotification('High quality mode enabled - better visuals');
-            }
-        });
-        
-        document.body.appendChild(toggle);
+        // Function kept empty for compatibility
+        // Performance mode is now always set to high quality
     }
 
     // Method to apply low performance mode
@@ -3235,9 +3162,9 @@ class Game {
     }
 
     initializeDebugHelpers() {
-        // Create minimal grid helper in non-debug mode
-        if (this.gridEnabled && !window.lowPerformanceMode) {
-            this.gridHelper = new THREE.GridHelper(1560, 10); // Fewer divisions in normal mode
+        // Always create grid helper with more divisions for high quality
+        if (this.gridEnabled) {
+            this.gridHelper = new THREE.GridHelper(1560, 20); // Higher quality with more divisions
             this.scene.add(this.gridHelper);
         }
     }
