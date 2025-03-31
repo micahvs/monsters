@@ -589,7 +589,22 @@ class Game {
         console.log("Game constructor called");
         
         // Store the callback for when game is fully loaded
-        this.onLoadCallback = onLoad || function() {};
+        this.onLoadCallback = onLoad || function(success) {};
+        
+        // Track initialization status
+        this.isInitialized = false;
+        this.initializationFailed = false;
+        
+        // Use a timeout to automatically fail after 15 seconds (common mobile timeout)
+        this.initializationTimeout = setTimeout(() => {
+            if (!this.isInitialized && !this.initializationFailed) {
+                console.error("Game initialization timed out after 15 seconds");
+                this.initializationFailed = true;
+                if (typeof this.onLoadCallback === 'function') {
+                    this.onLoadCallback(false);
+                }
+            }
+        }, 15000);
         
         // Core initialization only
         this.scene = new THREE.Scene();
@@ -599,8 +614,9 @@ class Game {
         this.camera.position.set(0, 1600, 3200); // Doubled camera distance for 2x arena
         this.renderer = null;
         this.truck = null;
-        this.isInitialized = false;
-        this.loadingComplete = false;
+        
+        // Check for mobile devices directly in constructor for early device optimizations
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         // Debug mode removed
         
@@ -912,82 +928,87 @@ class Game {
                     targetCanvas = canvas;
                 }
                 
-                // Configure renderer options based on device capabilities
+                // Use simpler renderer options for reliability
                 const rendererOptions = {
                     canvas: targetCanvas,
-                    powerPreference: 'high-performance',
-                    failIfMajorPerformanceCaveat: false,
+                    antialias: false, // Disable antialiasing initially for all devices
+                    alpha: false, // Disable alpha for performance
                     preserveDrawingBuffer: false
                 };
                 
-                // Only enable antialiasing on non-mobile or high-end mobile
-                if (!this.isMobile || window.devicePixelRatio <= 1) {
-                    rendererOptions.antialias = true;
-                }
-                
-                // Create the renderer
-                this.renderer = new THREE.WebGLRenderer(rendererOptions);
-                
-                // Set the renderer size to match the window
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                
-                // Disable shadow maps for performance
-                this.renderer.shadowMap.enabled = false;
-                
-                // Set appropriate pixel ratio based on device
-                if (this.isMobile) {
-                    // Limit to 1.0 on mobile for performance
-                    this.renderer.setPixelRatio(1.0);
-                } else {
-                    // Cap at 2x on desktop for performance vs. quality balance
-                    const pixelRatio = window.devicePixelRatio;
-                    this.renderer.setPixelRatio(Math.min(pixelRatio, 2));
-                }
-                
-                // Improve color rendering with current THREE.js settings
-                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-                
-                // Use simpler tone mapping on mobile
-                if (this.isMobile) {
-                    this.renderer.toneMapping = THREE.LinearToneMapping;
-                } else {
-                    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                }
-                this.renderer.toneMappingExposure = 1.0;
-                
-                // Add WebGL context loss/restore handlers
-                targetCanvas.addEventListener('webglcontextlost', (event) => {
-                    event.preventDefault();
-                    console.warn("WebGL context lost - will attempt to restore");
+                // Create the renderer with basic settings first
+                try {
+                    this.renderer = new THREE.WebGLRenderer(rendererOptions);
+                    console.log("WebGL renderer created successfully");
                     
-                    // Show a message to the user
-                    const message = document.createElement('div');
-                    message.style.position = 'fixed';
-                    message.style.top = '50%';
-                    message.style.left = '50%';
-                    message.style.transform = 'translate(-50%, -50%)';
-                    message.style.color = '#ff00ff';
-                    message.style.textShadow = '0 0 10px #ff00ff';
-                    message.style.fontFamily = "'Orbitron', sans-serif";
-                    message.style.fontSize = '24px';
-                    message.style.zIndex = '2000';
-                    message.innerHTML = 'RECONNECTING TO GRID...';
-                    message.id = 'contextLossMessage';
-                    document.body.appendChild(message);
-                }, false);
-                
-                targetCanvas.addEventListener('webglcontextrestored', () => {
-                    console.log("WebGL context restored - resuming game");
+                    // Set the renderer size to match the window
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
                     
-                    // Remove the message
-                    const message = document.getElementById('contextLossMessage');
-                    if (message) {
-                        document.body.removeChild(message);
+                    // Disable shadow maps for performance
+                    this.renderer.shadowMap.enabled = false;
+                    
+                    // Set pixel ratio based on device
+                    if (this.isMobile) {
+                        // Always use 1.0 for mobile for best performance
+                        this.renderer.setPixelRatio(1.0);
+                    } else {
+                        // Desktop can use higher pixel ratio if available
+                        const pixelRatio = window.devicePixelRatio || 1;
+                        this.renderer.setPixelRatio(Math.min(pixelRatio, 2));
                     }
                     
-                    // Reinitialize the scene if needed
-                    this.reinitializeAfterContextLoss();
-                }, false);
+                    // Basic color settings (in try-catch for compatibility)
+                    try {
+                        if (typeof this.renderer.outputColorSpace !== 'undefined') {
+                            this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+                        }
+                        
+                        // Simplified tone mapping for all devices
+                        this.renderer.toneMapping = THREE.LinearToneMapping;
+                        this.renderer.toneMappingExposure = 1.0;
+                    } catch (renderPropsErr) {
+                        console.warn("Could not set all renderer properties:", renderPropsErr);
+                        // Continue anyway
+                    }
+                } catch (rendererErr) {
+                    console.error("WebGL renderer creation failed:", rendererErr);
+                    throw new Error("Could not initialize WebGL renderer");
+                }
+                
+                // Add simple WebGL context loss handler
+                try {
+                    targetCanvas.addEventListener('webglcontextlost', (event) => {
+                        event.preventDefault();
+                        console.warn("WebGL context lost");
+                        
+                        // Show a simple message in the loading screen
+                        const loadingElement = document.getElementById('loadingScreen');
+                        if (loadingElement && loadingElement.style.display !== 'block') {
+                            loadingElement.style.display = 'block';
+                            loadingElement.innerHTML = '<div class="loading-text">RECONNECTING TO GRID...</div>';
+                        }
+                    }, false);
+                    
+                    targetCanvas.addEventListener('webglcontextrestored', () => {
+                        console.log("WebGL context restored");
+                        
+                        // Hide the loading screen after restoration
+                        const loadingElement = document.getElementById('loadingScreen');
+                        if (loadingElement) {
+                            loadingElement.style.display = 'none';
+                        }
+                        
+                        // Basic reinitialization - just resize the renderer
+                        if (this.renderer && this.camera) {
+                            this.renderer.setSize(window.innerWidth, window.innerHeight);
+                            this.camera.aspect = window.innerWidth / window.innerHeight;
+                            this.camera.updateProjectionMatrix();
+                        }
+                    }, false);
+                } catch (eventErr) {
+                    console.warn("Could not add context loss handlers:", eventErr);
+                    // Continue anyway
+                }
                 
             } catch (rendererError) {
                 console.error("Failed to create renderer:", rendererError);
@@ -1093,27 +1114,54 @@ class Game {
                 // Don't throw, this is not critical
             }
             
-            // Start animation loop
+            // Clear the timeout since initialization completed successfully
+            if (this.initializationTimeout) {
+                clearTimeout(this.initializationTimeout);
+                this.initializationTimeout = null;
+            }
+            
+            // Mark initialization as complete
             this.isInitialized = true;
-            this.loadingComplete = true;
+            this.initializationFailed = false;
             
             // Call the onLoad callback to signal that the game is ready
             if (typeof this.onLoadCallback === 'function') {
-                console.log("Game fully initialized, calling onLoad callback");
-                this.onLoadCallback();
+                console.log("Game fully initialized, calling onLoad callback with success=true");
+                
+                // Use setTimeout to ensure UI updates before potentially heavy animation starts
+                setTimeout(() => {
+                    this.onLoadCallback(true);
+                }, 100);
             }
             
+            // Start animation loop
             this.animate();
             
         } catch (error) {
             console.error("Critical error in game initialization:", error);
+            
+            // Clear the timeout if it exists
+            if (this.initializationTimeout) {
+                clearTimeout(this.initializationTimeout);
+                this.initializationTimeout = null;
+            }
+            
+            // Mark initialization as failed
+            this.isInitialized = false;
+            this.initializationFailed = true;
+            
+            // Call the callback with failure
+            if (typeof this.onLoadCallback === 'function') {
+                this.onLoadCallback(false);
+            }
+            
             // Show error message on screen
             try {
                 const loadingScreen = document.getElementById('loadingScreen');
                 if (loadingScreen) {
                     const loadingText = loadingScreen.querySelector('.loading-text');
                     if (loadingText) {
-                        loadingText.innerHTML = `ERROR: ${error.message}<br>Check console for details`;
+                        loadingText.innerHTML = `ERROR: ${error.message}<br><small>Please try refreshing the page</small>`;
                         loadingText.style.color = 'red';
                     }
                 }
@@ -1551,59 +1599,11 @@ class Game {
         }, { passive: true });
     }
     
-    // Handle WebGL context restoration after loss (common on mobile)
+    // Simplified handler for WebGL context restoration
     reinitializeAfterContextLoss() {
-        try {
-            // Recreate materials as they might be lost
-            if (this.truck && this.truck.body) {
-                // Refresh truck materials
-                if (typeof this.truck.updateMaterials === 'function') {
-                    this.truck.updateMaterials();
-                } else {
-                    console.log("Truck materials updating method not available");
-                }
-            }
-            
-            // Recreate arena materials
-            if (this.world && this.world.ground) {
-                // Refresh world materials
-                if (typeof this.world.updateMaterials === 'function') {
-                    this.world.updateMaterials();
-                } else {
-                    console.log("World materials updating method not available");
-                }
-            }
-            
-            // Reapply renderer settings
-            if (this.renderer) {
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                if (this.isMobile) {
-                    this.renderer.setPixelRatio(1.0);
-                    this.renderer.toneMapping = THREE.LinearToneMapping;
-                } else {
-                    const pixelRatio = window.devicePixelRatio;
-                    this.renderer.setPixelRatio(Math.min(pixelRatio, 2));
-                    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                }
-                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-                this.renderer.toneMappingExposure = 1.0;
-            }
-            
-            console.log("Game state restored after WebGL context loss");
-            
-            // Force a resize to ensure everything is correctly sized
-            if (this.camera) {
-                this.camera.aspect = window.innerWidth / window.innerHeight;
-                this.camera.updateProjectionMatrix();
-            }
-            
-            // Force a single frame render to prevent black screen
-            if (this.renderer && this.scene && this.camera) {
-                this.renderer.render(this.scene, this.camera);
-            }
-        } catch (error) {
-            console.error("Failed to reinitialize after context loss:", error);
-        }
+        // This simplified method is left for compatibility
+        // The actual handling is now done in the context restored event listener
+        console.log("Context loss handling moved to event listener");
     }
 
     initHUD() {
@@ -3371,18 +3371,47 @@ window.addEventListener('load', () => {
     const preloader = new AssetPreloader(() => {
         console.log("Assets preloaded, creating game");
         
-        // Create game but keep loading screen visible until game is ready
-        setTimeout(() => {
-            window.game = new Game(() => {
-                // This callback will be executed when the game is fully initialized
-                if (loadingElement) {
-                    // Add a slight delay before removing loading screen
-                    setTimeout(() => {
+        // For mobile devices, modify loading text to inform user
+        if (isMobile) {
+            if (loadingElement) {
+                const loadingText = loadingElement.querySelector('.loading-text');
+                if (loadingText) {
+                    loadingText.innerHTML = 'INITIALIZING ARENA<br><small>This may take a moment on mobile devices</small>';
+                }
+            }
+        }
+        
+        try {
+            // Create game with a callback for when it's fully loaded
+            window.game = new Game((success) => {
+                console.log("Game initialization complete, success:", success);
+                
+                if (success) {
+                    // Game initialized successfully
+                    if (loadingElement) {
                         loadingElement.style.display = 'none';
-                    }, 500);
+                    }
+                } else {
+                    // Game failed to initialize properly
+                    if (loadingElement) {
+                        const loadingText = loadingElement.querySelector('.loading-text');
+                        if (loadingText) {
+                            loadingText.innerHTML = 'INITIALIZATION ERROR<br><small>Please try refreshing the page</small>';
+                            loadingText.style.color = 'red';
+                        }
+                    }
                 }
             });
-        }, 100);
+        } catch (e) {
+            console.error("Failed to create game:", e);
+            if (loadingElement) {
+                const loadingText = loadingElement.querySelector('.loading-text');
+                if (loadingText) {
+                    loadingText.innerHTML = `ERROR: ${e.message}<br><small>Please try a different browser</small>`;
+                    loadingText.style.color = 'red';
+                }
+            }
+        }
     });
     
     // Preload key assets

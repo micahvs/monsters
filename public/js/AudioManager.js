@@ -516,96 +516,96 @@ export class AudioManager {
     // Utility methods
     unlockAudio() {
         try {
-            // Check if we're on a mobile device
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            console.log("Attempting to unlock audio context...");
-            
-            // Create audio context if it doesn't exist
+            // Simple approach: just create the audio context if needed
             if (!this.audioContext) {
-                // Use the appropriate AudioContext for the platform
                 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-                this.audioContext = new AudioContextClass({
-                    // Use low latency mode for mobile
-                    latencyHint: isMobile ? 'playback' : 'interactive'
-                });
+                if (!AudioContextClass) {
+                    console.warn("AudioContext not supported in this browser");
+                    return false;
+                }
                 
-                console.log("Audio context created successfully");
+                try {
+                    this.audioContext = new AudioContextClass();
+                    console.log("Audio context created");
+                } catch (ctxErr) {
+                    console.error("Failed to create audio context:", ctxErr);
+                    return false;
+                }
             }
             
-            // Resume the audio context (needed for Chrome)
+            // Create and play a silent buffer (iOS/Safari unlock technique)
+            try {
+                const buffer = this.audioContext.createBuffer(1, 1, 22050);
+                const source = this.audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(this.audioContext.destination);
+                source.start(0);
+            } catch (bufferErr) {
+                console.warn("Silent buffer playback failed:", bufferErr);
+                // Continue anyway
+            }
+            
+            // Resume the audio context if it's suspended
             if (this.audioContext.state === 'suspended') {
-                this.audioContext.resume().then(() => {
-                    console.log("Audio context resumed successfully");
-                }).catch(err => {
-                    console.warn("Failed to resume audio context:", err);
+                this.audioContext.resume().catch(e => {
+                    console.warn("Could not resume audio context:", e);
                 });
             }
             
-            // Create and play a silent buffer for mobile browsers
-            // This is necessary to unlock audio on iOS/Safari
-            const buffer = this.audioContext.createBuffer(1, 1, 22050);
-            const source = this.audioContext.createBufferSource();
-            source.buffer = buffer;
-            source.connect(this.audioContext.destination);
-            source.start(0);
-            
-            // Try to play the background music if user has interacted
+            // Try to play audio
             if (this.audioElement) {
-                console.log("Attempting to play background music...");
-                this.audioElement.play().then(() => {
-                    console.log("Background music started successfully");
-                }).catch(err => {
-                    console.warn("Could not autoplay music, waiting for user gesture:", err);
+                this.audioElement.play().catch(e => {
+                    console.warn("Audio autoplay prevented, will require user interaction:", e);
                     
-                    // On mobile, we need a button for the first play action
-                    if (isMobile) {
-                        // Create a play button if needed and there isn't already one
-                        if (!document.getElementById('audio-unlock-button')) {
-                            const unlockButton = document.createElement('div');
-                            unlockButton.id = 'audio-unlock-button';
-                            unlockButton.innerHTML = '<i class="fas fa-volume-up"></i>';
-                            unlockButton.style.position = 'fixed';
-                            unlockButton.style.bottom = '80px';
-                            unlockButton.style.right = '20px';
-                            unlockButton.style.width = '60px';
-                            unlockButton.style.height = '60px';
-                            unlockButton.style.borderRadius = '50%';
-                            unlockButton.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                            unlockButton.style.color = '#ff00ff';
-                            unlockButton.style.display = 'flex';
-                            unlockButton.style.alignItems = 'center';
-                            unlockButton.style.justifyContent = 'center';
-                            unlockButton.style.fontSize = '24px';
-                            unlockButton.style.boxShadow = '0 0 15px rgba(255, 0, 255, 0.7)';
-                            unlockButton.style.zIndex = '1000';
-                            unlockButton.style.cursor = 'pointer';
+                    // Only create the button if it doesn't already exist
+                    if (!document.getElementById('audio-unlock-button')) {
+                        const unlockButton = document.createElement('div');
+                        unlockButton.id = 'audio-unlock-button';
+                        unlockButton.innerHTML = '<i class="fas fa-volume-up"></i>';
+                        unlockButton.style.position = 'fixed';
+                        unlockButton.style.bottom = '80px';
+                        unlockButton.style.right = '20px';
+                        unlockButton.style.width = '60px';
+                        unlockButton.style.height = '60px';
+                        unlockButton.style.borderRadius = '50%';
+                        unlockButton.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+                        unlockButton.style.color = '#ff00ff';
+                        unlockButton.style.display = 'flex';
+                        unlockButton.style.alignItems = 'center';
+                        unlockButton.style.justifyContent = 'center';
+                        unlockButton.style.fontSize = '24px';
+                        unlockButton.style.boxShadow = '0 0 15px rgba(255, 0, 255, 0.7)';
+                        unlockButton.style.zIndex = '1000';
+                        unlockButton.style.cursor = 'pointer';
+                        
+                        // Add click event listener
+                        unlockButton.addEventListener('click', () => {
+                            if (this.audioContext && this.audioContext.state === 'suspended') {
+                                this.audioContext.resume();
+                            }
                             
-                            unlockButton.addEventListener('click', () => {
-                                // Try to play audio again on click
-                                this.audioElement.play().then(() => {
-                                    console.log("Audio unlocked by user interaction");
-                                    // Remove the button once audio is playing
-                                    document.body.removeChild(unlockButton);
-                                }).catch(e => {
-                                    console.error("Still couldn't play audio after click:", e);
-                                });
-                                
-                                // Also attempt to resume the audio context
-                                if (this.audioContext && this.audioContext.state === 'suspended') {
-                                    this.audioContext.resume();
+                            if (this.audioElement) {
+                                const playPromise = this.audioElement.play();
+                                if (playPromise !== undefined) {
+                                    playPromise.then(() => {
+                                        if (unlockButton.parentNode) {
+                                            unlockButton.parentNode.removeChild(unlockButton);
+                                        }
+                                    }).catch(e => {
+                                        console.error("Audio still blocked after click:", e);
+                                    });
                                 }
-                            });
-                            
-                            document.body.appendChild(unlockButton);
-                        }
+                            }
+                        });
+                        
+                        document.body.appendChild(unlockButton);
                     }
                 });
             }
             
             return true;
         } catch (e) {
-            console.error("Error unlocking audio:", e);
+            console.error("Error in audio initialization:", e);
             return false;
         }
     }
