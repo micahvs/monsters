@@ -14,7 +14,9 @@ export class World {
         // Create ground plane with simpler geometry
         const groundGeometry = new THREE.PlaneGeometry(1000, 1000, 1, 1);
         const groundMaterial = new THREE.MeshBasicMaterial({
-            color: 0x000000
+            color: 0x000033,
+            transparent: true,
+            opacity: 0.8
         });
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;

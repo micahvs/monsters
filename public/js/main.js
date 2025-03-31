@@ -600,7 +600,7 @@ class Game {
             this.maxParticles = 10;
             this.shadowsEnabled = false;
             this.effectsEnabled = false;
-            this.gridEnabled = false;
+            this.gridEnabled = true; // Always enable grid for neon effect
             
             // Disable multiplayer on mobile for better performance
             window.multiplayerEnabled = false;
@@ -830,10 +830,18 @@ class Game {
         // Disable shadows
         this.shadowsEnabled = false;
         
-        // Remove grid helper if it exists
+        // Keep the grid for visual effect but use simpler grid if needed
         if (this.gridHelper) {
-            this.scene.remove(this.gridHelper);
-            this.gridHelper = null;
+            // If using complex grid, replace with simpler one
+            if (this.gridHelper.widthSegments > 30) {
+                this.scene.remove(this.gridHelper);
+                this.gridHelper = new THREE.GridHelper(1560, 30, 0xff00ff, 0x00ffff);
+                this.scene.add(this.gridHelper);
+            }
+        } else {
+            // Create grid if it doesn't exist
+            this.gridHelper = new THREE.GridHelper(1560, 30, 0xff00ff, 0x00ffff);
+            this.scene.add(this.gridHelper);
         }
         
         // Limit particles and effects
@@ -1139,13 +1147,19 @@ class Game {
         
         // Use MeshBasicMaterial for floor for better performance and colors
         const groundMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x222222 // Darker floor color, better contrast
+            color: 0x000033, // Dark blue base for neon grid effect
+            transparent: true,
+            opacity: 0.8
         });
         
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = false; // Disabled shadows
         this.scene.add(ground);
+        
+        // Add grid helper for neon grid effect
+        const gridHelper = new THREE.GridHelper(arenaSize, 50, 0xff00ff, 0x00ffff);
+        this.scene.add(gridHelper);
         
         // Create walls - now 50% shorter (height reduced from 100 to 50)
         // Use MeshBasicMaterial for walls with more vibrant color
@@ -3007,32 +3021,86 @@ class Game {
         }
     }
 
-    // Method to apply damage to the player
-    applyDamage(damage) {
-        // Reduce health by damage amount
+    // UNIFIED DAMAGE SYSTEM - handles all damage in the game
+    applyDamage(damage, source = 'unknown', sourceId = null) {
+        console.log(`🩸🩸🩸 APPLYING DAMAGE: ${damage} from ${source} (${sourceId})`);
+        
+        // CRITICAL: Ensure damage is always at least 20 for visibility
+        damage = Math.max(damage, 20);
+        
+        // STEP 1: CORE HEALTH REDUCTION - This is the fundamental operation
         this.health = Math.max(0, this.health - damage);
         
-        // Update health display
+        // STEP 2: UI UPDATES - Ensure all UI elements reflect damage
+        // Update HTML health display
         const healthDiv = document.getElementById('health');
         if (healthDiv) {
             healthDiv.textContent = `HEALTH: ${this.health}%`;
+            
+            // Add visual flash to health text
+            const originalColor = healthDiv.style.color || 'white';
+            healthDiv.style.color = 'red';
+            setTimeout(() => { healthDiv.style.color = originalColor; }, 300);
         }
         
-        // Update health bar if using window.updateStatBars function
+        // Update health bar with window function
         if (window.updateStatBars) {
             window.updateStatBars(this.health, this.weapon?.ammo, this.weapon?.maxAmmo);
         }
         
-        // Flash screen red for visual feedback
-        this.flashScreen('rgba(255, 0, 0, 0.3)');
+        // STEP 3: VISUAL EFFECTS - Multiple visual indicators of damage
+        // Flash screen red (more intense for larger damage)
+        const opacity = Math.min(0.7, 0.3 + (damage / 100) * 0.4);
+        this.flashScreen(`rgba(255, 0, 0, ${opacity})`);
         
-        // Shake camera for impact effect
-        this.shakeCamera(damage * 0.05);
+        // Shake camera proportional to damage
+        this.shakeCamera(damage * 0.1);
+        
+        // Add blood splatter effect (if available)
+        if (typeof this.createBloodEffect === 'function') {
+            this.createBloodEffect(this.truck.position);
+        }
+        
+        // STEP 4: AUDIO FEEDBACK - Ensure damage is heard
+        // Play hit sound
+        if (window.audioManager) {
+            window.audioManager.playSound('vehicle_hit', this.truck.position);
+        }
+        
+        // STEP 5: TRUCK VISUALS - Update the vehicle appearance
+        // Apply damage to monster truck if it exists
+        if (this.truck && typeof this.truck.applyDamage === 'function') {
+            this.truck.applyDamage(damage);
+        }
+        
+        // STEP 6: MULTIPLAYER SYNC - Ensure damage is synced to other players
+        // Sync damage to multiplayer if in multiplayer mode and this is a local hit
+        if (this.multiplayer && window.multiplayerEnabled && source !== 'server') {
+            this.multiplayer.syncLocalDamage(damage, source, sourceId);
+        }
+        
+        // STEP 7: GAME STATE VALIDATION - Check for death and make a message
+        // Show notification
+        const damageLevel = damage < 30 ? 'light' : (damage < 60 ? 'moderate' : 'critical');
+        const sourceText = source === 'wall' ? 'wall collision' : 
+                           source === 'turret' ? 'turret fire' : 
+                           source === 'player' ? 'player attack' : 'damage';
+        
+        this.showNotification(`Took ${damageLevel} damage from ${sourceText}!`, 'error');
         
         // Check if player died
         if (this.health <= 0) {
+            console.log(`🩸🩸🩸 PLAYER DIED from ${source} damage!`);
             this.gameOver();
+            
+            // Notify multiplayer
+            if (this.multiplayer && window.multiplayerEnabled) {
+                this.multiplayer.reportLocalPlayerDeath(sourceId);
+            }
         }
+        
+        // Return the new health value
+        return this.health;
     }
 
     checkProjectileCollisions(projectile) {
