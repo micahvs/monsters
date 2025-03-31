@@ -643,10 +643,4 @@ export class AudioManager {
             this.audioElement.pause();
         }
     }
-}
-
-// Initialize audio manager when DOM is loaded but don't create the AudioContext yet
-document.addEventListener('DOMContentLoaded', () => {
-    // Will be actually initialized on first user interaction
-    window.audioManager = null;
-}); 
+} 

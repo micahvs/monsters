@@ -9,6 +9,60 @@ if (!THREE || !THREE.Scene) {
     console.log("THREE.js Scene class found:", THREE.Scene);
 }
 
+// Global variables
+let gameInstance = null;
+let audioInitialized = false;
+
+// Check if we're on a mobile device
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+// Handle the tap-to-start for audio initialization
+function setupMobileAudioHandling() {
+    const overlay = document.getElementById('tap-to-start-overlay');
+    
+    // Only show the overlay on mobile devices
+    if (isMobileDevice) {
+        console.log("Mobile device detected, showing tap-to-start overlay");
+        overlay.classList.remove('hidden');
+        
+        // Handle the tap event
+        overlay.addEventListener('click', () => {
+            console.log("Tap-to-start overlay clicked, initializing audio");
+            audioInitialized = true;
+            
+            // Hide the overlay
+            overlay.classList.add('hidden');
+            
+            // Initialize audio manager
+            if (!window.audioManager) {
+                console.log("Creating AudioManager on user interaction");
+                window.audioManager = new AudioManager(null);
+                
+                // Immediately trigger the audio initialization
+                if (window.audioManager) {
+                    window.audioManager.handleUserInteraction();
+                }
+            }
+            
+            // Start/resume the game if it exists
+            if (gameInstance) {
+                gameInstance.audioManager = window.audioManager;
+                if (gameInstance.audioManager && gameInstance.camera) {
+                    gameInstance.audioManager.camera = gameInstance.camera;
+                }
+            } else {
+                console.log("Game not yet started, will initialize when ready");
+            }
+        });
+    } else {
+        console.log("Desktop device detected, no tap-to-start needed");
+        audioInitialized = true;
+    }
+}
+
+// Call this on page load
+document.addEventListener('DOMContentLoaded', setupMobileAudioHandling);
+
 import { MonsterTruck } from './MonsterTruck.js'
 import { World } from './World.js'
 import Multiplayer from './Multiplayer.js'
@@ -621,52 +675,58 @@ class PowerUp {
 }
 
 class Game {
-    constructor(onLoad) {
-        console.log("Game constructor called");
+    constructor(debug = false) {
+        console.log("Game constructor");
         
-        // Store the callback for when game is fully loaded
-        this.onLoadCallback = onLoad || function(success) {};
+        // Store this instance globally
+        gameInstance = this;
         
-        // Track initialization status
-        this.isInitialized = false;
-        this.initializationFailed = false;
+        this.stats = new Stats();
+        document.body.appendChild(this.stats.dom);
         
-        // Use a timeout to automatically fail after 15 seconds (common mobile timeout)
-        this.initializationTimeout = setTimeout(() => {
-            if (!this.isInitialized && !this.initializationFailed) {
-                console.error("Game initialization timed out after 15 seconds");
-                this.initializationFailed = true;
-                if (typeof this.onLoadCallback === 'function') {
-                    this.onLoadCallback(false);
-                }
-            }
-        }, 15000);
+        this.speedFactor = 1.0; // Speed multiplier for vehicle movement
+        this.clockDelta = 0; // Initialize for first frame
         
-        // Core initialization only
+        // Create the scene
         this.scene = new THREE.Scene();
-        this.scene.game = this; // Add reference to the game instance
         
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000); // Increased far plane for larger arena
-        this.camera.position.set(0, 1600, 3200); // Doubled camera distance for 2x arena
-        this.renderer = null;
-        this.truck = null;
-        
-        // Check for mobile devices directly in constructor for early device optimizations
-        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        // Debug mode removed
+        // Setup camera
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.camera.position.set(0, 5, -10);
+        this.camera.lookAt(0, 0, 0);
         
         // Initialize audio manager with camera
         try {
-            if (!window.audioManager) {
-                console.log("Creating new AudioManager instance");
-                window.audioManager = new AudioManager(this.camera);
+            if (isMobileDevice) {
+                // On mobile, we wait for explicit user interaction via the overlay
+                console.log("Mobile device - waiting for audio interaction");
+                
+                // Use a silent audio manager until properly initialized
+                this.audioManager = {
+                    playSound: () => {},
+                    stopSound: () => {},
+                    playMusic: () => {},
+                    stopMusic: () => {}
+                };
+                
+                // If audio was already initialized through tap-to-start, update reference
+                if (window.audioManager) {
+                    console.log("Using existing AudioManager");
+                    this.audioManager = window.audioManager;
+                    this.audioManager.camera = this.camera;
+                }
             } else {
-                console.log("Using existing AudioManager instance");
-                window.audioManager.camera = this.camera;
+                // On desktop, initialize normally
+                if (!window.audioManager) {
+                    console.log("Creating new AudioManager instance");
+                    window.audioManager = new AudioManager(this.camera);
+                } else {
+                    console.log("Using existing AudioManager instance");
+                    window.audioManager.camera = this.camera;
+                }
+                this.audioManager = window.audioManager;
+                console.log("Audio manager initialized successfully");
             }
-            this.audioManager = window.audioManager;
-            console.log("Audio manager initialized successfully");
         } catch (error) {
             console.error("Error initializing audio manager:", error);
             // Create a dummy audio manager to prevent null reference errors
