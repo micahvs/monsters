@@ -1740,8 +1740,8 @@ export default class Multiplayer {
             if (isHit) {
                 console.log(`💥 DIRECT HIT on player ${playerId}!`);
                 
-                // Use projectile's damage, default to 20 if undefined
-                const damage = projectile.damage || 20; 
+                // FIXED: Use fixed damage value of 20 for balanced gameplay (5 hits to kill)
+                const damage = 20; // Fixed at 20 damage per hit
                 
                 // 2. Keep the standard method call to send the hit event to the server
                 try {
@@ -1796,6 +1796,35 @@ export default class Multiplayer {
         if (this.chatContainer) {
             this.chatContainer.remove();
         }
+    }
+
+    // Sync local player damage to server
+    syncLocalDamage(damage, source, sourceId) {
+        if (!this.isConnected || !this.socket) return;
+        
+        // Send updated health to server to keep everyone in sync
+        this.socket.emit('playerUpdate', {
+            health: this.game.health,
+            damageEvent: {
+                damage: damage,
+                source: source,
+                sourceId: sourceId
+            }
+        });
+        
+        console.log(`[MP-SyncDamage] Synced local damage: ${damage} from ${source}`);
+    }
+
+    // Report local player death to server
+    reportLocalPlayerDeath(killedById) {
+        if (!this.isConnected || !this.socket) return;
+        
+        // Send death notification to server
+        this.socket.emit('playerDied', {
+            killedBy: killedById || null
+        });
+        
+        console.log(`[MP-Death] Reported local player death to server. Killed by: ${killedById || 'unknown'}`);
     }
 
     // Central update method for Multiplayer logic called every frame by Game.js
@@ -1869,8 +1898,10 @@ export default class Multiplayer {
                 if (distanceToLocalPlayer < localTruckRadius) {
                     console.log(`💥 Multiplayer detected REMOTE projectile hit on LOCAL player.`);
                     // [Verify 4.A.6] Check if game.applyDamage is called
-                    console.log(`[MP-UpdateProj] Calling game.applyDamage(${projectile.damage}, 'player', ${projectile.playerId})`);
-                    this.game.applyDamage(projectile.damage, 'player', projectile.playerId);
+                    // FIXED: Limit damage to 20 (5 hits for full health)
+                    const reducedDamage = 20; // 20 damage per hit = 5 hits to kill
+                    console.log(`[MP-UpdateProj] Calling game.applyDamage(${reducedDamage}, 'player', ${projectile.playerId})`);
+                    this.game.applyDamage(reducedDamage, 'player', projectile.playerId);
                     hitOccurred = true;
                 }
             }
