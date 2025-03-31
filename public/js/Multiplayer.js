@@ -130,13 +130,14 @@ export default class Multiplayer {
     
     // CRITICAL FIX: Separate socket initialization into its own method
     initializeSocketConnection(serverUrl) {
-        console.log(`🎮 [Multiplayer] Creating socket connection to ${serverUrl}`);
-        
-        // Initialize socket with better error handling
-        this.socket = io(serverUrl, {
-            withCredentials: true,
-            transports: ['websocket', 'polling'],
-            timeout: 10000,
+        try {
+            console.log(`🎮 [Multiplayer] Creating socket connection to ${serverUrl}`);
+            
+            // Initialize socket with better error handling
+            this.socket = io(serverUrl, {
+                withCredentials: true,
+                transports: ['websocket', 'polling'],
+                timeout: 10000,
                 reconnection: true,
                 reconnectionAttempts: 5,
                 autoConnect: true,
