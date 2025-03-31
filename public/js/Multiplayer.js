@@ -407,10 +407,16 @@ export default class Multiplayer {
 
         // When a player takes damage
         this.socket.on('playerDamaged', (damageData) => {
-            console.log('💥 GOT DAMAGE EVENT FROM SERVER:', damageData);
+            // [Log 4.C.1] Log full damage data
+            console.log('[MP-OnDamage] Received playerDamaged:', damageData);
+            // console.log('💥 GOT DAMAGE EVENT FROM SERVER:', damageData);
             
+            // [Verify 4.C.2] Log local player ID check
+            const isLocalPlayerHit = damageData.id === this.localPlayerId;
+            console.log(`[MP-OnDamage] Is local player hit? ${isLocalPlayerHit} (Local ID: ${this.localPlayerId}, Event ID: ${damageData.id})`);
+
             // If it's the local player
-            if (damageData.id === this.localPlayerId) {
+            if (isLocalPlayerHit) {
                 // Only apply damage if it came from someone else
                 if (damageData.sourceId !== this.localPlayerId) {
                     console.log('🩸 TAKING DAMAGE FROM REMOTE PLAYER:', damageData.damage, 'New health:', damageData.health);
@@ -419,31 +425,56 @@ export default class Multiplayer {
                     if (this.game) {
                         // Immediately apply the health update for consistency
                         const oldHealth = this.game.health;
+                        // [Verify 4.C.3] Log health before update
+                        console.log(`[MP-OnDamage] Local health BEFORE update: ${oldHealth}`);
                         
                         // Update game health
                         this.game.health = Math.max(0, damageData.health);
-                        console.log('Game health set to:', this.game.health);
+                         // [Verify 4.C.3] Log health after update
+                        console.log(`[MP-OnDamage] Local health AFTER update: ${this.game.health} (Server value: ${damageData.health})`);
+                        // console.log('Game health set to:', this.game.health);
                         
                         // Update monster truck health
                         if (this.game.monsterTruck) {
                             this.game.monsterTruck.health = Math.max(0, damageData.health);
-                            console.log('MonsterTruck health set to:', this.game.monsterTruck.health);
+                            // console.log('MonsterTruck health set to:', this.game.monsterTruck.health);
                             
                             // Force visual damage effect
                             if (typeof this.game.monsterTruck.showDamageEffect === 'function') {
+                                // [Verify 4.C.4] Check if effects are called
+                                console.log('[MP-OnDamage] Calling monsterTruck.showDamageEffect()');
                                 this.game.monsterTruck.showDamageEffect();
                             }
                         }
                         
-                        // Try all possible ways to update HUD - SIMPLIFIED
+                        // Try standard HUD update - SIMPLIFIED
                         try {
                             if (typeof this.game.updateHUD === 'function') {
+                                // [Verify 4.C.4] Check if effects are called
+                                console.log('[MP-OnDamage] Calling game.updateHUD()');
                                 this.game.updateHUD(); 
                             } else {
                                 console.warn('this.game.updateHUD is not a function');
                             }
+                            // REMOVED: Direct DOM manipulation and window.updateStatBars call
                         } catch (e) {
                             console.error('Error updating HUD:', e);
+                        }
+                        
+                        // Add screen effect
+                        if (typeof this.game.addDamageScreenEffect === 'function') {
+                            // [Verify 4.C.4] Check if effects are called
+                            console.log(`[MP-OnDamage] Calling game.addDamageScreenEffect(${damageData.damage})`);
+                            this.game.addDamageScreenEffect(damageData.damage);
+                        }
+                        
+                        // Shake camera
+                        if (typeof this.game.shakeCamera === 'function') {
+                            // Scale shake based on damage, capped
+                            const shakeIntensity = Math.min(damageData.damage * 0.1, 1.0); 
+                            // [Verify 4.C.4] Check if effects are called
+                            console.log(`[MP-OnDamage] Calling game.shakeCamera(${shakeIntensity})`);
+                            this.game.shakeCamera(shakeIntensity);
                         }
                     }
                     
@@ -1582,9 +1613,11 @@ export default class Multiplayer {
                 interpolationFactor
             );
             
-            // Interpolate rotation
+            // Interpolate rotation with improved smoothing
+            // Use a slightly faster rotation interpolation for more responsive turning
+            const rotationFactor = Math.min(1.0, timeSinceUpdate / (this.throttleRate * 0.6));
             player.truckMesh.rotation.y = player.lastRotation.y + 
-                (player.targetRotation.y - player.lastRotation.y) * interpolationFactor;
+                (player.targetRotation.y - player.lastRotation.y) * rotationFactor;
                 
             // Update nickname position to follow the truck
             if (player.nicknameDisplay) {
@@ -1618,8 +1651,15 @@ export default class Multiplayer {
         if (!projectile || !projectile.mesh || !this.isConnected) return false;
         
         // MISSION CRITICAL DEBUG LOGGING
-        console.log(`⚠️⚠️⚠️ CHECKING PROJECTILE HITS: source=${projectile.source}, playerId=${projectile.playerId}, localId=${this.localPlayerId}`);
-        
+        // console.log(`⚠️⚠️⚠️ CHECKING PROJECTILE HITS: source=${projectile.source}, playerId=${projectile.playerId}, localId=${this.localPlayerId}`);
+        // [Verify 4.B.1] Confirm source is 'player' (or localPlayerId)
+        if (projectile.source !== 'player' && projectile.playerId !== this.localPlayerId) {
+            console.warn(`[MP-CheckHits] Called with non-local projectile? Source: ${projectile.source}, PlayerID: ${projectile.playerId}`);
+            // Optionally return false here if this should strictly not happen
+        }
+        console.log(`[MP-CheckHits] Checking Local Proj ${projectile.mesh.uuid.slice(-6)} against remote players...`);
+
+
         // CRITICAL FIX: Ensure projectile has playerId for proper tracking
         if (!projectile.playerId && projectile.source === 'player') {
             projectile.playerId = this.localPlayerId;
@@ -1665,7 +1705,9 @@ export default class Multiplayer {
                 return;
             }
             
-            console.log(`⚾ Checking collision with player ${playerId}`);
+            // [Log 4.B.2] Log target player ID
+            console.log(`[MP-CheckHits]   Target Player ID: ${playerId}`);
+            // console.log(`⚾ Checking collision with player ${playerId}`);
             
             // Use a more reasonable hitbox size
             const truckDimensions = {
@@ -1685,12 +1727,15 @@ export default class Multiplayer {
             };
             
             // Detailed position logging
-            console.log(`🚀 Projectile: ${projectile.mesh.position.x.toFixed(1)}, ${projectile.mesh.position.y.toFixed(1)}, ${projectile.mesh.position.z.toFixed(1)}`);
-            console.log(`🚗 Player ${playerId}: ${player.truckMesh.position.x.toFixed(1)}, ${player.truckMesh.position.y.toFixed(1)}, ${player.truckMesh.position.z.toFixed(1)}`);
-            console.log(`📦 Bounds: X(${truckBounds.minX.toFixed(1)}-${truckBounds.maxX.toFixed(1)}), Y(${truckBounds.minY.toFixed(1)}-${truckBounds.maxY.toFixed(1)}), Z(${truckBounds.minZ.toFixed(1)}-${truckBounds.maxZ.toFixed(1)})`);
+            // console.log(`🚀 Projectile: ${projectile.mesh.position.x.toFixed(1)}, ${projectile.mesh.position.y.toFixed(1)}, ${projectile.mesh.position.z.toFixed(1)}`);
+            // console.log(`🚗 Player ${playerId}: ${player.truckMesh.position.x.toFixed(1)}, ${player.truckMesh.position.y.toFixed(1)}, ${player.truckMesh.position.z.toFixed(1)}`);
+            // [Log 4.B.3] Log bounds
+            console.log(`[MP-CheckHits]     Bounds: X(${truckBounds.minX.toFixed(1)}-${truckBounds.maxX.toFixed(1)}), Y(${truckBounds.minY.toFixed(1)}-${truckBounds.maxY.toFixed(1)}), Z(${truckBounds.minZ.toFixed(1)}-${truckBounds.maxZ.toFixed(1)})`);
             
             // Get projectile position
             const pos = projectile.mesh.position;
+            // [Log 4.B.4] Log projectile position
+            console.log(`[MP-CheckHits]     Proj Pos: X:${pos.x.toFixed(1)}, Y:${pos.y.toFixed(1)}, Z:${pos.z.toFixed(1)}`);
             
             // Check if inside bounds - use simpler check for better performance
             let isHit = 
@@ -1701,6 +1746,9 @@ export default class Multiplayer {
                 pos.y >= truckBounds.minY &&
                 pos.y <= truckBounds.maxY;
                 
+            // [Log 4.B.5] Log hit result
+            console.log(`[MP-CheckHits]   Bounds Check Result: ${isHit}`);
+
             if (isHit) {
                 console.log(`💥 DIRECT HIT on player ${playerId}!`);
                 
@@ -1709,6 +1757,8 @@ export default class Multiplayer {
                 
                 // 2. Keep the standard method call to send the hit event to the server
                 try {
+                     // [Verify 4.B.6] Confirm sendPlayerHit is called
+                    console.log(`[MP-CheckHits] Calling sendPlayerHit(${playerId}, ${damage}, ${this.localPlayerId})`);
                     this.sendPlayerHit(playerId, damage, this.localPlayerId);
                 } catch (err) {
                     console.error("Error using sendPlayerHit method:", err);
@@ -1791,12 +1841,18 @@ export default class Multiplayer {
         for (const projectile of activeProjectiles) {
             if (!projectile || !projectile.mesh || !projectile.alive) continue;
 
+            // [Log 4.A.1] Log projectile details at start of check
+            console.log(`[MP-UpdateProj] Checking Proj ID (approx): ${projectile.mesh.uuid.slice(-6)}, Source: ${projectile.source}, PlayerID: ${projectile.playerId}, Alive: ${projectile.alive}`);
+
             let hitOccurred = false;
 
             // Case 1: Projectile fired by the LOCAL player
             if (projectile.source === 'player' || projectile.playerId === this.localPlayerId) {
                 // Check hits against REMOTE players
-                if (this.checkProjectileHits(projectile)) {
+                const localHitRemote = this.checkProjectileHits(projectile);
+                // [Log 4.A.3] Log result of local check
+                console.log(`[MP-UpdateProj] Local Proj ${projectile.mesh.uuid.slice(-6)} vs Remote Players. Hit? ${localHitRemote}`);
+                if (localHitRemote) {
                     console.log(`💥 Multiplayer detected LOCAL projectile hit on REMOTE player.`);
                     hitOccurred = true;
                 }
@@ -1805,10 +1861,13 @@ export default class Multiplayer {
             else if (projectile.source === 'remote') {
                 // Check hit against LOCAL player
                 const distanceToLocalPlayer = projectile.mesh.position.distanceTo(localTruckPosition);
-                
+                 // [Log 4.A.4] Log distance for remote check
+                console.log(`[MP-UpdateProj] Remote Proj ${projectile.mesh.uuid.slice(-6)} vs Local Player. Distance: ${distanceToLocalPlayer.toFixed(2)} (Radius: ${localTruckRadius})`);
+
                 if (distanceToLocalPlayer < localTruckRadius) {
                     console.log(`💥 Multiplayer detected REMOTE projectile hit on LOCAL player.`);
-                    // Apply damage locally (server already reduced health, this is for effects)
+                    // [Verify 4.A.6] Check if game.applyDamage is called
+                    console.log(`[MP-UpdateProj] Calling game.applyDamage(${projectile.damage}, 'player', ${projectile.playerId})`);
                     this.game.applyDamage(projectile.damage, 'player', projectile.playerId);
                     hitOccurred = true;
                 }
@@ -1816,6 +1875,8 @@ export default class Multiplayer {
 
             // If a hit occurred involving this projectile, mark it for removal
             if (hitOccurred) {
+                 // [Verify 4.A.5] Confirm projectile marked inactive on hit
+                console.log(`[MP-UpdateProj] Hit occurred for Proj ${projectile.mesh.uuid.slice(-6)}. Setting alive = false.`);
                 projectile.alive = false; // Mark for removal by the pool manager
                 projectile.hide(); // Immediately hide it
                 // The ObjectPoolManager in Game.js will handle releasing it

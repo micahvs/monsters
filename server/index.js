@@ -126,7 +126,9 @@ io.on('connection', (socket) => {
 
   // Handle player hit
   socket.on('playerHit', (data) => {
-    console.log(`PLAYER HIT: ${data.playerId} damaged by ${data.sourceId} for ${data.damage || 50} damage`);
+    // [Log 4.D.1] Log received playerHit data
+    console.log(`[Server-PlayerHit] Received playerHit: Target=${data.playerId}, Source=${data.sourceId}, Damage=${data.damage}`);
+    // console.log(`PLAYER HIT: ${data.playerId} damaged by ${data.sourceId} for ${data.damage || 50} damage`);
     
     // CRITICAL FIX: Add enhanced error handling
     if (!data.playerId) {
@@ -139,8 +141,12 @@ io.on('connection', (socket) => {
       const damageAmount = typeof data.damage === 'number' && data.damage >= 0 ? data.damage : 20; 
       
       // Update player health
+      const oldHealth = gameState.players[data.playerId].health;
       gameState.players[data.playerId].health -= damageAmount;
-      console.log(`Player ${data.playerId} health reduced to ${gameState.players[data.playerId].health}`);
+      const newHealth = gameState.players[data.playerId].health;
+      // [Log 4.D.2] Log health change
+      console.log(`[Server-PlayerHit] Player ${data.playerId} health: ${oldHealth} -> ${newHealth} (Damage: ${damageAmount})`);
+      // console.log(`Player ${data.playerId} health reduced to ${gameState.players[data.playerId].health}`);
       
       // Check if player is dead
       if (gameState.players[data.playerId].health <= 0) {
@@ -183,6 +189,8 @@ io.on('connection', (socket) => {
           timestamp: Date.now()
         };
         
+        // [Log 4.D.3] Log damageEvent object before emit
+        console.log('[Server-PlayerHit] Broadcasting playerDamaged:', damageEvent);
         // Broadcast damage update to all players
         io.emit('playerDamaged', damageEvent);
       }
