@@ -256,63 +256,7 @@
             to { opacity: 0.6; }
         }
 
-        /* Debug Panel - Left Side */
-        #debug-panel {
-            position: fixed;
-            top: 350px;
-            left: 20px;
-            width: 220px;
-            background: rgba(0, 0, 0, 0.7);
-            border-left: 3px solid #00ff00;
-            color: #00ff00;
-            font-family: 'Orbitron', monospace;
-            font-size: 14px;
-            max-height: 200px;
-            overflow: auto;
-            opacity: 0.8;
-            display: none;
-            padding: 12px;
-            z-index: 100;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
-        }
-        
-        #debug-panel::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 1px;
-            background: linear-gradient(to right, #00ff00, transparent);
-        }
-
-        body.debug-mode #debug-panel {
-            display: block;
-        }
-
-        /* Debug Toggle Button */
-        #debug-toggle {
-            position: fixed;
-            top: 20px;
-            left: 250px;
-            background: rgba(0, 0, 0, 0.7);
-            color: #00ff00;
-            border: 2px solid #00ff00;
-            padding: 6px 12px;
-            font-size: 14px;
-            cursor: pointer;
-            z-index: 101;
-            pointer-events: auto;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
-            font-family: 'Orbitron', sans-serif;
-            letter-spacing: 0.5px;
-            transition: all 0.2s ease;
-        }
-        
-        #debug-toggle:hover {
-            background: rgba(0, 255, 0, 0.2);
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
-        }
+        /* Debug panel and button styles removed */
 
         /* Chat Container - Bottom Right */
         #chat-container {
@@ -650,20 +594,7 @@
         <div id="powerup-indicators"></div>
     </div>
     
-    <!-- Debug Toggle Button -->
-    <button id="debug-toggle">DEBUG</button>
-    
-    <!-- Debug Panel - Left Side -->
-    <div id="debug-panel">
-        <div>Debug Controls:</div>
-        <div>D: Teleport to edge</div>
-        <div>Space: Fire weapon</div>
-        <div>1-4: Switch weapons</div>
-        <div>Q/E: Prev/Next weapon</div>
-        <div>&nbsp;</div>
-        <div>Debug Info:</div>
-        <div id="positionInfo">Pos: X:0 Y:0 Z:0</div>
-    </div>
+    <!-- Debug panel and button removed -->
     
     <!-- Unified Audio Controls Panel -->
     <audio id="backgroundMusic" preload="auto"></audio>
@@ -722,13 +653,7 @@
             }
         };
         
-        // Debug toggle functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const debugToggle = document.getElementById('debug-toggle');
-            debugToggle.addEventListener('click', function() {
-                document.body.classList.toggle('debug-mode');
-            });
-        });
+        // Debug toggle functionality removed
         
         // Update health and ammo bars
         window.updateStatBars = function(health, ammo, maxAmmo) {

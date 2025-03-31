@@ -577,8 +577,7 @@ class Game {
         this.truck = null;
         this.isInitialized = false;
         
-        // Disable debug by default
-        this.debugMode = false;
+        // Debug mode removed
         
         // Initialize audio manager with camera
         if (!window.audioManager) {
@@ -1335,10 +1334,7 @@ class Game {
                 this.keys[e.key] = true;
             }
             
-            // Add shortcut for debug mode toggle (F9)
-            if (e.key === 'F9') {
-                this.toggleDebugMode();
-            }
+            // Debug shortcut removed
         });
         
         window.addEventListener('keyup', (e) => {
@@ -1685,10 +1681,7 @@ class Game {
             this.renderer.render(this.scene, this.camera);
         }
         
-        // Update debug info if enabled
-        if (this.debugMode && this.debugPanel) {
-            this.updateDebugInfo();
-        }
+        // Debug info update removed
     }
 
     updateRendererSettings() {
@@ -3255,150 +3248,17 @@ class Game {
     }
 
     initializeDebugHelpers() {
-        // Only create debug visuals when debug mode is on
-        if (this.debugMode) {
-            // Add debug stats panel
-            const statsPanel = document.createElement('div');
-            statsPanel.id = 'debug-panel';
-            statsPanel.style.position = 'fixed';
-            statsPanel.style.top = '70px';
-            statsPanel.style.right = '10px';
-            statsPanel.style.backgroundColor = 'rgba(0,0,0,0.7)';
-            statsPanel.style.color = '#00ff00';
-            statsPanel.style.padding = '8px';
-            statsPanel.style.fontFamily = 'monospace';
-            statsPanel.style.fontSize = '11px';
-            statsPanel.style.zIndex = '1000';
-            statsPanel.innerHTML = `
-                <div id="debug-memory">Memory: 0 MB</div>
-                <div id="debug-particles">Particles: 0</div>
-                <div id="debug-drawcalls">Draw calls: 0</div>
-            `;
-            document.body.appendChild(statsPanel);
-            this.debugPanel = statsPanel;
-            
-            // Create grid helper with fine divisions if debug is on
-            if (this.gridEnabled) {
-                this.gridHelper = new THREE.GridHelper(1560, 20);
-                this.scene.add(this.gridHelper);
-            }
-            
-            // Enable verbose console output
-            this.enableDebugLogs();
-        } else {
-            // Limit console.log if not in debug mode
-            if (!this._originalConsoleLog) {
-                this._originalConsoleLog = console.log;
-                console.log = function() {
-                    // Only log errors and warnings
-                    if (arguments[0] && typeof arguments[0] === 'string' && 
-                        (arguments[0].includes('ERROR') || 
-                         arguments[0].includes('Warning') || 
-                         arguments[0].includes('CRITICAL'))) {
-                        this._originalConsoleLog.apply(console, arguments);
-                    }
-                }.bind(this);
-            }
-            
-            // Only create minimal grid helper in non-debug mode
-            if (this.gridEnabled && !window.lowPerformanceMode) {
-                this.gridHelper = new THREE.GridHelper(1560, 10); // Fewer divisions in normal mode
-                this.scene.add(this.gridHelper);
-            }
+        // Create minimal grid helper in non-debug mode
+        if (this.gridEnabled && !window.lowPerformanceMode) {
+            this.gridHelper = new THREE.GridHelper(1560, 10); // Fewer divisions in normal mode
+            this.scene.add(this.gridHelper);
         }
     }
 
-    enableDebugLogs() {
-        if (this._originalConsoleLog) {
-            console.log = this._originalConsoleLog;
-        }
-    }
-
-    updateDebugInfo() {
-        if (!this.debugPanel) return;
-        
-        // Update memory usage
-        const memoryElem = document.getElementById('debug-memory');
-        if (memoryElem && window.performance && window.performance.memory) {
-            const memoryUsed = Math.round(window.performance.memory.usedJSHeapSize / (1024 * 1024));
-            const memoryTotal = Math.round(window.performance.memory.totalJSHeapSize / (1024 * 1024));
-            memoryElem.textContent = `Memory: ${memoryUsed}/${memoryTotal} MB`;
-        }
-        
-        // Update particle count
-        const particleElem = document.getElementById('debug-particles');
-        if (particleElem && this.objectPools && this.objectPools.pools) {
-            const particlePool = this.objectPools.pools.get('particles');
-            const particleCount = particlePool ? particlePool.active.length : 0;
-            particleElem.textContent = `Particles: ${particleCount}/${this.maxParticles}`;
-        }
-        
-        // Update draw calls info
-        const drawCallsElem = document.getElementById('debug-drawcalls');
-        if (drawCallsElem && this.renderer) {
-            drawCallsElem.textContent = `Draw calls: ${this.renderer.info.render.calls}`;
-        }
-    }
-
-    toggleDebugMode() {
-        this.debugMode = !this.debugMode;
-        
-        // Update UI based on debug state
-        if (this.debugMode) {
-            this.enableDebugLogs();
-            
-            // Create debug panel if not exists
-            if (!this.debugPanel) {
-                const statsPanel = document.createElement('div');
-                statsPanel.id = 'debug-panel';
-                statsPanel.style.position = 'fixed';
-                statsPanel.style.top = '70px';
-                statsPanel.style.right = '10px';
-                statsPanel.style.backgroundColor = 'rgba(0,0,0,0.7)';
-                statsPanel.style.color = '#00ff00';
-                statsPanel.style.padding = '8px';
-                statsPanel.style.fontFamily = 'monospace';
-                statsPanel.style.fontSize = '11px';
-                statsPanel.style.zIndex = '1000';
-                statsPanel.innerHTML = `
-                    <div id="debug-memory">Memory: 0 MB</div>
-                    <div id="debug-particles">Particles: 0</div>
-                    <div id="debug-drawcalls">Draw calls: 0</div>
-                `;
-                document.body.appendChild(statsPanel);
-                this.debugPanel = statsPanel;
-            } else {
-                this.debugPanel.style.display = 'block';
-            }
-            
-            // Create/show grid if not exists
-            if (!this.gridHelper && this.gridEnabled) {
-                this.gridHelper = new THREE.GridHelper(1560, 20);
-                this.scene.add(this.gridHelper);
-            } else if (this.gridHelper) {
-                this.gridHelper.visible = true;
-            }
-            
-            this.showNotification('Debug mode enabled');
-        } else {
-            // Hide debug UI
-            if (this.debugPanel) {
-                this.debugPanel.style.display = 'none';
-            }
-            
-            // Hide grid
-            if (this.gridHelper) {
-                this.gridHelper.visible = false;
-            }
-            
-            // Restore console behavior
-            if (this._originalConsoleLog) {
-                console.log = this._originalConsoleLog;
-            }
-            
-            this.showNotification('Debug mode disabled');
-        }
-    }
+    // Debug methods removed - keeping empty stubs for compatibility
+    enableDebugLogs() {}
+    updateDebugInfo() {}
+    toggleDebugMode() {}
 }
 
 // Implement a preloader
