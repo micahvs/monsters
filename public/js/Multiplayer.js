@@ -26,8 +26,6 @@ export default class Multiplayer {
     
     connect() {
         try {
-            console.log('🎮 [Multiplayer] Connecting to multiplayer server...');
-            
             // Verify io is available (double-check)
             if (typeof io === 'undefined') {
                 throw new Error('Socket.io not found when attempting to connect');
@@ -38,11 +36,9 @@ export default class Multiplayer {
                 .then(serverReachable => {
                     if (serverReachable) {
                         // Initialize socket with better error handling
-                        console.log('🎮 [Multiplayer] Server is reachable, creating socket connection');
                         this.initializeSocketConnection(this.serverUrl);
                     } else {
                         // Try using a different server URL
-                        console.log('🎮 [Multiplayer] Primary server not reachable, trying alternative URLs');
                         this.tryBackupServers();
                     }
                 });
@@ -54,9 +50,6 @@ export default class Multiplayer {
     // CRITICAL FIX: Test if server is reachable
     testServerConnection() {
         return new Promise(resolve => {
-            // Create a test connection with short timeout
-            console.log(`🎮 [Multiplayer] Testing connection to server: ${this.serverUrl}`);
-            
             // Use fetch API to test if server is reachable
             fetch(`${this.serverUrl}/healthcheck`, { 
                 method: 'GET',
@@ -68,21 +61,17 @@ export default class Multiplayer {
             })
             .then(response => {
                 if (response.ok) {
-                    console.log('🎮 [Multiplayer] Server healthcheck successful!');
                     resolve(true);
                 } else {
-                    console.error('🎮 [Multiplayer] Server healthcheck failed:', response.status);
                     resolve(false);
                 }
             })
             .catch(error => {
-                console.error('🎮 [Multiplayer] Server healthcheck error:', error);
                 resolve(false);
             });
             
             // Set a backup timeout in case fetch doesn't resolve
             setTimeout(() => {
-                console.log('🎮 [Multiplayer] Server test timeout - assuming unreachable');
                 resolve(false);
             }, 5000);
         });
@@ -90,8 +79,6 @@ export default class Multiplayer {
     
     // Try connecting to backup servers
     tryBackupServers() {
-        console.log('🎮 [Multiplayer] Trying backup server URLs');
-        
         // Alternative server URLs to try
         const backupServers = [
             'https://monster-truck-stadium.fly.dev',
@@ -102,27 +89,22 @@ export default class Multiplayer {
         // Try each server in order
         const tryServer = (index) => {
             if (index >= backupServers.length) {
-                console.error('🎮 [Multiplayer] All servers failed, falling back to offline mode');
                 this.enableOfflineMode();
                 return;
             }
             
             const serverUrl = backupServers[index];
-            console.log(`🎮 [Multiplayer] Trying backup server ${index+1}/${backupServers.length}: ${serverUrl}`);
             
             // Simple fetch test
             fetch(`${serverUrl}/healthcheck`, { timeout: 3000 })
                 .then(response => {
                     if (response.ok) {
-                        console.log(`🎮 [Multiplayer] Backup server ${serverUrl} is reachable!`);
                         this.initializeSocketConnection(serverUrl);
                     } else {
-                        console.log(`🎮 [Multiplayer] Backup server ${serverUrl} returned error status`);
                         tryServer(index + 1);
                     }
                 })
                 .catch(() => {
-                    console.log(`🎮 [Multiplayer] Backup server ${serverUrl} is not reachable`);
                     tryServer(index + 1);
                 });
         };
@@ -134,8 +116,6 @@ export default class Multiplayer {
     // CRITICAL FIX: Separate socket initialization into its own method
     initializeSocketConnection(serverUrl) {
         try {
-            console.log(`🎮 [Multiplayer] Creating socket connection to ${serverUrl}`);
-            
             // Initialize socket with better error handling
             this.socket = io(serverUrl, {
                 withCredentials: true,
@@ -150,7 +130,6 @@ export default class Multiplayer {
             // Add missing error handler method if needed
             if (typeof this.handleConnectionError !== 'function') {
                 this.handleConnectionError = (error) => {
-                    console.error('🎮 [Multiplayer] Connection error:', error);
                     this.showNotification("Multiplayer connection error! Using offline mode.", "error");
                     this.enableOfflineMode();
                 };
@@ -159,18 +138,14 @@ export default class Multiplayer {
             // Add missing offline mode handler if needed
             if (typeof this.enableOfflineMode !== 'function') {
                 this.enableOfflineMode = () => {
-                    console.log('🎮 [Multiplayer] Enabling offline mode');
                     this.isOfflineMode = true;
                     this.isConnected = false;
                     this.showNotification("Running in offline mode - no multiplayer functionality", "warning");
                 };
             }
-
-            console.log('🎮 [Multiplayer] Socket created:', !!this.socket);
             
             // Add connection error handler with fallback logic
             this.socket.on('connect_error', (error) => {
-                console.error('🎮 [Multiplayer] Connection error:', error);
                 window.isMultiplayerInitialized = false;
                 
                 if (window.addChatMessage && typeof window.addChatMessage === 'function') {
@@ -182,7 +157,6 @@ export default class Multiplayer {
                 this.socket.disconnect();
                 
                 // Try fallback server
-                console.log('🎮 [Multiplayer] Trying fallback server...');
                 this.socket = io(this.fallbackUrl, {
                     withCredentials: true,
                     transports: ['websocket', 'polling'],
@@ -198,7 +172,6 @@ export default class Multiplayer {
                 
                 // Add a specific error handler for the fallback
                 this.socket.on('connect_error', (fallbackError) => {
-                    console.error('🎮 [Multiplayer] Fallback connection error:', fallbackError);
                     if (window.addChatMessage && typeof window.addChatMessage === 'function') {
                         window.addChatMessage('System', 'Error connecting to fallback server. Switching to offline mode.');
                     }
@@ -210,7 +183,6 @@ export default class Multiplayer {
 
             // Handle disconnection
             this.socket.on('disconnect', (reason) => {
-                console.warn('🎮 [Multiplayer] Disconnected from server:', reason);
                 window.isMultiplayerInitialized = false;
                 
                 if (window.addChatMessage && typeof window.addChatMessage === 'function') {
@@ -225,10 +197,7 @@ export default class Multiplayer {
             // Start sending updates and listening for chat toggle
             this.startUpdates();
             
-            console.log('🎮 [Multiplayer] Connection setup completed');
-            
         } catch (error) {
-            console.error('🎮 [Multiplayer] Socket initialization error:', error);
             window.isMultiplayerInitialized = false;
             if (this.game && this.game.showMessage) {
                 this.game.showMessage('Multiplayer initialization failed - playing in single player mode');
@@ -244,26 +213,20 @@ export default class Multiplayer {
     
     // Create an offline mode with a mock socket
     enableOfflineMode() {
-        console.log('🎮 [Multiplayer] Enabling offline mode');
-        
         // Create a mock socket object that won't throw errors
         this.socket = {
             connected: false,
             id: 'offline-' + Math.random().toString(36).substr(2, 9),
             on: (event, callback) => {
-                console.log(`🎮 [Multiplayer] Offline mode: event ${event} would be registered`);
                 return this;
             },
             emit: (event, data) => {
-                console.log(`🎮 [Multiplayer] Offline mode: event ${event} would be emitted`);
                 return this;
             },
             disconnect: () => {
-                console.log('🎮 [Multiplayer] Offline mode: would disconnect');
                 return this;
             },
             connect: () => {
-                console.log('🎮 [Multiplayer] Offline mode: would connect');
                 return this;
             },
             // Add any other socket methods that might be called
@@ -286,15 +249,11 @@ export default class Multiplayer {
     
     setupSocketEvents() {
         if (!this.socket) {
-            console.error('🎮 [Multiplayer] Cannot set up socket events: socket is null');
             return;
         }
         
-        console.log('🎮 [Multiplayer] Setting up socket events');
-        
         // When connected to the server
         this.socket.on('connect', () => {
-            console.log('🎮 [Multiplayer] Connected to multiplayer server');
             this.isConnected = true;
             this.localPlayerId = this.socket.id;
             
@@ -321,19 +280,11 @@ export default class Multiplayer {
         
         // When a connection error occurs
         this.socket.on('connect_error', (error) => {
-            console.error('Connection error:', error);
-            console.log('Connection error details:', {
-                errorMessage: error.message,
-                errorType: error.type,
-                errorDescription: error.description
-            });
             this.showNotification('Connection error, retrying...', 'error');
         });
         
         // When receiving full game state
         this.socket.on('gameState', (gameState) => {
-            console.log('Received game state:', gameState);
-            
             // Clear existing players before adding new ones to prevent duplicates
             this.players.forEach((player, id) => {
                 if (id !== this.localPlayerId) {
@@ -352,11 +303,8 @@ export default class Multiplayer {
         // When a new player joins
         this.socket.on('playerJoined', (playerData) => {
             if (playerData.id !== this.localPlayerId) {
-                console.log('New player joined:', playerData);
-                
                 // Remove any existing player with this ID first to prevent duplicates
                 if (this.players.has(playerData.id)) {
-                    console.log('Removing existing player before adding new one:', playerData.id);
                     this.removeRemotePlayer(playerData.id);
                 }
                 
@@ -372,8 +320,6 @@ export default class Multiplayer {
         
         // When a player leaves
         this.socket.on('playerLeft', (playerData) => {
-            console.log('Player left:', playerData.id);
-            
             // Store nickname before removing
             const nickname = this.players.get(playerData.id)?.nickname || 'Player';
             
@@ -559,8 +505,6 @@ export default class Multiplayer {
                 console.error('Chat messages container not found');
                 return;
             }
-            
-            console.log('Using internal chat UI to display message');
             
             // Add message to chat history if it's an array
             if (Array.isArray(this.chatMessages)) {
@@ -753,7 +697,7 @@ export default class Multiplayer {
                          localStorage.getItem('monsterTruckNickname') || 
                          'Player';
         
-        // Send message to server with additional debugging
+        // Send message to server
         try {
             const chatData = {
                 message: message,
@@ -1007,7 +951,6 @@ export default class Multiplayer {
         // Acquire a projectile from the pool - Correct method is 'get'
         const pooledProjectile = this.game.objectPools.get('projectiles'); 
         if (!pooledProjectile) {
-            console.warn("Multiplayer.createRemoteProjectile: Failed to acquire projectile from pool.");
             return;
         }
 
