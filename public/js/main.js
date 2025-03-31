@@ -164,8 +164,7 @@ class Turret {
             emissive: type.color,
             emissiveIntensity: 0.8,
             shininess: 30,
-            transparent: true,
-            opacity: 0.9
+            transparent: false // Make turrets fully opaque
         });
         this.base = new THREE.Mesh(baseGeometry, baseMaterial);
         this.base.position.copy(position);
@@ -193,8 +192,7 @@ class Turret {
             emissive: type.color,
             emissiveIntensity: 0.8,
             shininess: 30,
-            transparent: true,
-            opacity: 0.9
+            transparent: false // Make turret guns fully opaque
         });
         this.gun = new THREE.Mesh(gunGeometry, gunMaterial);
         this.gun.position.y = 0.5 * turretScale;
@@ -1174,13 +1172,13 @@ class Game {
         this.scene.add(gridHelper);
         
         // Create walls - now 50% shorter (height reduced from 100 to 50)
-        // Use MeshBasicMaterial for walls with cyberpunk colors
-        const wallMaterial = new THREE.MeshBasicMaterial({
+        // Use MeshPhongMaterial for walls with cyberpunk colors and glow
+        const wallMaterial = new THREE.MeshPhongMaterial({
             color: 0x8800ff, // Vibrant purple from cyberpunk scheme
-            transparent: true,
-            opacity: 0.8,
             emissive: 0x8800ff,
-            emissiveIntensity: 0.5
+            emissiveIntensity: 0.5,
+            shininess: 30,
+            transparent: false // Make walls fully opaque
         });
         
         // Arena half size is now 780 (doubled from 390)
@@ -1252,11 +1250,21 @@ class Game {
     createSimpleTruck() {
         console.log("Creating simplified truck");
         
+        // Get truck color from localStorage
+        let truckColor = 0xff00ff; // Default to magenta/pink
+        const savedColor = localStorage.getItem('monsterTruckColor');
+        if (savedColor) {
+            // Parse the hex color from localStorage (removing # if present)
+            truckColor = parseInt(savedColor.replace('#', '0x'), 16);
+        }
+        console.log("Using truck color:", savedColor || "default pink");
+        
         // Double the truck dimensions (2x bigger)
         const truckGeometry = new THREE.BoxGeometry(5, 2.5, 7.5); // 2x the original dimensions
         const truckMaterial = new THREE.MeshPhongMaterial({ // Changed back to MeshPhongMaterial for better lighting
-            color: 0xff00ff,
-            emissive: 0x330033,
+            color: truckColor,
+            emissive: truckColor,
+            emissiveIntensity: 0.3,
             shininess: 30,
             specular: 0xffffff
         });
@@ -1270,6 +1278,14 @@ class Game {
         
         // Add wheels for better visual feedback
         this.addWheelsToTruck();
+        
+        // Update player name in UI
+        const playerNameElement = document.getElementById('playerName');
+        const savedNickname = localStorage.getItem('monsterTruckNickname') || 'PLAYER';
+        if (playerNameElement) {
+            playerNameElement.textContent = savedNickname.toUpperCase();
+            playerNameElement.style.color = savedColor || '#ff00ff';
+        }
     }
 
     addWheelsToTruck() {
@@ -1957,6 +1973,24 @@ class Game {
             // Smoothly interpolate camera position
             this.camera.position.lerp(targetCameraPos, 0.05);
             this.camera.lookAt(this.truck.position);
+            
+            // Update speedometer - calculate speed in MPH (arbitrary multiplier for game feel)
+            const speedMph = Math.abs(Math.round(this.truck.velocity * 100));
+            const speedDisplay = document.getElementById('speed');
+            if (speedDisplay) {
+                speedDisplay.textContent = `SPEED: ${speedMph} MPH`;
+            }
+            
+            // Update score display if score has changed
+            if (this.scoreDisplay) {
+                this.scoreDisplay.textContent = `SCORE: ${this.score}`;
+            }
+            
+            // Also update the DOM element for score
+            const scoreElement = document.getElementById('score');
+            if (scoreElement) {
+                scoreElement.textContent = `SCORE: ${this.score}`;
+            }
         }
         
         // Handle shooting
