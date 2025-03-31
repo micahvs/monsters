@@ -1568,39 +1568,21 @@ class Game {
     }
 
     initHUD() {
-        console.log("Initializing simplified HUD");
+        console.log("Initializing HUD");
         
-        // Create a simple HUD container
-        const hudContainer = document.createElement('div');
-        hudContainer.style.position = 'absolute';
-        hudContainer.style.top = '10px';
-        hudContainer.style.left = '10px';
-        hudContainer.style.color = '#fff';
-        hudContainer.style.fontFamily = 'Arial, sans-serif';
-        hudContainer.style.fontSize = '16px';
-        hudContainer.style.textShadow = '1px 1px 2px black';
+        // Instead of creating new elements, just get references to existing UI elements
+        const healthDiv = document.getElementById('health');
+        const scoreDiv = document.getElementById('score');
+        const ammoDiv = document.getElementById('ammo');
         
-        // Add health display
-        const healthDiv = document.createElement('div');
-        healthDiv.id = 'health';
-        healthDiv.textContent = `Health: ${this.health}`;
-        hudContainer.appendChild(healthDiv);
-        
-        // Add score display
-        const scoreDiv = document.createElement('div');
-        scoreDiv.id = 'score';
-        scoreDiv.textContent = `Score: ${this.score}`;
-        hudContainer.appendChild(scoreDiv);
+        // Store references for updates
         this.scoreDisplay = scoreDiv;
-        
-        // Add ammo display
-        const ammoDiv = document.createElement('div');
-        ammoDiv.id = 'ammo';
-        ammoDiv.textContent = `Ammo: 0/0`;
-        hudContainer.appendChild(ammoDiv);
         this.ammoDisplay = ammoDiv;
         
-        document.body.appendChild(hudContainer);
+        // Update with initial values
+        if (healthDiv) healthDiv.textContent = `HEALTH: ${this.health}%`;
+        if (scoreDiv) scoreDiv.textContent = `SCORE: ${this.score}`;
+        if (ammoDiv) ammoDiv.textContent = `AMMO: 0/0`;
     }
 
     animate() {
@@ -2180,16 +2162,21 @@ class Game {
         
         console.log(`Collision damage applied: -${damageAmount}. Health now: ${this.health}`);
         
-        // Update health display
+        // Update health display and bar
         const healthDiv = document.getElementById('health');
         if (healthDiv) {
-            healthDiv.textContent = `Health: ${this.health}`;
+            healthDiv.textContent = `HEALTH: ${this.health}%`;
             
             // Add visual feedback with red flash
             healthDiv.style.color = 'red';
             setTimeout(() => {
                 healthDiv.style.color = 'white';
             }, 300);
+        }
+        
+        // Update health bar using window function if available
+        if (window.updateStatBars) {
+            window.updateStatBars(this.health, this.weapon?.ammo, this.weapon?.maxAmmo);
         }
         
         // Flash the screen red
