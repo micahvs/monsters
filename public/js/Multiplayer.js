@@ -1830,17 +1830,23 @@ export default class Multiplayer {
 
     // Placeholder for projectile update logic
     updateProjectiles() {
+        // [Log] Confirm entry
+        console.log("[MP-UpdateProj] Entered function.");
+
         // Ensure game, truck, and projectiles array/pool exist
+        // [Log] Check initial objects
+        console.log(`[MP-UpdateProj] Checks: game=${!!this.game}, truck=${!!this.game?.truck}, objectPools=${!!this.game?.objectPools}`);
         if (!this.game || !this.game.truck || !this.game.objectPools) return;
 
         const projectilePool = this.game.objectPools.pools.get('projectiles');
+        // [Log] Check pool status
+        console.log(`[MP-UpdateProj] Checks: projectilePool=${!!projectilePool}, pool.active=${!!projectilePool?.active}`);
         if (!projectilePool || !projectilePool.active) return;
 
-        // [Log] Log the number of active projectiles being checked
-        if (projectilePool.active.length > 0) {
-           // Only log if there are projectiles to avoid spam
-           console.log(`[MP-UpdateProj] Checking ${projectilePool.active.length} active projectiles.`);
-        }
+        // [Log] Log the number of active projectiles being checked - ALWAYS LOG LENGTH NOW
+        const poolSize = projectilePool.active.length;
+        console.log(`[MP-UpdateProj] Active projectile pool size: ${poolSize}`);
+        if (poolSize === 0) return; // Exit if pool is empty
 
         const localTruckPosition = this.game.truck.position;
         const localTruckRadius = 2.5; // Approximate radius for collision
