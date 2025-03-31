@@ -66,6 +66,7 @@ export class AudioManager {
         
         // Add global audio unlock
         document.addEventListener('click', this.handleUserInteraction.bind(this), { passive: true, once: true });
+        document.addEventListener('touchstart', this.handleUserInteraction.bind(this), { passive: true, once: true });
         document.addEventListener('keydown', this.handleUserInteraction.bind(this), { passive: true, once: true });
     }
     
@@ -629,18 +630,6 @@ export class AudioManager {
 
 // Initialize audio manager when DOM is loaded but don't create the AudioContext yet
 document.addEventListener('DOMContentLoaded', () => {
-    // Create a placeholder instance that will be properly initialized on user interaction
+    // Will be actually initialized on first user interaction
     window.audioManagerInstance = null;
-    
-    // Add global audio unlock
-    const unlockAudio = () => {
-        if (window.audioManagerInstance && !window.audioManagerInstance.poolsInitialized) {
-            window.audioManagerInstance.handleUserInteraction();
-        }
-    };
-    
-    // Listen for any user interaction
-    document.addEventListener('click', unlockAudio, { passive: true, once: true });
-    document.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
-    document.addEventListener('keydown', unlockAudio, { passive: true, once: true });
 }); 
