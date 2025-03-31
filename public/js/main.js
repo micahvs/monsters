@@ -693,20 +693,16 @@ class Game {
                 
             // Add event listener
             toggle.addEventListener('click', () => {
-                window.multiplayerEnabled = !window.multiplayerEnabled;
-                toggle.textContent = window.multiplayerEnabled ? 
-                    '🌐 Multiplayer: ON - Click to toggle' : 
-                    '🌐 Multiplayer: OFF - Click to toggle';
-                toggle.style.border = window.multiplayerEnabled ?
-                    '1px solid #00ffff' : '1px solid #ff0000';
+                // Always set multiplayer to true
+                window.multiplayerEnabled = true;
+                toggle.textContent = '🌐 Multiplayer: ON';
+                toggle.style.border = '1px solid #00ffff';
                     
                 // Save preference to localStorage
-                localStorage.setItem('monsterTruckMultiplayer', window.multiplayerEnabled);
+                localStorage.setItem('monsterTruckMultiplayer', true);
                     
                 // Show notification
-                this.showNotification(window.multiplayerEnabled ? 
-                    'Multiplayer enabled - restart needed' : 
-                    'Multiplayer disabled - performance will improve');
+                this.showNotification('Multiplayer is always enabled for better experience');
             });
             return;
         }
@@ -732,20 +728,16 @@ class Game {
             '1px solid #00ffff' : '1px solid #ff0000';
         
         toggle.addEventListener('click', () => {
-            window.multiplayerEnabled = !window.multiplayerEnabled;
-            toggle.textContent = window.multiplayerEnabled ? 
-                '🌐 Multiplayer: ON - Click to toggle' : 
-                '🌐 Multiplayer: OFF - Click to toggle';
-            toggle.style.border = window.multiplayerEnabled ?
-                '1px solid #00ffff' : '1px solid #ff0000';
+            // Always set multiplayer to true
+            window.multiplayerEnabled = true;
+            toggle.textContent = '🌐 Multiplayer: ON';
+            toggle.style.border = '1px solid #00ffff';
                 
             // Save preference to localStorage
-            localStorage.setItem('monsterTruckMultiplayer', window.multiplayerEnabled);
+            localStorage.setItem('monsterTruckMultiplayer', true);
                 
             // Show notification
-            this.showNotification(window.multiplayerEnabled ? 
-                'Multiplayer enabled - restart needed' : 
-                'Multiplayer disabled - performance will improve');
+            this.showNotification('Multiplayer is always enabled for better experience');
         });
         
         document.body.appendChild(toggle);
@@ -1548,17 +1540,10 @@ class Game {
                         this.shadowsEnabled = false;
                         this.updateRendererSettings();
                     }
-                    if (window.multiplayerEnabled) {
-                        console.log("Low FPS - disabling multiplayer");
-                        window.multiplayerEnabled = false;
-                        localStorage.setItem('monsterTruckMultiplayer', false);
-                        this.showNotification("Multiplayer disabled due to low performance");
-                        const toggleBtn = document.getElementById('multiplayer-toggle');
-                        if (toggleBtn) {
-                            toggleBtn.textContent = '🌐 Multiplayer: OFF (auto)';
-                            toggleBtn.style.border = '1px solid #ff0000';
-                        }
-                    }
+                    // FPS is low but we keep multiplayer on
+                    console.log("Low FPS detected but keeping multiplayer enabled");
+                    // Show a performance notification without disabling multiplayer
+                    this.showNotification("Performance optimizations active");
                 }
             }
         }
@@ -3214,9 +3199,10 @@ window.addEventListener('load', () => {
     console.log("Window loaded, initializing preloader");
     const loadingElement = document.getElementById('loadingScreen');
     
-    // Disable multiplayer by default - this is critical for performance
-    window.multiplayerEnabled = localStorage.getItem('monsterTruckMultiplayer') === 'false' ? false : true;
-    console.log("Multiplayer enabled by default for better gameplay experience");
+    // Always enable multiplayer by default
+    window.multiplayerEnabled = true;
+    localStorage.setItem('monsterTruckMultiplayer', 'true');
+    console.log("Multiplayer always enabled by default for better gameplay experience");
     
     const preloader = new AssetPreloader(() => {
         if (loadingElement) loadingElement.style.display = 'none';

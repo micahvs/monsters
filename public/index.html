@@ -734,11 +734,13 @@
                 });
             }
             
-            // Set initial multiplayer toggle state from localStorage
+            // Always default to multiplayer on
             const multiplayerToggle = document.getElementById('multiplayer');
             const multiplayerStatus = document.querySelector('.multiplayer-status');
             const savedMultiplayerState = localStorage.getItem('monsterTruckMultiplayer');
-            multiplayerToggle.checked = savedMultiplayerState === null ? true : savedMultiplayerState === 'true';
+            // Default to true (on) regardless of saved state
+            multiplayerToggle.checked = true;
+            localStorage.setItem('monsterTruckMultiplayer', true);
             
             // Update status indicator based on initial state
             if (multiplayerToggle.checked) {
