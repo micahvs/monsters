@@ -660,8 +660,11 @@ class Game {
         if (!window.audioManager) {
             console.log("Creating new AudioManager instance");
             window.audioManager = new AudioManager(this.camera);
+        } else {
+            console.log("Using existing AudioManager instance");
+            window.audioManager.camera = this.camera;
         }
-        this.audioManager = window.audioManager; // Always use the global instance
+        this.audioManager = window.audioManager;
         
         // Create shared geometries for better performance
         this.sharedParticleGeometry = new THREE.SphereGeometry(1, 8, 6); // Higher quality than before

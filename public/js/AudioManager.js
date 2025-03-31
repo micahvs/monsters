@@ -631,5 +631,5 @@ export class AudioManager {
 // Initialize audio manager when DOM is loaded but don't create the AudioContext yet
 document.addEventListener('DOMContentLoaded', () => {
     // Will be actually initialized on first user interaction
-    window.audioManagerInstance = null;
+    window.audioManager = null;
 }); 
