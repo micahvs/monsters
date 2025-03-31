@@ -1595,17 +1595,6 @@ class Game {
         // Basic update for truck movement
         if (!this.truck) return;
         
-        // CRITICAL FIX: Check projectiles against players in EVERY update
-        if (this.multiplayer && window.multiplayerEnabled && this.objectPools && this.objectPools.pools.get('projectiles')) {
-            const projectilePool = this.objectPools.pools.get('projectiles');
-            projectilePool.active.forEach(projectile => {
-                // Check every active projectile against remote players
-                if (projectile.source === 'player' || projectile.playerId === this.multiplayer.localPlayerId) {
-                    this.multiplayer.checkProjectileHits(projectile);
-                }
-            });
-        }
-        
         // Throttle updates for better performance
         const updateAll = this.frameCount % 2 === 0; // Update non-essential items at half rate
         
@@ -1979,21 +1968,9 @@ class Game {
         // Check for powerup collection
         this.checkPowerupCollection();
         
-        // Update multiplayer if enabled
+        // Update multiplayer system (handles interpolation, state sending, and projectile checks)
         if (this.multiplayer && window.multiplayerEnabled) {
-            this.multiplayer.update({
-                position: {
-                    x: this.truck.position.x,
-                    y: this.truck.position.y,
-                    z: this.truck.position.z
-                },
-                rotation: {
-                    y: this.truck.rotation.y
-                },
-                velocity: this.truck.velocity,
-                health: this.health,
-                maxHealth: this.maxHealth
-            });
+            this.multiplayer.update(); // Call the new central update method
         }
     }
 
@@ -3089,7 +3066,9 @@ class Game {
         }
         
         // Check for hits on other players in multiplayer mode
-        // CRITICAL FIX: Allow both 'player' source and projectiles with our localPlayerId
+        // REMOVED: Multiplayer hit check logic, including aggressive checks.
+        // This responsibility is moved to Multiplayer.js.
+        /*
         if (this.multiplayer && window.multiplayerEnabled && 
             (projectile.source === 'player' || projectile.playerId === this.multiplayer.localPlayerId)) {
             
@@ -3162,6 +3141,7 @@ class Game {
                 return true; // Signal that we processed a hit
             }
         }
+        */
         
         // Other collision checks (walls, obstacles, etc.)
         // These already exist in your code elsewhere

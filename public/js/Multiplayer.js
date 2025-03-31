@@ -17,6 +17,9 @@ export default class Multiplayer {
         this.throttleRate = 50; // ms between updates
         this.playerColors = ['#ff00ff', '#00ffff', '#ffff00', '#00ff00', '#ff0000', '#0000ff'];
         
+        // Track projectiles that need multiplayer collision checks
+        this.activeProjectiles = new Set(); 
+
         // Connect to the server
         this.connect();
     }
@@ -1754,6 +1757,69 @@ export default class Multiplayer {
         // Remove UI elements
         if (this.chatContainer) {
             this.chatContainer.remove();
+        }
+    }
+
+    // Central update method for Multiplayer logic called every frame by Game.js
+    update() { 
+        if (!this.isConnected) return;
+
+        // Smoothly update visual positions of remote players
+        this.interpolateRemotePlayers();
+
+        // Check projectile collisions involving multiplayer entities
+        this.updateProjectiles();
+
+        // Send local player state updates (throttled automatically within)
+        this.sendLocalPlayerUpdate(); 
+    }
+
+    // Placeholder for projectile update logic
+    updateProjectiles() {
+        // Ensure game, truck, and projectiles array/pool exist
+        if (!this.game || !this.game.truck || !this.game.objectPools) return;
+
+        const projectilePool = this.game.objectPools.pools.get('projectiles');
+        if (!projectilePool || !projectilePool.active) return;
+
+        const localTruckPosition = this.game.truck.position;
+        const localTruckRadius = 2.5; // Approximate radius for collision
+
+        // Iterate through active projectiles (use a copy or iterate backwards for safe removal)
+        const activeProjectiles = [...projectilePool.active]; 
+
+        for (const projectile of activeProjectiles) {
+            if (!projectile || !projectile.mesh || !projectile.alive) continue;
+
+            let hitOccurred = false;
+
+            // Case 1: Projectile fired by the LOCAL player
+            if (projectile.source === 'player' || projectile.playerId === this.localPlayerId) {
+                // Check hits against REMOTE players
+                if (this.checkProjectileHits(projectile)) {
+                    console.log(`💥 Multiplayer detected LOCAL projectile hit on REMOTE player.`);
+                    hitOccurred = true;
+                }
+            }
+            // Case 2: Projectile fired by a REMOTE player 
+            else if (projectile.source === 'remote') {
+                // Check hit against LOCAL player
+                const distanceToLocalPlayer = projectile.mesh.position.distanceTo(localTruckPosition);
+                
+                if (distanceToLocalPlayer < localTruckRadius) {
+                    console.log(`💥 Multiplayer detected REMOTE projectile hit on LOCAL player.`);
+                    // Apply damage locally (server already reduced health, this is for effects)
+                    this.game.applyDamage(projectile.damage, 'player', projectile.playerId);
+                    hitOccurred = true;
+                }
+            }
+
+            // If a hit occurred involving this projectile, mark it for removal
+            if (hitOccurred) {
+                projectile.alive = false; // Mark for removal by the pool manager
+                projectile.hide(); // Immediately hide it
+                // The ObjectPoolManager in Game.js will handle releasing it
+            }
         }
     }
 }
