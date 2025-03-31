@@ -658,15 +658,8 @@ class Game {
         
         // Initialize audio manager with camera
         if (!window.audioManagerInstance) {
-            console.log("Waiting for AudioManager to be initialized...");
-            // Wait for the audio manager to be initialized
-            const checkAudioManager = setInterval(() => {
-                if (window.audioManagerInstance) {
-                    console.log("AudioManager initialized, updating camera reference");
-                    window.audioManagerInstance.camera = this.camera;
-                    clearInterval(checkAudioManager);
-                }
-            }, 100);
+            console.log("Creating new AudioManager instance");
+            window.audioManagerInstance = new AudioManager(this.camera);
         } else {
             console.log("Using existing AudioManager instance");
             window.audioManagerInstance.camera = this.camera;

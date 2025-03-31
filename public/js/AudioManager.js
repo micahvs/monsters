@@ -630,11 +630,11 @@ export class AudioManager {
 // Initialize audio manager when DOM is loaded but don't create the AudioContext yet
 document.addEventListener('DOMContentLoaded', () => {
     // Create a placeholder instance that will be properly initialized on user interaction
-    window.audioManagerInstance = new AudioManager(null);
+    window.audioManagerInstance = null;
     
     // Add global audio unlock
     const unlockAudio = () => {
-        if (!window.audioManagerInstance.poolsInitialized) {
+        if (window.audioManagerInstance && !window.audioManagerInstance.poolsInitialized) {
             window.audioManagerInstance.handleUserInteraction();
         }
     };
