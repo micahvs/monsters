@@ -1,6 +1,6 @@
-// Import THREE.js using ES modules (from importmap)
-import * as THREE from 'three';
-console.log("THREE.js imported:", THREE);
+// Import THREE.js using global window object
+const THREE = window.THREE;
+console.log("THREE.js accessed:", THREE);
 
 // Check if THREE was loaded properly
 if (!THREE || !THREE.Scene) {

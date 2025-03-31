@@ -1,4 +1,5 @@
-import * as THREE from 'three';
+// Use global THREE object
+const THREE = window.THREE;
 
 // Define the different weapon types
 export const WeaponTypes = {

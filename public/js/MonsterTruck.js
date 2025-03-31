@@ -1,4 +1,5 @@
-import * as THREE from 'three';
+// Use global THREE object
+const THREE = window.THREE;
 
 export class MonsterTruck {
     constructor(scene, position = new THREE.Vector3(), config = {}) {
