@@ -657,14 +657,26 @@ class Game {
         // Debug mode removed
         
         // Initialize audio manager with camera
-        if (!window.audioManager) {
-            console.log("Creating new AudioManager instance");
-            window.audioManager = new AudioManager(this.camera);
-        } else {
-            console.log("Using existing AudioManager instance");
-            window.audioManager.camera = this.camera;
+        try {
+            if (!window.audioManager) {
+                console.log("Creating new AudioManager instance");
+                window.audioManager = new AudioManager(this.camera);
+            } else {
+                console.log("Using existing AudioManager instance");
+                window.audioManager.camera = this.camera;
+            }
+            this.audioManager = window.audioManager;
+            console.log("Audio manager initialized successfully");
+        } catch (error) {
+            console.error("Error initializing audio manager:", error);
+            // Create a dummy audio manager to prevent null reference errors
+            this.audioManager = {
+                playSound: () => {},
+                stopSound: () => {},
+                playMusic: () => {},
+                stopMusic: () => {}
+            };
         }
-        this.audioManager = window.audioManager;
         
         // Create shared geometries for better performance
         this.sharedParticleGeometry = new THREE.SphereGeometry(1, 8, 6); // Higher quality than before

@@ -64,18 +64,35 @@ export class AudioManager {
         this.initControlListeners();
         this.loadSavedSettings();
         
-        // Add global audio unlock
-        document.addEventListener('click', this.handleUserInteraction.bind(this), { passive: true, once: true });
-        document.addEventListener('touchstart', this.handleUserInteraction.bind(this), { passive: true, once: true });
-        document.addEventListener('keydown', this.handleUserInteraction.bind(this), { passive: true, once: true });
+        // Add global audio unlock with proper binding
+        const boundHandleInteraction = this.handleUserInteraction.bind(this);
+        document.addEventListener('click', boundHandleInteraction, { passive: true, once: true });
+        document.addEventListener('touchstart', boundHandleInteraction, { passive: true, once: true });
+        document.addEventListener('keydown', boundHandleInteraction, { passive: true, once: true });
+        
+        // Store the bound function for cleanup if needed
+        this.boundHandleInteraction = boundHandleInteraction;
     }
     
     handleUserInteraction() {
+        console.log("User interaction detected - initializing audio");
         if (!this.poolsInitialized) {
-            this.scanForMusicFiles();
-            this.unlockAudio();
-            this.initializeSoundPools();
-            this.poolsInitialized = true;
+            try {
+                this.scanForMusicFiles();
+                this.unlockAudio();
+                this.initializeSoundPools();
+                this.poolsInitialized = true;
+                console.log("Audio initialization complete");
+                
+                // Remove event listeners after successful initialization
+                if (this.boundHandleInteraction) {
+                    document.removeEventListener('click', this.boundHandleInteraction);
+                    document.removeEventListener('touchstart', this.boundHandleInteraction);
+                    document.removeEventListener('keydown', this.boundHandleInteraction);
+                }
+            } catch (error) {
+                console.error("Error during audio initialization:", error);
+            }
         }
     }
     
