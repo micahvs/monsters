@@ -1001,8 +1001,8 @@ export default class Multiplayer {
             projectileData.position.z
         );
         
-        // Acquire a projectile from the pool
-        const pooledProjectile = this.game.objectPools.acquire('projectiles');
+        // Acquire a projectile from the pool - Correct method is 'get'
+        const pooledProjectile = this.game.objectPools.get('projectiles'); 
         if (!pooledProjectile) {
             console.warn("Multiplayer.createRemoteProjectile: Failed to acquire projectile from pool.");
             return;

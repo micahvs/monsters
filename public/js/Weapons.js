@@ -87,7 +87,7 @@ export class Weapon {
         const pooledProjectiles = [];
         
         for (let i = 0; i < this.type.projectilesPerShot; i++) {
-            const pooledProjectile = this.game.objectPools.acquire('projectiles');
+            const pooledProjectile = this.game.objectPools.get('projectiles');
             if (!pooledProjectile) {
                 console.warn("Weapon.shoot: Failed to acquire projectile from pool.");
                 continue; // Skip if pool is exhausted
