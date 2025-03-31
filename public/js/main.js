@@ -681,8 +681,11 @@ class Game {
         // Store this instance globally
         gameInstance = this;
         
-        this.stats = new Stats();
-        document.body.appendChild(this.stats.dom);
+        // Only create stats if the library is available
+        if (typeof Stats !== 'undefined') {
+            this.stats = new Stats();
+            document.body.appendChild(this.stats.dom);
+        }
         
         this.speedFactor = 1.0; // Speed multiplier for vehicle movement
         this.clockDelta = 0; // Initialize for first frame
@@ -1740,6 +1743,9 @@ class Game {
         
         if (!this.isInitialized) return;
         
+        // Update stats if available
+        if (this.stats) this.stats.begin();
+        
         // Calculate delta time for stable physics updates
         const now = performance.now();
         let deltaTime = 0;
@@ -1807,6 +1813,9 @@ class Game {
         }
         
         // Debug info update removed
+        
+        // Update stats if available
+        if (this.stats) this.stats.end();
     }
 
     updateRendererSettings() {
