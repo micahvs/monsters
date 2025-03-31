@@ -2323,7 +2323,12 @@ class Game {
                     // Update health display
                     const healthDiv = document.getElementById('health');
                     if (healthDiv) {
-                        healthDiv.textContent = `Health: ${this.health}`;
+                        healthDiv.textContent = `HEALTH: ${this.health}%`;
+                    }
+                    
+                    // Update stat bars
+                    if (window.updateStatBars) {
+                        window.updateStatBars(this.health, this.weapon?.ammo, this.weapon?.maxAmmo);
                     }
                     
                     // Check if health depleted
@@ -2585,13 +2590,18 @@ class Game {
                 // Update health display
                 const healthDiv = document.getElementById('health');
                 if (healthDiv) {
-                    healthDiv.textContent = `Health: ${this.health}`;
+                    healthDiv.textContent = `HEALTH: ${this.health}%`;
                     
                     // Add visual feedback with green flash
                     healthDiv.style.color = 'green';
                     setTimeout(() => {
                         healthDiv.style.color = 'white';
                     }, 300);
+                }
+                
+                // Update stat bars
+                if (window.updateStatBars) {
+                    window.updateStatBars(this.health, this.weapon?.ammo, this.weapon?.maxAmmo);
                 }
                 
                 // Add green flash to screen

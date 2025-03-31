@@ -308,23 +308,18 @@ export default class Multiplayer {
                             
                             const healthDisplay = document.getElementById('health');
                             if (healthDisplay) {
-                                healthDisplay.textContent = `HEALTH: ${this.game.health}`;
+                                healthDisplay.textContent = `HEALTH: ${this.game.health}%`;
                                 
                                 // Add visual flash effect to health display
-                                healthDisplay.style.backgroundColor = 'rgba(255,0,0,0.5)';
+                                healthDisplay.style.color = 'red';
                                 setTimeout(() => {
-                                    healthDisplay.style.backgroundColor = 'transparent';
+                                    healthDisplay.style.color = 'white';
                                 }, 300);
                             }
                             
-                            // Update health bar if it exists
-                            const healthBar = document.getElementById('health-bar');
-                            if (healthBar) {
-                                healthBar.style.width = `${(this.game.health / 100) * 100}%`;
-                                healthBar.style.backgroundColor = 'red';
-                                setTimeout(() => {
-                                    healthBar.style.backgroundColor = '';
-                                }, 300);
+                            // Use the standard updateStatBars function to ensure consistent UI updates
+                            if (window.updateStatBars) {
+                                window.updateStatBars(this.game.health, this.game.weapon?.ammo, this.game.weapon?.maxAmmo);
                             }
                         } catch (e) {
                             console.error('Error updating HUD:', e);
