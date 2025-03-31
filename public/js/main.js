@@ -62,14 +62,15 @@ class Projectile {
         const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 6) // Reduced segments from 8 to 6
         geometry.rotateX(Math.PI / 2);
         
-        const projectileColor = source === 'player' ? 0xff00ff : 0xff0000
-        // Changed to MeshBasicMaterial from MeshPhongMaterial
+        const projectileColor = source === 'player' ? 0xff00ff : 0x00ffff // Magenta for player, cyan for enemies
+        // Enhanced material for cyberpunk look
         const material = new THREE.MeshPhongMaterial({
             color: new THREE.Color(projectileColor),
             transparent: true,
-            opacity: 0.8,
+            opacity: 0.9,
             emissive: projectileColor,
-            shininess: 10
+            emissiveIntensity: 0.8,
+            shininess: 30
         })
         
         this.mesh = new THREE.Mesh(geometry, material);
@@ -109,14 +110,15 @@ class Projectile {
     }
 
     createTrail() {
-        // Create simpler particle trail
+        // Create simpler particle trail with cyberpunk colors
         const trailGeometry = new THREE.SphereGeometry(0.05, 4, 2); // Reduced segments
         const trailMaterial = new THREE.MeshPhongMaterial({
-            color: this.source === 'player' ? 0xff00ff : 0xff0000,
+            color: this.source === 'player' ? 0xff00ff : 0x00ffff, // Magenta for player, cyan for enemies
             transparent: true,
-            opacity: 0.5,
-            emissive: this.source === 'player' ? 0xff00ff : 0xff0000,
-            shininess: 10
+            opacity: 0.7,
+            emissive: this.source === 'player' ? 0xff00ff : 0x00ffff,
+            emissiveIntensity: 0.8,
+            shininess: 30
         })
         const trail = new THREE.Mesh(trailGeometry, trailMaterial)
         trail.position.copy(this.mesh.position);
@@ -156,11 +158,14 @@ class Turret {
             1 * turretScale, 
             8
         );
-        // Use MeshBasicMaterial but with better color settings
+        // Use MeshPhongMaterial with emissive for neon cyberpunk glow
         const baseMaterial = new THREE.MeshPhongMaterial({ 
             color: new THREE.Color(type.color),
             emissive: type.color,
-            shininess: 10
+            emissiveIntensity: 0.8,
+            shininess: 30,
+            transparent: true,
+            opacity: 0.9
         });
         this.base = new THREE.Mesh(baseGeometry, baseMaterial);
         this.base.position.copy(position);
@@ -182,11 +187,14 @@ class Turret {
             gunGeometry = new THREE.BoxGeometry(0.3 * turretScale, 0.3 * turretScale, 2 * turretScale);
         }
         
-        // Keep using MeshBasicMaterial for turrets as they don't need lighting and it's faster
+        // Use MeshPhongMaterial with emissive for neon cyberpunk glow on the gun
         const gunMaterial = new THREE.MeshPhongMaterial({ 
             color: new THREE.Color(type.color),
             emissive: type.color,
-            shininess: 10
+            emissiveIntensity: 0.8,
+            shininess: 30,
+            transparent: true,
+            opacity: 0.9
         });
         this.gun = new THREE.Mesh(gunGeometry, gunMaterial);
         this.gun.position.y = 0.5 * turretScale;
@@ -1019,8 +1027,8 @@ class Game {
                 throw rendererError;
             }
             
-            // Add fog for distance culling
-            this.scene.fog = new THREE.Fog(0x120023, 1000, 1800);
+            // Add fog for distance culling with cyberpunk background color
+            this.scene.fog = new THREE.Fog(0x120023, 1000, 1800); // Dark purple from cyberpunk theme
             
             // Set up camera
             try {
@@ -1033,28 +1041,32 @@ class Game {
             
             // Add basic lighting
             try {
-                // Modern lighting setup for better color rendering
-                // Main ambient light provides base illumination
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Increased from 0.7 for better visibility
+                // Modern lighting setup for cyberpunk/synthwave color rendering
+                // Main ambient light provides base illumination with subtle purple tint
+                const ambientLight = new THREE.AmbientLight(0x8800ff, 0.3); // Subtle purple ambient
                 this.scene.add(ambientLight);
                 
+                // Secondary ambient for basic visibility
+                const secondaryAmbient = new THREE.AmbientLight(0xffffff, 0.5);
+                this.scene.add(secondaryAmbient);
+                
                 // Main directional light WITHOUT shadows
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased from 1.0
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
                 directionalLight.position.set(50, 200, 100);
                 directionalLight.castShadow = false; // Explicitly disable shadows
                 this.scene.add(directionalLight);
                 
-                // Add some colored rim lighting for visual interest
-                const pinkLight = new THREE.DirectionalLight(0xff00ff, 0.4); // Increased from 0.3
-                pinkLight.position.set(-100, 50, -100);
-                pinkLight.castShadow = false; // Explicitly disable shadows
-                this.scene.add(pinkLight);
+                // Magenta rim lighting for synthwave feel
+                const magentaLight = new THREE.DirectionalLight(0xff00ff, 0.8); // Stronger magenta
+                magentaLight.position.set(-100, 50, -100);
+                magentaLight.castShadow = false;
+                this.scene.add(magentaLight);
                 
-                // Blue backlight for cyberpunk feel
-                const blueLight = new THREE.DirectionalLight(0x0088ff, 0.4); // Increased from 0.3
-                blueLight.position.set(100, 20, -100);
-                blueLight.castShadow = false; // Explicitly disable shadows
-                this.scene.add(blueLight);
+                // Cyan backlight for cyberpunk feel
+                const cyanLight = new THREE.DirectionalLight(0x00ffff, 0.8); // Stronger cyan
+                cyanLight.position.set(100, 20, -100);
+                cyanLight.castShadow = false;
+                this.scene.add(cyanLight);
             } catch (lightingError) {
                 console.error("Failed to add lighting:", lightingError);
                 throw lightingError;
@@ -1162,9 +1174,13 @@ class Game {
         this.scene.add(gridHelper);
         
         // Create walls - now 50% shorter (height reduced from 100 to 50)
-        // Use MeshBasicMaterial for walls with more vibrant color
+        // Use MeshBasicMaterial for walls with cyberpunk colors
         const wallMaterial = new THREE.MeshBasicMaterial({
-            color: 0x444488 // More interesting blue-grey color
+            color: 0x8800ff, // Vibrant purple from cyberpunk scheme
+            transparent: true,
+            opacity: 0.8,
+            emissive: 0x8800ff,
+            emissiveIntensity: 0.5
         });
         
         // Arena half size is now 780 (doubled from 390)
@@ -2275,13 +2291,13 @@ class Game {
         const minDistanceFromCenter = 240; // Adjusted for larger arena
         const numTurrets = 4; // Keep the same number of turrets
         
-        // Define turret types
+        // Define turret types with cyberpunk/synthwave colors
         const turretTypes = [
             {
                 name: "Standard",
-                color: 0x666666,
-                activeColor: 0xff0000,
-                warningColor: 0xffff00,
+                color: 0x00ffff, // Cyan base color
+                activeColor: 0xff00ff, // Magenta active color
+                warningColor: 0xff8800, // Orange warning color
                 health: 5,
                 damage: 10,
                 fireRate: 180,
@@ -2291,9 +2307,9 @@ class Game {
             },
             {
                 name: "Heavy",
-                color: 0x444444,
-                activeColor: 0xbb0000,
-                warningColor: 0xbbbb00,
+                color: 0x0088ff, // Blue base color
+                activeColor: 0xff00ff, // Magenta active color
+                warningColor: 0xff8800, // Orange warning color
                 health: 8,
                 damage: 20,
                 fireRate: 240,
