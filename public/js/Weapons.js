@@ -58,7 +58,8 @@ export const WeaponTypes = {
 
 // Weapon class for handling weapon functionality
 export class Weapon {
-    constructor(scene, type = WeaponTypes.MACHINE_GUN) {
+    constructor(game, scene, type = WeaponTypes.MACHINE_GUN) {
+        this.game = game;
         this.scene = scene;
         this.type = type;
         this.ammo = type.ammoPerMagazine;

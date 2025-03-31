@@ -2384,8 +2384,8 @@ class Game {
     }
 
     createWeapon() {
-        // Create a basic weapon for the player
-        this.weapon = new Weapon(this.scene, WeaponTypes.MACHINE_GUN);
+        // Create a basic weapon for the player, passing the game instance
+        this.weapon = new Weapon(this, this.scene, WeaponTypes.MACHINE_GUN);
         
         // Add a simple weapon model attached to the truck
         const weaponGeometry = new THREE.BoxGeometry(0.3, 0.3, 1);
