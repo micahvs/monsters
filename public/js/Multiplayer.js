@@ -984,6 +984,8 @@ export default class Multiplayer {
     }
     
     createRemoteProjectile(projectileData) {
+        // [Log] Confirm this function is called when server sends projectile data
+        console.log("[MP-CreateRemoteProj] Received data for remote projectile:", projectileData);
         if (!this.game.scene) return;
         
         // Create a new projectile based on the remote data
@@ -1812,6 +1814,8 @@ export default class Multiplayer {
 
     // Central update method for Multiplayer logic called every frame by Game.js
     update() { 
+        // [Log] Confirm this function is being called
+        console.log("[MP-Update] Update called"); 
         if (!this.isConnected) return;
 
         // Smoothly update visual positions of remote players
@@ -1831,6 +1835,12 @@ export default class Multiplayer {
 
         const projectilePool = this.game.objectPools.pools.get('projectiles');
         if (!projectilePool || !projectilePool.active) return;
+
+        // [Log] Log the number of active projectiles being checked
+        if (projectilePool.active.length > 0) {
+           // Only log if there are projectiles to avoid spam
+           console.log(`[MP-UpdateProj] Checking ${projectilePool.active.length} active projectiles.`);
+        }
 
         const localTruckPosition = this.game.truck.position;
         const localTruckRadius = 2.5; // Approximate radius for collision
