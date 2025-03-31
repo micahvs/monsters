@@ -391,33 +391,69 @@ class Turret {
         }
     }
 
-    damage() {
-        // Log when turret is damaged
-        console.log(`Turret damaged! Health before: ${this.health}`);
+    damage(damageAmount = 1) {
+        // Ensure damage amount is at least 1
+        damageAmount = Math.max(1, damageAmount);
         
-        this.health--;
-        console.log(`Turret health after: ${this.health}`);
+        // Apply damage - ensure it's at least 20% of turret health for better gameplay
+        const effectiveDamage = Math.max(damageAmount, Math.ceil(this.type.health * 0.2));
+        this.health -= effectiveDamage;
         
-        // Flash the turret red to show damage
+        // Flash the turret red to show damage (more intense for bigger hits)
         if (this.base && this.base.material) {
+            // Save original color
             const originalColor = this.base.material.color.clone();
-            this.base.material.color.setHex(0xff0000); // Red flash
+            const originalEmissive = this.base.material.emissive.clone();
             
-            // Reset to original color after 100ms
+            // Flash red with intensity based on damage
+            this.base.material.color.setHex(0xff0000); // Red flash
+            this.base.material.emissive.setHex(0xff0000); // Red glow
+            this.base.material.emissiveIntensity = 1.0; // Full intensity
+            
+            // Make the gun flash too if it exists
+            if (this.gun && this.gun.material) {
+                const gunOriginalColor = this.gun.material.color.clone();
+                const gunOriginalEmissive = this.gun.material.emissive.clone();
+                
+                this.gun.material.color.setHex(0xff0000);
+                this.gun.material.emissive.setHex(0xff0000);
+                this.gun.material.emissiveIntensity = 1.0;
+                
+                // Reset gun color after flash
+                setTimeout(() => {
+                    if (this.gun && this.gun.material) {
+                        this.gun.material.color.copy(gunOriginalColor);
+                        this.gun.material.emissive.copy(gunOriginalEmissive);
+                        this.gun.material.emissiveIntensity = 0.8;
+                    }
+                }, 150);
+            }
+            
+            // Reset base color after flash
             setTimeout(() => {
                 if (this.base && this.base.material) {
                     this.base.material.color.copy(originalColor);
+                    this.base.material.emissive.copy(originalEmissive);
+                    this.base.material.emissiveIntensity = 0.8;
                 }
-            }, 100);
+            }, 150);
         }
         
+        // Check if destroyed
         if (this.health <= 0) {
-            console.log("Turret destroyed!");
             this.alive = false;
             
+            // Death effects
             if (this.base && this.base.material) {
                 this.base.material.color.setHex(0x333333); // Darkened color when destroyed
-                this.base.material.emissive.setHex(0x000000); // Turn off glow
+                this.base.material.emissive.setHex(0x111111); // Almost no glow
+                this.base.material.emissiveIntensity = 0.2; // Low intensity
+            }
+            
+            if (this.gun && this.gun.material) {
+                this.gun.material.color.setHex(0x333333);
+                this.gun.material.emissive.setHex(0x111111);
+                this.gun.material.emissiveIntensity = 0.2;
             }
             
             // Store initial type and properties for respawn
@@ -434,6 +470,8 @@ class Turret {
                 }
             }
         }
+        
+        return this.health;
     }
 
     canShoot() {
@@ -2233,29 +2271,73 @@ class Game {
         }
     }
 
-    showCollisionEffect(position) {
-        // Create particles for collision with enhanced effect
-        this.createSimpleEffect(position, 0xff3300, 15); // Orange/red explosion
-        
-        // Add a flash effect by creating a temporary bright light
-        const flashLight = new THREE.PointLight(0xff3300, 2, 50);
-        flashLight.position.copy(position);
-        flashLight.position.y += 10; // Position light above the collision
-        this.scene.add(flashLight);
-        
-        // Remove the light after short duration
-        setTimeout(() => {
-            if (flashLight && this.scene) {
-                this.scene.remove(flashLight);
+    showCollisionEffect(position, isTurretHit = false) {
+        // Create more dramatic effect for turret hits
+        if (isTurretHit) {
+            // Create a much larger particle effect for turret hits
+            this.createSimpleEffect(position, 0xff5500, 25); // Orange/red explosion with more particles
+            
+            // Add a powerful flash effect
+            const flashLight = new THREE.PointLight(0xff5500, 3, 100);
+            flashLight.position.copy(position);
+            flashLight.position.y += 10; // Position light above the collision
+            this.scene.add(flashLight);
+            
+            // Add a second, larger light for dramatic effect
+            const outerLight = new THREE.PointLight(0xff3300, 2, 150);
+            outerLight.position.copy(position);
+            outerLight.position.y += 15;
+            this.scene.add(outerLight);
+            
+            // Fade out the lights over time
+            let intensity = 3;
+            const fadeInterval = setInterval(() => {
+                intensity -= 0.3;
+                if (intensity <= 0 || !this.scene) {
+                    // Remove lights and clear interval
+                    if (this.scene) {
+                        this.scene.remove(flashLight);
+                        this.scene.remove(outerLight);
+                    }
+                    clearInterval(fadeInterval);
+                } else {
+                    // Fade intensity
+                    flashLight.intensity = intensity;
+                    outerLight.intensity = intensity * 0.7;
+                }
+            }, 50);
+            
+            // More camera shake for turret hits
+            this.shakeCamera(1.0);
+            
+            // Play explosion sound for turret hit
+            if (window.audioManager) {
+                window.audioManager.playSound('vehicle_explosion');
             }
-        }, 100);
-        
-        // Shake camera for effect - moderate intensity
-        this.shakeCamera(0.5);
-        
-        // Play explosion sound if audio manager is available
-        if (window.audioManager) {
-            window.audioManager.playSound('vehicle_hit');
+        } else {
+            // Regular collision effect for non-turret hits
+            this.createSimpleEffect(position, 0xff3300, 15);
+            
+            // Simple flash light
+            const flashLight = new THREE.PointLight(0xff3300, 2, 50);
+            flashLight.position.copy(position);
+            flashLight.position.y += 10;
+            this.scene.add(flashLight);
+            
+            // Remove the light after short duration
+            setTimeout(() => {
+                if (flashLight && this.scene) {
+                    this.scene.remove(flashLight);
+                }
+            }, 100);
+            
+            // Less camera shake for regular hits
+            this.shakeCamera(0.5);
+            
+            // Play hit sound
+            if (window.audioManager) {
+                window.audioManager.playSound('vehicle_hit');
+            }
         }
     }
 
@@ -2522,15 +2604,14 @@ class Game {
         const projectiles = this.weapon.projectiles;
         if (!projectiles || !projectiles.length) return;
         
-        // Log for debugging
-        console.log(`Checking ${projectiles.length} projectiles against ${this.turrets ? this.turrets.length : 0} turrets`);
-        
         // Check each projectile
-        for (let i = 0; i < projectiles.length; i++) {
+        for (let i = projectiles.length - 1; i >= 0; i--) { // Iterate backwards for safe removal
             const projectile = projectiles[i];
             
             // Skip invalid projectiles
             if (!projectile || !projectile.mesh || !projectile.alive) continue;
+            
+            let hitDetected = false;
             
             // Check each turret
             if (this.turrets && this.turrets.length > 0) {
@@ -2540,28 +2621,20 @@ class Game {
                     // Skip dead turrets or turrets without a base
                     if (!turret || !turret.alive || !turret.base) continue;
                     
-                    // Get distance to turret
+                    // Get distance to turret - use a very generous hit radius
                     const distance = projectile.mesh.position.distanceTo(turret.base.position);
                     
-                    // Log for debugging
+                    // Super generous hit radius (50 units) for better gameplay
                     if (distance < 50) {
-                        console.log(`Projectile near turret! Distance: ${distance.toFixed(2)}`);
-                    }
-                    
-                    // If hit - use larger hit radius (30 instead of 22.5) to make hitting easier
-                    if (distance < 30) {
-                        console.log(`HIT DETECTED! Turret ${j} hit by projectile ${i}`);
+                        // We hit a turret!
+                        hitDetected = true;
                         
-                        // Remove projectile
-                        projectile.alive = false;
-                        projectile.mesh.visible = false; // Ensure it disappears immediately
+                        // Damage turret - pass the projectile for damage info
+                        const damageAmount = projectile.damage || 1;
+                        turret.damage(damageAmount);
                         
-                        // Damage turret
-                        turret.damage();
-                        console.log(`Turret health now: ${turret.health}`);
-                        
-                        // Create hit effect at the turret position for better visibility
-                        this.showCollisionEffect(turret.base.position.clone());
+                        // Create hit effect at the turret position with turret hit parameter
+                        this.showCollisionEffect(turret.base.position.clone(), true);
                         
                         // If turret is destroyed, give player points
                         if (!turret.alive) {
@@ -2583,18 +2656,31 @@ class Game {
                                 this.scoreDisplay.textContent = `Score: ${this.score}`;
                             }
                             
-                            // Show notification with appropriate message
+                            // Show notification
                             const turretName = turret.type && turret.type.name ? turret.type.name : "Standard";
                             this.showNotification(`${turretName} Turret destroyed! +${scoreValue} points`, 'success');
                         } else {
-                            // Show hit notification even for non-destroying hits
+                            // Show hit notification
                             this.showNotification('Turret hit!', 'info');
                         }
                         
-                        // Break out of inner loop when hit detected
+                        // Only destroy one turret per projectile
                         break;
                     }
                 }
+            }
+            
+            // If we hit something, remove the projectile
+            if (hitDetected) {
+                // Mark the projectile as not alive
+                projectile.alive = false;
+                projectile.mesh.visible = false;
+                
+                // Remove the projectile from the scene immediately
+                this.scene.remove(projectile.mesh);
+                
+                // Remove from projectiles array (we're iterating backwards so this is safe)
+                projectiles.splice(i, 1);
             }
         }
     }
