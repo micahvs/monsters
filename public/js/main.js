@@ -585,8 +585,11 @@ class PowerUp {
 }
 
 class Game {
-    constructor() {
+    constructor(onLoad) {
         console.log("Game constructor called");
+        
+        // Store the callback for when game is fully loaded
+        this.onLoadCallback = onLoad || function() {};
         
         // Core initialization only
         this.scene = new THREE.Scene();
@@ -597,6 +600,7 @@ class Game {
         this.renderer = null;
         this.truck = null;
         this.isInitialized = false;
+        this.loadingComplete = false;
         
         // Debug mode removed
         
@@ -895,6 +899,7 @@ class Game {
                 const canvas = document.getElementById('game');
                 
                 // If canvas not found, create one
+                let targetCanvas;
                 if (!canvas) {
                     const newCanvas = document.createElement('canvas');
                     newCanvas.id = 'game';
@@ -902,33 +907,97 @@ class Game {
                     newCanvas.style.height = '100%';
                     newCanvas.style.display = 'block';
                     document.body.appendChild(newCanvas);
-                    
-                    this.renderer = new THREE.WebGLRenderer({ 
-                        antialias: true,
-                        canvas: newCanvas
-                    });
+                    targetCanvas = newCanvas;
                 } else {
-                    this.renderer = new THREE.WebGLRenderer({ 
-                        antialias: true,
-                        canvas: canvas
-                    });
+                    targetCanvas = canvas;
                 }
                 
+                // Configure renderer options based on device capabilities
+                const rendererOptions = {
+                    canvas: targetCanvas,
+                    powerPreference: 'high-performance',
+                    failIfMajorPerformanceCaveat: false,
+                    preserveDrawingBuffer: false
+                };
+                
+                // Only enable antialiasing on non-mobile or high-end mobile
+                if (!this.isMobile || window.devicePixelRatio <= 1) {
+                    rendererOptions.antialias = true;
+                }
+                
+                // Create the renderer
+                this.renderer = new THREE.WebGLRenderer(rendererOptions);
+                
+                // Set the renderer size to match the window
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                // Disable shadow maps completely as requested
+                
+                // Disable shadow maps for performance
                 this.renderer.shadowMap.enabled = false;
                 
-                // Adjust pixel ratio for performance
-                const pixelRatio = window.devicePixelRatio;
-                this.renderer.setPixelRatio(Math.min(pixelRatio, 2)); // Cap at 2x for performance
+                // Set appropriate pixel ratio based on device
+                if (this.isMobile) {
+                    // Limit to 1.0 on mobile for performance
+                    this.renderer.setPixelRatio(1.0);
+                } else {
+                    // Cap at 2x on desktop for performance vs. quality balance
+                    const pixelRatio = window.devicePixelRatio;
+                    this.renderer.setPixelRatio(Math.min(pixelRatio, 2));
+                }
                 
                 // Improve color rendering with current THREE.js settings
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                
+                // Use simpler tone mapping on mobile
+                if (this.isMobile) {
+                    this.renderer.toneMapping = THREE.LinearToneMapping;
+                } else {
+                    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                }
                 this.renderer.toneMappingExposure = 1.0;
+                
+                // Add WebGL context loss/restore handlers
+                targetCanvas.addEventListener('webglcontextlost', (event) => {
+                    event.preventDefault();
+                    console.warn("WebGL context lost - will attempt to restore");
+                    
+                    // Show a message to the user
+                    const message = document.createElement('div');
+                    message.style.position = 'fixed';
+                    message.style.top = '50%';
+                    message.style.left = '50%';
+                    message.style.transform = 'translate(-50%, -50%)';
+                    message.style.color = '#ff00ff';
+                    message.style.textShadow = '0 0 10px #ff00ff';
+                    message.style.fontFamily = "'Orbitron', sans-serif";
+                    message.style.fontSize = '24px';
+                    message.style.zIndex = '2000';
+                    message.innerHTML = 'RECONNECTING TO GRID...';
+                    message.id = 'contextLossMessage';
+                    document.body.appendChild(message);
+                }, false);
+                
+                targetCanvas.addEventListener('webglcontextrestored', () => {
+                    console.log("WebGL context restored - resuming game");
+                    
+                    // Remove the message
+                    const message = document.getElementById('contextLossMessage');
+                    if (message) {
+                        document.body.removeChild(message);
+                    }
+                    
+                    // Reinitialize the scene if needed
+                    this.reinitializeAfterContextLoss();
+                }, false);
+                
             } catch (rendererError) {
                 console.error("Failed to create renderer:", rendererError);
-                throw rendererError;
+                
+                // Show error in loading screen instead of throwing
+                const loadingElement = document.getElementById('loadingScreen');
+                if (loadingElement) {
+                    loadingElement.innerHTML = '<div class="loading-text">GRAPHICS ERROR - Your device does not fully support WebGL required for this game.</div>';
+                }
+                return false;
             }
             
             // Add fog for distance culling with cyberpunk background color
@@ -1026,6 +1095,14 @@ class Game {
             
             // Start animation loop
             this.isInitialized = true;
+            this.loadingComplete = true;
+            
+            // Call the onLoad callback to signal that the game is ready
+            if (typeof this.onLoadCallback === 'function') {
+                console.log("Game fully initialized, calling onLoad callback");
+                this.onLoadCallback();
+            }
+            
             this.animate();
             
         } catch (error) {
@@ -1472,6 +1549,61 @@ class Game {
         window.addEventListener('resize', () => {
             this.updateMobileUI();
         }, { passive: true });
+    }
+    
+    // Handle WebGL context restoration after loss (common on mobile)
+    reinitializeAfterContextLoss() {
+        try {
+            // Recreate materials as they might be lost
+            if (this.truck && this.truck.body) {
+                // Refresh truck materials
+                if (typeof this.truck.updateMaterials === 'function') {
+                    this.truck.updateMaterials();
+                } else {
+                    console.log("Truck materials updating method not available");
+                }
+            }
+            
+            // Recreate arena materials
+            if (this.world && this.world.ground) {
+                // Refresh world materials
+                if (typeof this.world.updateMaterials === 'function') {
+                    this.world.updateMaterials();
+                } else {
+                    console.log("World materials updating method not available");
+                }
+            }
+            
+            // Reapply renderer settings
+            if (this.renderer) {
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                if (this.isMobile) {
+                    this.renderer.setPixelRatio(1.0);
+                    this.renderer.toneMapping = THREE.LinearToneMapping;
+                } else {
+                    const pixelRatio = window.devicePixelRatio;
+                    this.renderer.setPixelRatio(Math.min(pixelRatio, 2));
+                    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                }
+                this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+                this.renderer.toneMappingExposure = 1.0;
+            }
+            
+            console.log("Game state restored after WebGL context loss");
+            
+            // Force a resize to ensure everything is correctly sized
+            if (this.camera) {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+            }
+            
+            // Force a single frame render to prevent black screen
+            if (this.renderer && this.scene && this.camera) {
+                this.renderer.render(this.scene, this.camera);
+            }
+        } catch (error) {
+            console.error("Failed to reinitialize after context loss:", error);
+        }
     }
 
     initHUD() {
@@ -3202,23 +3334,67 @@ window.addEventListener('load', () => {
     console.log("Window loaded, initializing preloader");
     const loadingElement = document.getElementById('loadingScreen');
     
-    // Always enable multiplayer by default
-    window.multiplayerEnabled = true;
-    localStorage.setItem('monsterTruckMultiplayer', 'true');
-    console.log("Multiplayer always enabled by default for better gameplay experience");
+    // Check for mobile devices
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Set multiplayer based on device type
+    if (isMobile) {
+        window.multiplayerEnabled = false;
+        localStorage.setItem('monsterTruckMultiplayer', 'false');
+        console.log("Mobile device detected - multiplayer disabled for better performance");
+    } else {
+        window.multiplayerEnabled = true;
+        localStorage.setItem('monsterTruckMultiplayer', 'true');
+        console.log("Desktop device detected - multiplayer enabled");
+    }
+    
+    // Check for WebGL support before proceeding
+    const checkWebGLSupport = () => {
+        try {
+            const canvas = document.createElement('canvas');
+            const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            return gl !== null;
+        } catch (e) {
+            return false;
+        }
+    };
+    
+    // If WebGL is not supported, show error message
+    if (!checkWebGLSupport()) {
+        if (loadingElement) {
+            loadingElement.innerHTML = '<div class="loading-text">Your device does not support WebGL, which is required to run this game.</div>';
+        }
+        console.error("WebGL not supported on this device");
+        return;
+    }
     
     const preloader = new AssetPreloader(() => {
-        if (loadingElement) loadingElement.style.display = 'none';
         console.log("Assets preloaded, creating game");
-        window.game = new Game();
+        
+        // Create game but keep loading screen visible until game is ready
+        setTimeout(() => {
+            window.game = new Game(() => {
+                // This callback will be executed when the game is fully initialized
+                if (loadingElement) {
+                    // Add a slight delay before removing loading screen
+                    setTimeout(() => {
+                        loadingElement.style.display = 'none';
+                    }, 500);
+                }
+            });
+        }, 100);
     });
     
     // Preload key assets
-    // Audio files - only load essential sounds
+    // Audio files - essential sounds
     preloader.loadAudio('sounds/engine_rev.mp3');
-    preloader.loadAudio('sounds/weapon_fire.mp3'); 
+    preloader.loadAudio('sounds/weapon_fire.mp3');
     
-    // Other sounds will be loaded on demand to improve startup time
+    // Preload more assets on mobile to prevent stuttering
+    if (isMobile) {
+        preloader.loadAudio('sounds/engine_idle.mp3');
+        preloader.loadAudio('sounds/tire_screech.mp3');
+    }
     
     // If there are no assets to load, call complete immediately
     if (preloader.assetsToLoad === 0) {
