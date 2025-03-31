@@ -30,19 +30,137 @@ export default class Multiplayer {
                 throw new Error('Socket.io not found when attempting to connect');
             }
             
-            // Initialize socket with better error handling
-            console.log('🎮 [Multiplayer] Creating socket with options');
+            // CRITICAL FIX: Test server reachability before connecting
+            this.testServerConnection()
+                .then(serverReachable => {
+                    if (serverReachable) {
+                        // Initialize socket with better error handling
+                        console.log('🎮 [Multiplayer] Server is reachable, creating socket connection');
+                        this.initializeSocketConnection(this.serverUrl);
+                    } else {
+                        // Try using a different server URL
+                        console.log('🎮 [Multiplayer] Primary server not reachable, trying alternative URLs');
+                        this.tryBackupServers();
+                    }
+                });
+        } catch (error) {
+            this.handleConnectionError(error);
+        }
+    }
+    
+    // CRITICAL FIX: Test if server is reachable
+    testServerConnection() {
+        return new Promise(resolve => {
+            // Create a test connection with short timeout
+            console.log(`🎮 [Multiplayer] Testing connection to server: ${this.serverUrl}`);
             
-            // Use the primary server URL
-            this.socket = io(this.serverUrl, {
-                withCredentials: true,
-                transports: ['websocket', 'polling'],
-                timeout: 10000,
+            // Use fetch API to test if server is reachable
+            fetch(`${this.serverUrl}/healthcheck`, { 
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-cache',
+                headers: { 'Content-Type': 'application/json' },
+                referrerPolicy: 'no-referrer',
+                timeout: 5000
+            })
+            .then(response => {
+                if (response.ok) {
+                    console.log('🎮 [Multiplayer] Server healthcheck successful!');
+                    resolve(true);
+                } else {
+                    console.error('🎮 [Multiplayer] Server healthcheck failed:', response.status);
+                    resolve(false);
+                }
+            })
+            .catch(error => {
+                console.error('🎮 [Multiplayer] Server healthcheck error:', error);
+                resolve(false);
+            });
+            
+            // Set a backup timeout in case fetch doesn't resolve
+            setTimeout(() => {
+                console.log('🎮 [Multiplayer] Server test timeout - assuming unreachable');
+                resolve(false);
+            }, 5000);
+        });
+    }
+    
+    // Try connecting to backup servers
+    tryBackupServers() {
+        console.log('🎮 [Multiplayer] Trying backup server URLs');
+        
+        // Alternative server URLs to try
+        const backupServers = [
+            'https://monster-truck-stadium.fly.dev',
+            'https://monster-truck-game.fly.dev',
+            'http://localhost:3000'
+        ];
+        
+        // Try each server in order
+        const tryServer = (index) => {
+            if (index >= backupServers.length) {
+                console.error('🎮 [Multiplayer] All servers failed, falling back to offline mode');
+                this.enableOfflineMode();
+                return;
+            }
+            
+            const serverUrl = backupServers[index];
+            console.log(`🎮 [Multiplayer] Trying backup server ${index+1}/${backupServers.length}: ${serverUrl}`);
+            
+            // Simple fetch test
+            fetch(`${serverUrl}/healthcheck`, { timeout: 3000 })
+                .then(response => {
+                    if (response.ok) {
+                        console.log(`🎮 [Multiplayer] Backup server ${serverUrl} is reachable!`);
+                        this.initializeSocketConnection(serverUrl);
+                    } else {
+                        console.log(`🎮 [Multiplayer] Backup server ${serverUrl} returned error status`);
+                        tryServer(index + 1);
+                    }
+                })
+                .catch(() => {
+                    console.log(`🎮 [Multiplayer] Backup server ${serverUrl} is not reachable`);
+                    tryServer(index + 1);
+                });
+        };
+        
+        // Start trying with the first backup server
+        tryServer(0);
+    }
+    
+    // CRITICAL FIX: Separate socket initialization into its own method
+    initializeSocketConnection(serverUrl) {
+        console.log(`🎮 [Multiplayer] Creating socket connection to ${serverUrl}`);
+        
+        // Initialize socket with better error handling
+        this.socket = io(serverUrl, {
+            withCredentials: true,
+            transports: ['websocket', 'polling'],
+            timeout: 10000,
                 reconnection: true,
                 reconnectionAttempts: 5,
                 autoConnect: true,
                 forceNew: true // Force a new connection to avoid sharing issues
             });
+            
+            // Add missing error handler method if needed
+            if (typeof this.handleConnectionError !== 'function') {
+                this.handleConnectionError = (error) => {
+                    console.error('🎮 [Multiplayer] Connection error:', error);
+                    this.showNotification("Multiplayer connection error! Using offline mode.", "error");
+                    this.enableOfflineMode();
+                };
+            }
+            
+            // Add missing offline mode handler if needed
+            if (typeof this.enableOfflineMode !== 'function') {
+                this.enableOfflineMode = () => {
+                    console.log('🎮 [Multiplayer] Enabling offline mode');
+                    this.isOfflineMode = true;
+                    this.isConnected = false;
+                    this.showNotification("Running in offline mode - no multiplayer functionality", "warning");
+                };
+            }
 
             console.log('🎮 [Multiplayer] Socket created:', !!this.socket);
             
@@ -270,6 +388,19 @@ export default class Multiplayer {
             }
         });
         
+        // CRITICAL FIX: Add handler for hit confirmation
+        this.socket.on('hitConfirmed', (hitData) => {
+            console.log('⚡ HIT CONFIRMED BY SERVER:', hitData);
+            
+            // Show visual feedback
+            this.showNotification(`Hit confirmed on player! Damage: ${hitData.damage}`, 'success');
+            
+            // Update UI
+            if (this.game && this.game.updateScore) {
+                this.game.updateScore(hitData.damage);
+            }
+        });
+
         // When a player takes damage
         this.socket.on('playerDamaged', (damageData) => {
             console.log('💥 GOT DAMAGE EVENT FROM SERVER:', damageData);

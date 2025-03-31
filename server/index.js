@@ -126,16 +126,31 @@ io.on('connection', (socket) => {
 
   // Handle player hit
   socket.on('playerHit', (data) => {
+    console.log(`PLAYER HIT: ${data.playerId} damaged by ${data.sourceId} for ${data.damage || 50} damage`);
+    
+    // CRITICAL FIX: Add enhanced error handling
+    if (!data.playerId) {
+      console.error("Invalid playerHit - missing playerId", data);
+      return;
+    }
+    
     if (gameState.players[data.playerId]) {
+      // CRITICAL FIX: Make sure damage is always significant
+      const damageAmount = data.damage || 50; // Default to 50 damage if not specified
+      
       // Update player health
-      gameState.players[data.playerId].health -= data.damage;
+      gameState.players[data.playerId].health -= damageAmount;
+      console.log(`Player ${data.playerId} health reduced to ${gameState.players[data.playerId].health}`);
       
       // Check if player is dead
       if (gameState.players[data.playerId].health <= 0) {
+        console.log(`Player ${data.playerId} died!`);
+        
         // Broadcast player death to all players
         io.emit('playerDied', {
           id: data.playerId,
-          killedBy: data.sourceId
+          killedBy: data.sourceId,
+          timestamp: Date.now()
         });
         
         // Respawn after 5 seconds
@@ -153,19 +168,43 @@ io.on('connection', (socket) => {
             io.emit('playerRespawned', {
               id: data.playerId,
               position: gameState.players[data.playerId].position,
-              health: gameState.players[data.playerId].health
+              health: gameState.players[data.playerId].health,
+              timestamp: Date.now()
             });
           }
         }, 5000);
       } else {
-        // Broadcast damage to all players
-        io.emit('playerDamaged', {
+        // CRITICAL FIX: Send multiple playerDamaged events to ensure clients receive the update
+        const damageEvent = {
           id: data.playerId,
           health: gameState.players[data.playerId].health,
-          damage: data.damage,
-          sourceId: data.sourceId
-        });
+          damage: damageAmount,
+          sourceId: data.sourceId,
+          timestamp: Date.now()
+        };
+        
+        // Broadcast damage to all players multiple times for reliability
+        io.emit('playerDamaged', damageEvent);
+        // Send again after a short delay to ensure it's received
+        setTimeout(() => {
+          io.emit('playerDamaged', damageEvent);
+        }, 100);
       }
+      
+      // CRITICAL FIX: Send acknowledgment back to the source player
+      // This ensures the source player knows their hit was registered
+      if (data.sourceId && data.sourceId !== socket.id) {
+        const sourceSocket = io.sockets.sockets.get(data.sourceId);
+        if (sourceSocket) {
+          sourceSocket.emit('hitConfirmed', {
+            targetId: data.playerId,
+            damage: damageAmount,
+            timestamp: Date.now()
+          });
+        }
+      }
+    } else {
+      console.error(`Player with ID ${data.playerId} not found in gameState`);
     }
   });
 
