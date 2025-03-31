@@ -701,11 +701,16 @@ export default class Multiplayer {
     sendPlayerHit(playerId, damage, sourceId) {
         if (!this.isConnected || !this.socket) return;
         
+        // FIXED: Always use 20 damage (5 hits to kill) regardless of what's passed in
+        const fixedDamage = 20;
+        
         this.socket.emit('playerHit', {
             playerId: playerId,
-            damage: damage,
+            damage: fixedDamage, // Use fixed damage value instead of passed parameter
             sourceId: sourceId || this.localPlayerId
         });
+        
+        console.log(`[MP-SendPlayerHit] Sending hit with fixed damage: ${fixedDamage} (original: ${damage})`);
     }
     
     sendTurretUpdate() {
