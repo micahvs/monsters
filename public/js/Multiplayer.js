@@ -432,111 +432,15 @@ export default class Multiplayer {
                             }
                         }
                         
-                        // Try all possible ways to update HUD
+                        // Try all possible ways to update HUD - SIMPLIFIED
                         try {
                             if (typeof this.game.updateHUD === 'function') {
-                                this.game.updateHUD();
-                            }
-                            
-                            const healthDisplay = document.getElementById('health');
-                            if (healthDisplay) {
-                                healthDisplay.textContent = `HEALTH: ${this.game.health}%`;
-                                
-                                // Add visual flash effect to health display
-                                healthDisplay.style.color = 'red';
-                                setTimeout(() => {
-                                    healthDisplay.style.color = 'white';
-                                }, 300);
-                            }
-                            
-                            // Use the standard updateStatBars function to ensure consistent UI updates
-                            if (window.updateStatBars) {
-                                window.updateStatBars(this.game.health, this.game.weapon?.ammo, this.game.weapon?.maxAmmo);
+                                this.game.updateHUD(); 
+                            } else {
+                                console.warn('this.game.updateHUD is not a function');
                             }
                         } catch (e) {
                             console.error('Error updating HUD:', e);
-                        }
-                        
-                        // Ensure visual feedback - add to damage value in case health delta is too small
-                        const visualDamage = Math.max(damageData.damage, oldHealth - this.game.health, 10);
-                        
-                        // Call multiple visual effect methods for redundancy
-                        try {
-                            // Method 1: Use handleRemoteProjectileHit but don't let it do server updates
-                            // to avoid duplicating the damage
-                            if (typeof this.game.handleRemoteProjectileHit === 'function') {
-                                // Create a special version of the function that doesn't send updates back to server
-                                const localHandler = this.game.handleRemoteProjectileHit;
-                                this.game.handleRemoteProjectileHit = function(sourceId, damage) {
-                                    console.log(`Visual-only hit effect from ${sourceId}`);
-                                    // Play hit sound
-                                    if (window.audioManager) {
-                                        window.audioManager.playSound('vehicle_hit', this.truck?.position);
-                                    } else if (window.SoundFX) {
-                                        window.SoundFX.play('vehicle_hit');
-                                    }
-                                    
-                                    // Create hit effect
-                                    if (this.truck && typeof this.createProjectileImpactOnVehicle === 'function') {
-                                        this.createProjectileImpactOnVehicle(this.truck.position.clone());
-                                    }
-                                    
-                                    // Shake camera
-                                    if (typeof this.shakeCamera === 'function') {
-                                        this.shakeCamera(damage * 0.15);
-                                    }
-                                    
-                                    // Add screen effect
-                                    if (typeof this.addDamageScreenEffect === 'function') {
-                                        this.addDamageScreenEffect(damage);
-                                    }
-                                };
-                                
-                                // Call modified handler
-                                this.game.handleRemoteProjectileHit(damageData.sourceId, visualDamage);
-                                
-                                // Restore original function
-                                this.game.handleRemoteProjectileHit = localHandler;
-                            } else {
-                                // Fallback methods if handleRemoteProjectileHit doesn't exist
-                                
-                                // Method 2: Use addDamageScreenEffect
-                                if (typeof this.game.addDamageScreenEffect === 'function') {
-                                    this.game.addDamageScreenEffect(visualDamage);
-                                }
-                                
-                                // Method 3: Create direct impact effect at player position
-                                if (this.game.truck && typeof this.game.createProjectileImpactOnVehicle === 'function') {
-                                    this.game.createProjectileImpactOnVehicle(this.game.truck.position.clone());
-                                }
-                                
-                                // Method 4: Shake camera
-                                if (typeof this.game.shakeCamera === 'function') {
-                                    this.game.shakeCamera(visualDamage * 0.15);
-                                }
-                                
-                                // Sound effects
-                                if (window.audioManager) {
-                                    window.audioManager.playSound('vehicle_hit', this.game.truck?.position);
-                                } else if (window.SoundFX) {
-                                    window.SoundFX.play('vehicle_hit');
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Error showing damage effects:', e);
-                            
-                            // Fallback to basic effects if an error occurs
-                            try {
-                                if (typeof this.game.addDamageScreenEffect === 'function') {
-                                    this.game.addDamageScreenEffect(visualDamage);
-                                }
-                                
-                                if (window.SoundFX) {
-                                    window.SoundFX.play('vehicle_hit');
-                                }
-                            } catch (innerError) {
-                                console.error('Critical error in fallback damage effects:', innerError);
-                            }
                         }
                     }
                     
@@ -1592,7 +1496,7 @@ export default class Multiplayer {
                 if (particle) {
                     // Stronger explosion velocity
                     const angle = Math.random() * Math.PI * 2;
-                    const speed = Math.random() * 0.25 + 0.1;
+                    const speed = Math.random() * 0.25 + 0.15;
                     particle.velocity = {
                         x: Math.cos(angle) * speed,
                         y: Math.random() * 0.25 + 0.15,
@@ -1760,18 +1664,18 @@ export default class Multiplayer {
             
             console.log(`⚾ Checking collision with player ${playerId}`);
             
-            // EVEN LARGER hitbox for guaranteed hit detection - we'll make it absolutely massive
+            // Use a more reasonable hitbox size
             const truckDimensions = {
-                width: 20.0,   // MASSIVELY increased for hit detection
-                length: 25.0,  // MASSIVELY increased for hit detection
-                height: 15.0   // MASSIVELY increased for hit detection
+                width: 4.0,   // More realistic size
+                length: 6.0,  // More realistic size
+                height: 3.0   // More realistic size
             };
             
-            // Create a larger bounding box to ensure hits register
+            // Create a standard bounding box
             const truckBounds = {
                 minX: player.truckMesh.position.x - (truckDimensions.width / 2),
                 maxX: player.truckMesh.position.x + (truckDimensions.width / 2),
-                minY: player.truckMesh.position.y - 5.0, // Extended down more
+                minY: player.truckMesh.position.y, // Base at origin
                 maxY: player.truckMesh.position.y + truckDimensions.height,
                 minZ: player.truckMesh.position.z - (truckDimensions.length / 2),
                 maxZ: player.truckMesh.position.z + (truckDimensions.length / 2)
@@ -1794,79 +1698,17 @@ export default class Multiplayer {
                 pos.y >= truckBounds.minY &&
                 pos.y <= truckBounds.maxY;
                 
-            // RELIABILITY FIX: If not a direct hit, also check proximity for near misses
-            if (!isHit) {
-                // Calculate distance to player's truck
-                const distance = Math.sqrt(
-                    Math.pow(player.truckMesh.position.x - pos.x, 2) +
-                    Math.pow(player.truckMesh.position.y - pos.y, 2) +
-                    Math.pow(player.truckMesh.position.z - pos.z, 2)
-                );
-                
-                // If very close, count as a hit anyway - MUCH bigger radius for guaranteed hits
-                if (distance < 15) {
-                    console.log(`Near miss converted to hit! Distance: ${distance.toFixed(2)}`);
-                    isHit = true;
-                } else if (distance < 30) {
-                    console.log(`Near miss! Distance: ${distance.toFixed(2)}`);
-                }
-            }
-            
             if (isHit) {
                 console.log(`💥 DIRECT HIT on player ${playerId}!`);
                 
-                // Calculate damage - MUCH HIGHER damage for guaranteed effect
-                const damage = Math.max(projectile.damage || 20, 50); // At least 50 damage for visibility
+                // Use projectile's damage, default to 20 if undefined
+                const damage = projectile.damage || 20; 
                 
-                // ULTRA AGGRESSIVE HIT HANDLING:
-                
-                // 1. Direct socket emission (most important)
-                console.log(`⚡⚡⚡ DIRECTLY sending hit: target=${playerId}, damage=${damage}`);
-                
-                // Send the hit 3 times to ensure it gets through
-                for (let i = 0; i < 3; i++) {
-                    this.socket.emit('playerHit', {
-                        playerId: playerId,
-                        damage: damage,
-                        sourceId: this.localPlayerId
-                    });
-                }
-                
-                // 2. Also try the method approach as backup
+                // 2. Keep the standard method call to send the hit event to the server
                 try {
                     this.sendPlayerHit(playerId, damage, this.localPlayerId);
                 } catch (err) {
                     console.error("Error using sendPlayerHit method:", err);
-                }
-                
-                // 3. Try sending a direct message to the specific player
-                try {
-                    this.socket.emit('directHit', {
-                        targetId: playerId,
-                        damage: damage,
-                        sourceId: this.localPlayerId,
-                        timestamp: Date.now()
-                    });
-                } catch (err) {
-                    console.error("Error sending direct hit message:", err);
-                }
-                
-                // 4. DIRECTLY MODIFY THE REMOTE PLAYER'S HEALTH
-                // This will show damage visually even if server sync fails
-                if (player.health !== undefined) {
-                    // Apply damage directly to the player object
-                    player.health = Math.max(0, player.health - damage);
-                    console.log(`💉 DIRECTLY modified remote player health: ${player.health}`);
-                    
-                    // Update visual if possible
-                    if (player.monsterTruck) {
-                        player.monsterTruck.health = player.health;
-                    }
-                    
-                    // If health depleted, create an explosion
-                    if (player.health <= 0) {
-                        this.showExplosion(player.truckMesh.position.clone());
-                    }
                 }
                 
                 // Create impact effect at hit position

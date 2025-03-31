@@ -135,8 +135,8 @@ io.on('connection', (socket) => {
     }
     
     if (gameState.players[data.playerId]) {
-      // CRITICAL FIX: Make sure damage is always significant
-      const damageAmount = data.damage || 50; // Default to 50 damage if not specified
+      // Use damage from client, default to 20 if not provided or invalid
+      const damageAmount = typeof data.damage === 'number' && data.damage >= 0 ? data.damage : 20; 
       
       // Update player health
       gameState.players[data.playerId].health -= damageAmount;
@@ -174,7 +174,7 @@ io.on('connection', (socket) => {
           }
         }, 5000);
       } else {
-        // CRITICAL FIX: Send multiple playerDamaged events to ensure clients receive the update
+        // Send playerDamaged event ONCE
         const damageEvent = {
           id: data.playerId,
           health: gameState.players[data.playerId].health,
@@ -183,12 +183,8 @@ io.on('connection', (socket) => {
           timestamp: Date.now()
         };
         
-        // Broadcast damage to all players multiple times for reliability
+        // Broadcast damage update to all players
         io.emit('playerDamaged', damageEvent);
-        // Send again after a short delay to ensure it's received
-        setTimeout(() => {
-          io.emit('playerDamaged', damageEvent);
-        }, 100);
       }
       
       // CRITICAL FIX: Send acknowledgment back to the source player
