@@ -1581,6 +1581,12 @@ export default class Multiplayer {
         // MISSION CRITICAL DEBUG LOGGING
         console.log(`⚠️⚠️⚠️ CHECKING PROJECTILE HITS: source=${projectile.source}, playerId=${projectile.playerId}, localId=${this.localPlayerId}`);
         
+        // CRITICAL FIX: Ensure projectile has playerId for proper tracking
+        if (!projectile.playerId && projectile.source === 'player') {
+            projectile.playerId = this.localPlayerId;
+            console.log("⚠️ Added localPlayerId to projectile with source 'player'");
+        }
+        
         // Add additional logging for players
         console.log(`⚠️⚠️⚠️ Total remote players to check: ${this.players.size}`);
         
@@ -1590,6 +1596,7 @@ export default class Multiplayer {
                 `${projectile.mesh.position.x.toFixed(2)}, ${projectile.mesh.position.y.toFixed(2)}, ${projectile.mesh.position.z.toFixed(2)}` : "NO MESH",
             damage: projectile.damage,
             source: projectile.source,
+            playerId: projectile.playerId,
             speed: projectile.speed
         });
         
@@ -1601,9 +1608,15 @@ export default class Multiplayer {
             console.log(`⚠️ Player in map: id=${id}, has mesh=${!!player.truckMesh}`);
         });
         
+        // CRITICAL FIX: Create a separate variable to track if this is a local projectile
+        const isLocalProjectile = projectile.playerId === this.localPlayerId || projectile.source === 'player';
+        console.log(`⚠️ Is local projectile: ${isLocalProjectile}`);
+        
         this.players.forEach((player, playerId) => {
             // Skip only the local player - allow hits on other players
-            if (playerId === this.localPlayerId) {
+            // CRITICAL FIX: Don't skip the check if the projectile isn't from the local player
+            if (playerId === this.localPlayerId && isLocalProjectile) {
+                console.log(`⚠️ Skipping local player check for local projectile`);
                 return;
             }
             

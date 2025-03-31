@@ -1595,6 +1595,17 @@ class Game {
         // Basic update for truck movement
         if (!this.truck) return;
         
+        // CRITICAL FIX: Check projectiles against players in EVERY update
+        if (this.multiplayer && window.multiplayerEnabled && this.objectPools && this.objectPools.pools.get('projectiles')) {
+            const projectilePool = this.objectPools.pools.get('projectiles');
+            projectilePool.active.forEach(projectile => {
+                // Check every active projectile against remote players
+                if (projectile.source === 'player' || projectile.playerId === this.multiplayer.localPlayerId) {
+                    this.multiplayer.checkProjectileHits(projectile);
+                }
+            });
+        }
+        
         // Throttle updates for better performance
         const updateAll = this.frameCount % 2 === 0; // Update non-essential items at half rate
         
@@ -3078,15 +3089,24 @@ class Game {
         }
         
         // Check for hits on other players in multiplayer mode
-        if (this.multiplayer && window.multiplayerEnabled && projectile.source === 'player') {
+        // CRITICAL FIX: Allow both 'player' source and projectiles with our localPlayerId
+        if (this.multiplayer && window.multiplayerEnabled && 
+            (projectile.source === 'player' || projectile.playerId === this.multiplayer.localPlayerId)) {
+            
             console.log("🎯 CHECKING PROJECTILE FOR MULTIPLAYER HITS:", projectile);
             
-            // ULTRA-AGGRESSIVE APPROACH: Always check at least once for every projectile
+            // First ensure the projectile has our localPlayerId for proper hit detection
+            if (!projectile.playerId) {
+                projectile.playerId = this.multiplayer.localPlayerId;
+            }
+            
+            // ULTRA-AGGRESSIVE APPROACH: Always check for hits with every projectile update
             // First, let the multiplayer component check for hits normally
             let hitDetected = this.multiplayer.checkProjectileHits(projectile);
             console.log("🎯 Regular hit detection result:", hitDetected);
             
-            // If no hit was detected normally, do a secondary check with each player directly
+            // CRITICAL FIX: Add second aggressive hit detection
+            // If no hit was detected normally, directly check against each player
             if (!hitDetected && this.multiplayer.players && this.multiplayer.players.size > 0) {
                 console.log("🎯 SECONDARY CHECK - Force checking nearby players");
                 
@@ -3098,15 +3118,20 @@ class Game {
                     // Skip players without meshes
                     if (!player.truckMesh) return;
                     
-                    // Check if projectile is somewhat close to this player (VERY generous distance)
+                    // Check if projectile is close to this player (VERY generous distance)
                     const distance = projectile.mesh.position.distanceTo(player.truckMesh.position);
                     console.log(`🎯 Distance to player ${playerId}: ${distance}`);
                     
-                    // GUARANTEED HIT: If projectile is within 30 units, force a hit
-                    if (distance < 30) {
+                    // GUARANTEED HIT: If projectile is within 20 units, force a hit
+                    if (distance < 20) {
                         console.log(`🎯 FORCE HIT on player ${playerId}! Distance: ${distance}`);
                         
-                        // Apply massive damage directly
+                        // Send hit to server multiple times for reliability
+                        for (let i = 0; i < 3; i++) {
+                            this.multiplayer.sendPlayerHit(playerId, 50, this.multiplayer.localPlayerId);
+                        }
+                        
+                        // Apply massive damage directly for immediate visual feedback
                         const damage = 50;
                         player.health = Math.max(0, player.health - damage);
                         
