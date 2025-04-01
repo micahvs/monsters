@@ -2644,6 +2644,318 @@ class Game {
         console.log("Weapon created successfully");
         return this.weapon;
     }
+
+    // Restore the missing update method
+    update(deltaTime = 1/60) {
+        // Skip update if game over
+        if (this.isGameOver) return;
+        
+        // Basic update for truck movement
+        if (!this.truck) return;
+        
+        // Process keyboard/touch input for truck movement
+        const accelerating = this.keys['ArrowUp'] || this.keys['forward'];
+        const braking = this.keys['ArrowDown'] || this.keys['backward'];
+        const turningLeft = this.keys['ArrowLeft'] || this.keys['left'];
+        const turningRight = this.keys['ArrowRight'] || this.keys['right'];
+        const shooting = this.keys[' '] || this.keys['shoot'];
+        
+        // Throttle updates for better performance
+        const updateAll = this.frameCount % 2 === 0; // Update non-essential items at half rate
+        
+        // Process keyboard input for more realistic driving
+        const acceleration = 0.008; // Balanced between original 0.01 and slower 0.006
+        const deceleration = 0.98; // Friction
+        const maxSpeed = 0.9; // Changed from 0.5 to 0.9
+        const turnSpeed = 0.05; // Changed from 0.03 to 0.05
+        
+        // Initialize steering angle if not present
+        if (this.truck.steeringAngle === undefined) {
+            this.truck.steeringAngle = 0;
+        }
+        
+        // Maximum steering angle in radians (about 30 degrees)
+        const maxSteeringAngle = 0.13;
+        // How quickly steering centers when not turning
+        const steeringReturnSpeed = 0.09;
+        // How quickly steering responds to input
+        const steeringResponseSpeed = 0.09;
+        
+        // Calculate the truck's forward direction based on its rotation
+        const direction = new THREE.Vector3();
+        direction.z = Math.cos(this.truck.rotation.y);
+        direction.x = Math.sin(this.truck.rotation.y);
+        
+        // Acceleration/braking
+        if (accelerating) {
+            this.truck.velocity += acceleration;
+            if (this.truck.velocity > maxSpeed) {
+                this.truck.velocity = maxSpeed;
+            }
+        } else if (braking) {
+            this.truck.velocity -= acceleration;
+            if (this.truck.velocity < -maxSpeed/2) {  // Slower in reverse
+                this.truck.velocity = -maxSpeed/2;
+            }
+        } else {
+            // Natural deceleration
+            this.truck.velocity *= deceleration;
+            if (Math.abs(this.truck.velocity) < 0.001) {
+                this.truck.velocity = 0;
+            }
+        }
+        
+        // Update steering angle based on input
+        if (turningLeft) {
+            // Gradually increase steering angle
+            this.truck.steeringAngle = Math.max(
+                -maxSteeringAngle,
+                this.truck.steeringAngle - steeringResponseSpeed
+            );
+        } else if (turningRight) {
+            // Gradually increase steering angle
+            this.truck.steeringAngle = Math.min(
+                maxSteeringAngle,
+                this.truck.steeringAngle + steeringResponseSpeed
+            );
+        } else {
+            // Gradually return steering to center
+            if (Math.abs(this.truck.steeringAngle) < steeringReturnSpeed) {
+                this.truck.steeringAngle = 0;
+            } else if (this.truck.steeringAngle > 0) {
+                this.truck.steeringAngle -= steeringReturnSpeed;
+            } else {
+                this.truck.steeringAngle += steeringReturnSpeed;
+            }
+        }
+        
+        // Apply steering - turning effect is proportional to velocity
+        // Note: When in reverse, we need to invert the steering effect
+        if (Math.abs(this.truck.velocity) > 0.01) {
+            // Rotation amount is influenced by:
+            // 1. Steering angle (with direction inverted when in reverse)
+            // 2. Velocity (faster = more turning)
+            // 3. TurnFactor (slower = more responsive steering)
+            const turnFactor = 1 - (Math.abs(this.truck.velocity) / maxSpeed) * 0.5;
+            
+            // Get direction of travel (positive = forward, negative = reverse)
+            const directionMultiplier = (this.truck.velocity > 0) ? 1 : -1;
+            
+            // Apply steering angle with proper direction adjustment
+            this.truck.rotation.y -= this.truck.steeringAngle * Math.abs(this.truck.velocity) * 
+                                    turnFactor * 0.5 * directionMultiplier;
+        }
+        
+        // Visualize wheel steering
+        if (this.animateWheelTurn) {
+            if (this.truck.steeringAngle !== 0) {
+                // The steering angle direction is already correct, so we pass it directly
+                this.animateWheelTurn(-this.truck.steeringAngle / maxSteeringAngle);
+            } else if (this.resetWheels) {
+                this.resetWheels();
+            }
+        }
+        
+        // Calculate new position
+        const newPosition = new THREE.Vector3(
+            this.truck.position.x + direction.x * this.truck.velocity,
+            this.truck.position.y,
+            this.truck.position.z + direction.z * this.truck.velocity
+        );
+        
+        // Check for wall collisions before moving
+        if (this.walls) {
+            const truckSize = 5; // Doubled from 2.5 for 2x truck size
+            const wallHalfSize = this.walls.halfSize;
+            const wallThickness = this.walls.thickness;
+            let wallCollision = false;
+            
+            // Check X boundaries (East and West walls)
+            if (newPosition.x > wallHalfSize - truckSize) {
+                // Save previous position to calculate bounce
+                const prevX = newPosition.x;
+                newPosition.x = wallHalfSize - truckSize;
+                
+                // Reverse velocity with bounce factor (don't just reduce it)
+                this.truck.velocity *= -0.7; // Bounce with 70% of original speed in opposite direction
+                
+                // Mark collision for damage calculation
+                wallCollision = true;
+            } else if (newPosition.x < -wallHalfSize + truckSize) {
+                // Save previous position to calculate bounce
+                const prevX = newPosition.x;
+                newPosition.x = -wallHalfSize + truckSize;
+                
+                // Reverse velocity with bounce factor
+                this.truck.velocity *= -0.7; // Bounce with 70% of original speed in opposite direction
+                
+                // Mark collision for damage calculation
+                wallCollision = true;
+            }
+            
+            // Check Z boundaries (North and South walls)
+            if (newPosition.z > wallHalfSize - truckSize) {
+                // Save previous position to calculate bounce
+                const prevZ = newPosition.z;
+                newPosition.z = wallHalfSize - truckSize;
+                
+                // Reverse velocity with bounce factor
+                this.truck.velocity *= -0.7; // Bounce with 70% of original speed in opposite direction
+                
+                // Mark collision for damage calculation
+                wallCollision = true;
+            } else if (newPosition.z < -wallHalfSize + truckSize) {
+                // Save previous position to calculate bounce
+                const prevZ = newPosition.z;
+                newPosition.z = -wallHalfSize + truckSize;
+                
+                // Reverse velocity with bounce factor
+                this.truck.velocity *= -0.7; // Bounce with 70% of original speed in opposite direction
+                
+                // Mark collision for damage calculation
+                wallCollision = true;
+            }
+            
+            // Apply damage on collision
+            if (wallCollision && typeof this.applyCollisionDamage === 'function') {
+                this.applyCollisionDamage();
+                if (typeof this.showCollisionEffect === 'function') {
+                    this.showCollisionEffect(newPosition);
+                }
+            }
+        }
+        
+        // Apply final position
+        this.truck.position.copy(newPosition);
+        
+        // Animate wheels rolling based on speed
+        if (typeof this.animateWheelRoll === 'function') {
+            this.animateWheelRoll(this.truck.velocity);
+        }
+        
+        // Update camera to follow truck with smooth transition
+        if (this.camera) {
+            // Position camera behind truck based on truck's direction
+            const cameraDistance = 19.5; // Increased from 15 (30% larger)
+            const cameraHeight = 10.4; // Increased from 8 (30% larger)
+            const targetCameraPos = new THREE.Vector3(
+                this.truck.position.x - direction.x * cameraDistance,
+                this.truck.position.y + cameraHeight,
+                this.truck.position.z - direction.z * cameraDistance
+            );
+            
+            // Smoothly interpolate camera position
+            this.camera.position.lerp(targetCameraPos, 0.05);
+            this.camera.lookAt(this.truck.position);
+            
+            // Update speedometer - calculate speed in MPH (arbitrary multiplier for game feel)
+            const speedMph = Math.abs(Math.round(this.truck.velocity * 100));
+            const speedDisplay = document.getElementById('speed');
+            if (speedDisplay) {
+                speedDisplay.textContent = `SPEED: ${speedMph} MPH`;
+            }
+            
+            // Update score display if score has changed
+            if (this.scoreDisplay) {
+                this.scoreDisplay.textContent = `SCORE: ${this.score}`;
+            }
+            
+            // Also update the DOM element for score
+            const scoreElement = document.getElementById('score');
+            if (scoreElement) {
+                scoreElement.textContent = `SCORE: ${this.score}`;
+            }
+        }
+        
+        // Handle shooting
+        if (shooting && this.weapon) {
+            const truckDirection = new THREE.Vector3(
+                Math.sin(this.truck.rotation.y),
+                0,
+                Math.cos(this.truck.rotation.y)
+            );
+            
+            // Get position at the front of the truck
+            const weaponPosition = this.weaponMesh.getWorldPosition(new THREE.Vector3());
+            
+            // Fire the weapon
+            const projectiles = this.weapon.shoot(weaponPosition, truckDirection, 'player');
+            
+            // Notify multiplayer system of new projectiles for network sync
+            if (this.multiplayer && window.multiplayerEnabled && projectiles && projectiles.length > 0) {
+                // Make sure projectiles have correct source
+                projectiles.forEach(projectile => {
+                    // Force source to be 'player' for reliable hit detection
+                    projectile.source = 'player';
+                    projectile.playerId = this.multiplayer.localPlayerId;
+                    
+                    this.multiplayer.sendProjectileCreated(projectile);
+                });
+            }
+        }
+        
+        // Handle reload
+        if ((this.keys['r'] || this.keys['R']) && this.weapon && !this.weapon.isReloading && this.weapon.ammo < this.weapon.maxAmmo) {
+            // Start reload
+            this.weapon.reload();
+            
+            // Show reloading notification
+            if (typeof this.showNotification === 'function') {
+                this.showNotification("Reloading...");
+            }
+        }
+        
+        // Update weapon
+        if (this.weapon) {
+            this.weapon.update();
+            
+            // Update ammo display
+            if (this.ammoDisplay) {
+                this.ammoDisplay.textContent = `Ammo: ${this.weapon.ammo}/${this.weapon.maxAmmo}`;
+            }
+        }
+        
+        // Update turrets
+        if (updateAll && typeof this.updateTurrets === 'function') {
+            this.updateTurrets();
+        }
+        
+        // Update powerups with throttled frequency
+        if (updateAll && typeof this.updatePowerups === 'function') {
+            this.updatePowerups();
+            
+            // Check for powerup spawning
+            if (this.powerupSpawnTimer !== undefined) {
+                this.powerupSpawnTimer++;
+                if (this.powerupSpawnTimer >= this.powerupSpawnInterval) {
+                    if (typeof this.spawnRandomPowerup === 'function') {
+                        this.spawnRandomPowerup();
+                    }
+                    this.powerupSpawnTimer = 0;
+                }
+            }
+        }
+        
+        // Check for projectile hits
+        if (typeof this.checkProjectileHits === 'function') {
+            this.checkProjectileHits();
+        }
+        
+        // Check for player projectile hits on turrets
+        if (typeof this.checkPlayerProjectileHits === 'function') {
+            this.checkPlayerProjectileHits();
+        }
+        
+        // Check for powerup collection
+        if (typeof this.checkPowerupCollection === 'function') {
+            this.checkPowerupCollection();
+        }
+        
+        // Update multiplayer system
+        if (this.multiplayer && window.multiplayerEnabled) {
+            this.multiplayer.update();
+        }
+    }
 }
 
 // Implement a preloader
