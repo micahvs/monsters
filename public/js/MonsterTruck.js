@@ -830,32 +830,39 @@ export class MonsterTruck {
     }
     
     takeDamage(amount) {
-        // Initialize health if it doesn't exist
-        if (this.health === undefined) {
-            this.health = 100;
+        try {
+            // Initialize health if it doesn't exist
+            if (this.health === undefined) {
+                this.health = 100;
+            }
+            
+            // Apply damage
+            this.health = Math.max(0, this.health - amount);
+            
+            // Create damage effect
+            if (typeof this.showDamageEffect === 'function') {
+                this.showDamageEffect();
+            }
+            
+            // Play sound
+            const audioManager = window.audioManager || this.audioManager || {
+                playSound: () => {}
+            };
+            
+            if (audioManager) {
+                audioManager.playSound('vehicle_hit');
+            }
+            
+            // Check if destroyed
+            if (this.health <= 0 && typeof this.handleDestruction === 'function') {
+                this.handleDestruction();
+            }
+            
+            return this.health;
+        } catch (e) {
+            console.error("Error in takeDamage:", e);
+            return this.health || 0;
         }
-        
-        // Apply damage
-        this.health = Math.max(0, this.health - amount);
-        
-        // Create damage effect
-        this.showDamageEffect();
-        
-        // Play sound
-        const audioManager = window.audioManager || this.audioManager || {
-            playSound: () => {}
-        };
-        
-        if (audioManager) {
-            audioManager.playSound('vehicle_hit');
-        }
-        
-        // Check if destroyed
-        if (this.health <= 0) {
-            this.handleDestruction();
-        }
-        
-        return this.health;
     }
     
     createDamageParticles(amount) {

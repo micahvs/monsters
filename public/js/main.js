@@ -152,100 +152,130 @@ const TRUCK_SPECS = {
     }
 }
 
+// Define global Projectile class so it's accessible to object pools
 class Projectile {
     // Constructor now only creates the mesh and sets default state
     constructor(scene) { 
-        this.scene = scene; // Store scene reference
-        const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 6);
-        geometry.rotateX(Math.PI / 2);
-        
-        const material = new THREE.MeshPhongMaterial({
-            color: 0xff00ff,
-            emissive: 0xff00ff,
-            emissiveIntensity: 1,
-            transparent: true,
-            opacity: 0.8
-        });
-        
-        this.mesh = new THREE.Mesh(geometry, material);
-        this.mesh.visible = false; // Start invisible
-        this.scene.add(this.mesh); // Add mesh to scene once
-
+        this.scene = scene || null; // Store scene reference
         this.alive = false; // Start inactive
+        
+        try {
+            if (!scene) {
+                console.warn("Scene not provided to Projectile constructor");
+                this.mesh = { position: new THREE.Vector3(), visible: false };
+                return;
+            }
+            
+            const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 6);
+            geometry.rotateX(Math.PI / 2);
+            
+            const material = new THREE.MeshPhongMaterial({
+                color: 0xff00ff,
+                emissive: 0xff00ff,
+                emissiveIntensity: 1,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            this.mesh = new THREE.Mesh(geometry, material);
+            this.mesh.visible = false; // Start invisible
+            this.scene.add(this.mesh); // Add mesh to scene once
+        } catch (e) {
+            console.error("Error creating projectile mesh:", e);
+            this.mesh = { position: new THREE.Vector3(), visible: false };
+        }
     }
 
     // Setup method to configure/reset the projectile
     setup(position, direction, speed, damage, lifetime, source, weaponType, playerId) {
-        this.mesh.position.copy(position);
-        this.direction = direction.normalize();
-        this.speed = speed || 0.5;
-        this.damage = damage || 10;
-        this.source = source || 'player';
-        this.playerId = playerId || null; // Store the shooter's ID
-        this.weaponType = weaponType; // Store weapon type
-        this.lifetime = lifetime || 200;
-        this.alive = true;
-        this.mesh.visible = true;
+        try {
+            if (!position || !direction || !this.mesh) {
+                console.warn("Invalid parameters for projectile setup");
+                return this;
+            }
+            
+            this.mesh.position.copy(position);
+            this.direction = direction.normalize();
+            this.speed = speed || 0.5;
+            this.damage = damage || 10;
+            this.source = source || 'player';
+            this.playerId = playerId || null; // Store the shooter's ID
+            this.weaponType = weaponType; // Store weapon type
+            this.lifetime = lifetime || 200;
+            this.alive = true;
+            this.mesh.visible = true;
 
-        // Reset scale in case it was changed (e.g., trails)
-        this.mesh.scale.set(1, 1, 1);
+            // Reset scale in case it was changed (e.g., trails)
+            this.mesh.scale.set(1, 1, 1);
 
-        // Update appearance based on source/type/color
-        this.updateAppearance(this.weaponType, source === 'remote' ? null : undefined);
+            // Update appearance based on source/type/color
+            this.updateAppearance(this.weaponType, source === 'remote' ? null : undefined);
 
-        // Set rotation to match direction
-        this.mesh.quaternion.setFromUnitVectors(
-            new THREE.Vector3(0, 0, 1),
-            this.direction
-        );
+            // Set rotation to match direction
+            this.mesh.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 0, 1),
+                this.direction
+            );
+        } catch (e) {
+            console.error("Error setting up projectile:", e);
+            this.alive = false;
+        }
         
         return this;
     }
 
     updateAppearance(weaponType, colorOverride = undefined) {
-        let projectileColor;
-        let geometry;
+        try {
+            if (!this.mesh || !this.mesh.material) return;
+            
+            let projectileColor;
+            
+            if (colorOverride) {
+                projectileColor = new THREE.Color(colorOverride);
+            } else if (weaponType && weaponType.color) {
+                projectileColor = new THREE.Color(weaponType.color);
+            } else {
+                // Default colors based on source if no weapon type
+                projectileColor = this.source === 'player' ? new THREE.Color(0xff00ff) : new THREE.Color(0x00ffff);
+            }
 
-        if (colorOverride) {
-            projectileColor = new THREE.Color(colorOverride);
-        } else if (weaponType) {
-            projectileColor = new THREE.Color(weaponType.color);
-        } else {
-            // Default colors based on source if no weapon type
-            projectileColor = this.source === 'player' ? new THREE.Color(0xff00ff) : new THREE.Color(0x00ffff);
+            // Update color/emissive
+            this.mesh.material.color.copy(projectileColor);
+            this.mesh.material.emissive.copy(projectileColor);
+            this.mesh.material.needsUpdate = true;
+        } catch (e) {
+            console.error("Error updating projectile appearance:", e);
         }
-
-        // Adjust geometry based on weapon type (optional, could reuse standard)
-        // For now, just update color/emissive
-        this.mesh.material.color.copy(projectileColor);
-        this.mesh.material.emissive.copy(projectileColor);
-        this.mesh.material.needsUpdate = true;
     }
 
     update(delta) { // Pass delta for potential frame-rate independent movement
-        if (!this.alive) return false;
+        if (!this.alive || !this.mesh) return false;
         
-        // Use delta in movement calculation if available
-        const effectiveSpeed = this.speed * (delta ? delta * 60 : 1); // Assume 60 FPS if delta is missing
-        const movement = this.direction.clone().multiplyScalar(effectiveSpeed);
-        this.mesh.position.add(movement);
-        
-        // Reduce lifetime
-        this.lifetime--;
-        if (this.lifetime <= 0) this.alive = false;
+        try {
+            // Use delta in movement calculation if available
+            const effectiveSpeed = this.speed * (delta ? delta * 60 : 1); // Assume 60 FPS if delta is missing
+            const movement = this.direction.clone().multiplyScalar(effectiveSpeed);
+            this.mesh.position.add(movement);
+            
+            // Reduce lifetime
+            this.lifetime--;
+            if (this.lifetime <= 0) this.alive = false;
+        } catch (e) {
+            console.error("Error updating projectile:", e);
+            this.alive = false;
+        }
         
         return this.alive;
     }
 
     hide() {
-        this.mesh.visible = false;
-        this.alive = false;
-        // Note: Pool manager will handle removing from scene if needed, 
-        // but we added mesh in constructor, so it stays unless explicitly removed.
+        try {
+            if (this.mesh) this.mesh.visible = false;
+            this.alive = false;
+        } catch (e) {
+            console.error("Error hiding projectile:", e);
+        }
     }
-
-    // Old constructor logic removed/merged into setup
-    /* constructor(position, direction, speed, damage, source) { ... } */
 }
 
 class Turret {
@@ -719,19 +749,32 @@ class Game {
     constructor(debugOrCallback = false) {
         console.log("Game constructor");
         
-        // Determine if first parameter is a callback or debug flag
-        if (typeof debugOrCallback === 'function') {
-            this.onLoadCallback = debugOrCallback;
-            this.debug = false;
-        } else {
-            this.debug = debugOrCallback;
-            this.onLoadCallback = function(success) {};
-        }
-        
-        // Store this instance globally
-        gameInstance = this;
-        
         try {
+            // Determine if first parameter is a callback or debug flag
+            if (typeof debugOrCallback === 'function') {
+                this.onLoadCallback = debugOrCallback;
+                this.debug = false;
+            } else {
+                this.debug = debugOrCallback;
+                this.onLoadCallback = function(success) {};
+            }
+            
+            // Create key game components in the right order
+            // 1. First create the scene - CRITICAL for adding objects
+            this.scene = new THREE.Scene();
+            console.log("Scene created successfully");
+            
+            // 2. Setup camera
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            this.camera.position.set(0, 5, -10);
+            this.camera.lookAt(0, 0, 0);
+            
+            // 3. Create shared geometries for better performance
+            this.sharedParticleGeometry = new THREE.SphereGeometry(1, 8, 6);
+            
+            // Store this instance globally
+            gameInstance = this;
+            
             // Detect mobile for performance optimizations
             this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
@@ -947,74 +990,126 @@ class Game {
     }
 
     initObjectPools() {
-        // Create particle pool
-        this.objectPools.createPool('particles', () => {
-            // Use shared geometry instead of creating new ones each time
-            const material = new THREE.MeshPhongMaterial({
-                color: 0xff00ff,
-                emissive: 0xff00ff,
-                emissiveIntensity: 0.5,
-                transparent: true,
-                opacity: 0.8
-            });
-            const mesh = new THREE.Mesh(this.sharedParticleGeometry, material);
-            mesh.visible = false;
-            this.scene.add(mesh);
-            return {
-                mesh: mesh,
-                reset: function(position, color) {
-                    this.mesh.visible = true;
-                    this.mesh.position.copy(position);
-                    this.mesh.material.color.set(color || 0xff00ff);
-                    this.mesh.material.emissive.set(color || 0xff00ff);
-                    this.mesh.material.opacity = 0.8;
-                    this.mesh.scale.set(0.2, 0.2, 0.2); // Scale the shared geometry
-                    this.life = 1.0;
-                    this.velocity = new THREE.Vector3(
-                        (Math.random() - 0.5) * 0.5,
-                        Math.random() * 0.5,
-                        (Math.random() - 0.5) * 0.5
-                    );
-                    return this;
-                },
-                update: function(delta) {
-                    this.life -= delta * 2;
-                    this.mesh.position.add(this.velocity);
-                    this.mesh.material.opacity = this.life;
-                    return this.life > 0;
-                },
-                hide: function() {
-                    this.mesh.visible = false;
+        try {
+            if (!this.scene) {
+                console.error("Cannot initialize object pools: scene is not defined");
+                return;
+            }
+            
+            if (!this.objectPools) {
+                console.error("Cannot initialize object pools: objectPools is not defined");
+                return;
+            }
+            
+            if (!this.sharedParticleGeometry) {
+                console.log("Creating shared particle geometry");
+                this.sharedParticleGeometry = new THREE.SphereGeometry(1, 8, 6);
+            }
+            
+            // Create particle pool
+            this.objectPools.createPool('particles', () => {
+                try {
+                    // Use shared geometry instead of creating new ones each time
+                    const material = new THREE.MeshPhongMaterial({
+                        color: 0xff00ff,
+                        emissive: 0xff00ff,
+                        emissiveIntensity: 0.5,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    const mesh = new THREE.Mesh(this.sharedParticleGeometry, material);
+                    mesh.visible = false;
+                    if (this.scene) {
+                        this.scene.add(mesh);
+                    } else {
+                        console.warn("Scene not available, particle won't be added");
+                    }
+                    return {
+                        mesh: mesh,
+                        reset: function(position, color) {
+                            if (!position) return this;
+                            this.mesh.visible = true;
+                            this.mesh.position.copy(position);
+                            if (color && this.mesh.material) {
+                                this.mesh.material.color.set(color || 0xff00ff);
+                                this.mesh.material.emissive.set(color || 0xff00ff);
+                            }
+                            this.mesh.material.opacity = 0.8;
+                            this.mesh.scale.set(0.2, 0.2, 0.2); // Scale the shared geometry
+                            this.life = 1.0;
+                            this.velocity = new THREE.Vector3(
+                                (Math.random() - 0.5) * 0.5,
+                                Math.random() * 0.5,
+                                (Math.random() - 0.5) * 0.5
+                            );
+                            return this;
+                        },
+                        update: function(delta) {
+                            if (!this.mesh) return false;
+                            this.life -= delta * 2;
+                            if (this.velocity) {
+                                this.mesh.position.add(this.velocity);
+                            }
+                            if (this.mesh.material) {
+                                this.mesh.material.opacity = this.life;
+                            }
+                            return this.life > 0;
+                        },
+                        hide: function() {
+                            if (this.mesh) this.mesh.visible = false;
+                        }
+                    };
+                } catch (e) {
+                    console.error("Error creating particle:", e);
+                    // Return dummy object with required methods to prevent errors
+                    return {
+                        mesh: { position: new THREE.Vector3(), visible: false },
+                        reset: function() { return this; },
+                        update: function() { return false; },
+                        hide: function() {}
+                    };
                 }
-            };
-        }, 50);
-        
-        // Create projectile pool
-        this.objectPools.createPool('projectiles', () => {
-            // Create an instance of the Projectile class
-            const projectileInstance = new Projectile(this.scene); 
+            }, this.isMobile ? 20 : 50); // Fewer particles for mobile
             
-            // Return the instance. The object pool manager will store this.
-            // The instance already has mesh, reset (renamed setup), update, hide methods.
-            return projectileInstance;
-            
-            // REMOVED: Old plain object definition
-            /*
-            const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 8);
-            geometry.rotateX(Math.PI / 2);
-            const material = new THREE.MeshPhongMaterial(...);
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.visible = false;
-            this.scene.add(mesh);
-            
-            return {
-                mesh: mesh,
-                reset: function(position, direction, speed, damage, source) { ... },
-                update: function(delta) { ... },
-                hide: function() { ... }
-            };
-            */
-        }, 30); // Initial size of 30 projectiles in the pool
+            // Create projectile pool
+            this.objectPools.createPool('projectiles', () => {
+                try {
+                    // Safe creation of Projectile instance
+                    if (typeof Projectile === 'function' && this.scene) {
+                        const projectileInstance = new Projectile(this.scene);
+                        return projectileInstance;
+                    } else {
+                        // Fallback if Projectile class isn't available or scene is missing
+                        console.warn("Using dummy projectile - Projectile class not available or scene missing");
+                        return {
+                            mesh: { position: new THREE.Vector3(), visible: false },
+                            direction: new THREE.Vector3(0, 0, 1),
+                            speed: 0.5,
+                            damage: 10,
+                            alive: false,
+                            setup: function() { this.alive = true; return this; },
+                            update: function() { return false; },
+                            hide: function() { this.alive = false; }
+                        };
+                    }
+                } catch (e) {
+                    console.error("Error creating projectile:", e);
+                    // Return dummy object with required methods to prevent errors
+                    return {
+                        mesh: { position: new THREE.Vector3(), visible: false },
+                        direction: new THREE.Vector3(0, 0, 1),
+                        speed: 0.5,
+                        damage: 10,
+                        alive: false,
+                        setup: function() { this.alive = true; return this; },
+                        update: function() { return false; },
+                        hide: function() { this.alive = false; }
+                    };
+                }
+            }, this.isMobile ? 15 : 30); // Fewer projectiles for mobile
+        } catch (error) {
+            console.error("Error initializing object pools:", error);
+        }
     }
 
     init() {
@@ -1509,171 +1604,208 @@ class Game {
         }, { passive: true });
     }
     
-    updateMobileControlsVisibility() {
-        const controls = document.getElementById('mobile-controls');
-        if (controls) {
-            controls.style.display = this.isMobile ? 'block' : 'none';
+    createMobileControls() {
+        try {
+            if (!this.isMobile) return;
+            
+            // Remove any existing mobile controls
+            const existingControls = document.getElementById('mobile-controls');
+            if (existingControls) {
+                existingControls.remove();
+            }
+            
+            // Create container for mobile controls
+            const controlsContainer = document.createElement('div');
+            controlsContainer.id = 'mobile-controls';
+            document.body.appendChild(controlsContainer);
+            
+            // Create movement pad
+            const movementPad = document.createElement('div');
+            movementPad.id = 'movement-pad';
+            movementPad.className = 'control-pad';
+            controlsContainer.appendChild(movementPad);
+            
+            // Create weapon button
+            const weaponButton = document.createElement('div');
+            weaponButton.id = 'weapon-button';
+            weaponButton.className = 'control-button';
+            weaponButton.innerHTML = '<i class="fas fa-crosshairs"></i>';
+            controlsContainer.appendChild(weaponButton);
+            
+            // Add touch event listeners with proper options
+            const touchOptions = {
+                passive: false // Important for iOS
+            };
+            
+            // Movement pad touch handling
+            if (movementPad) {
+                movementPad.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (e.touches && e.touches[0]) {
+                        this.handleMovementTouch(e.touches[0]);
+                        movementPad.classList.add('active');
+                    }
+                }, touchOptions);
+                
+                movementPad.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    if (e.touches && e.touches[0]) {
+                        this.handleMovementTouch(e.touches[0]);
+                    }
+                }, touchOptions);
+                
+                movementPad.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.resetMovementControls();
+                    movementPad.classList.remove('active');
+                }, touchOptions);
+            }
+            
+            // Weapon button touch handling
+            if (weaponButton) {
+                weaponButton.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.keys.shoot = true;
+                    weaponButton.classList.add('active');
+                }, touchOptions);
+                
+                weaponButton.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.keys.shoot = false;
+                    weaponButton.classList.remove('active');
+                }, touchOptions);
+            }
+            
+            // Add styles
+            const style = document.createElement('style');
+            style.textContent = `
+                #mobile-controls {
+                    position: fixed;
+                    bottom: 20px;
+                    left: 0;
+                    right: 0;
+                    height: 180px;
+                    z-index: 1000;
+                    pointer-events: none;
+                    display: ${this.isMobile ? 'block' : 'none'};
+                }
+                
+                .control-pad {
+                    position: absolute;
+                    left: 20px;
+                    bottom: 20px;
+                    width: 120px;
+                    height: 120px;
+                    background: rgba(255, 0, 255, 0.2);
+                    border: 2px solid rgba(255, 0, 255, 0.5);
+                    border-radius: 50%;
+                    pointer-events: auto;
+                }
+                
+                .control-button {
+                    position: absolute;
+                    right: 20px;
+                    bottom: 20px;
+                    width: 80px;
+                    height: 80px;
+                    background: rgba(0, 255, 255, 0.2);
+                    border: 2px solid rgba(0, 255, 255, 0.5);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: rgba(0, 255, 255, 0.8);
+                    font-size: 24px;
+                    pointer-events: auto;
+                }
+                
+                .control-pad.active {
+                    background: rgba(255, 0, 255, 0.3);
+                    border-color: rgba(255, 0, 255, 0.8);
+                }
+                
+                .control-button.active {
+                    background: rgba(0, 255, 255, 0.3);
+                    border-color: rgba(0, 255, 255, 0.8);
+                }
+            `;
+            document.head.appendChild(style);
+            
+            console.log("Mobile controls created successfully");
+        } catch (error) {
+            console.error("Error creating mobile controls:", error);
         }
     }
     
-    createMobileControls() {
-        if (!this.isMobile) return;
-        
-        // Remove any existing mobile controls
-        const existingControls = document.getElementById('mobile-controls');
-        if (existingControls) {
-            existingControls.remove();
+    updateMobileControlsVisibility() {
+        try {
+            const controls = document.getElementById('mobile-controls');
+            if (controls) {
+                controls.style.display = this.isMobile ? 'block' : 'none';
+            }
+        } catch (error) {
+            console.error("Error updating mobile controls visibility:", error);
         }
-        
-        // Create container for mobile controls
-        const controlsContainer = document.createElement('div');
-        controlsContainer.id = 'mobile-controls';
-        document.body.appendChild(controlsContainer);
-        
-        // Create movement pad
-        const movementPad = document.createElement('div');
-        movementPad.id = 'movement-pad';
-        movementPad.className = 'control-pad';
-        controlsContainer.appendChild(movementPad);
-        
-        // Create weapon button
-        const weaponButton = document.createElement('div');
-        weaponButton.id = 'weapon-button';
-        weaponButton.className = 'control-button';
-        weaponButton.innerHTML = '<i class="fas fa-crosshairs"></i>';
-        controlsContainer.appendChild(weaponButton);
-        
-        // Add touch event listeners with proper options
-        const touchOptions = {
-            passive: false // Important for iOS
-        };
-        
-        // Movement pad touch handling
-        if (movementPad) {
-            movementPad.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (e.touches && e.touches[0]) {
-                    this.handleMovementTouch(e.touches[0]);
-                    movementPad.classList.add('active');
-                }
-            }, touchOptions);
-            
-            movementPad.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                if (e.touches && e.touches[0]) {
-                    this.handleMovementTouch(e.touches[0]);
-                }
-            }, touchOptions);
-            
-            movementPad.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                this.resetMovementControls();
-                movementPad.classList.remove('active');
-            }, touchOptions);
-        }
-        
-        // Weapon button touch handling
-        if (weaponButton) {
-            weaponButton.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.keys.shoot = true;
-                weaponButton.classList.add('active');
-            }, touchOptions);
-            
-            weaponButton.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                this.keys.shoot = false;
-                weaponButton.classList.remove('active');
-            }, touchOptions);
-        }
-        
-        // Add styles
-        const style = document.createElement('style');
-        style.textContent = `
-            #mobile-controls {
-                position: fixed;
-                bottom: 20px;
-                left: 0;
-                right: 0;
-                height: 180px;
-                z-index: 1000;
-                pointer-events: none;
-                display: ${this.isMobile ? 'block' : 'none'};
-            }
-            
-            .control-pad {
-                position: absolute;
-                left: 20px;
-                bottom: 20px;
-                width: 120px;
-                height: 120px;
-                background: rgba(255, 0, 255, 0.2);
-                border: 2px solid rgba(255, 0, 255, 0.5);
-                border-radius: 50%;
-                pointer-events: auto;
-            }
-            
-            .control-button {
-                position: absolute;
-                right: 20px;
-                bottom: 20px;
-                width: 80px;
-                height: 80px;
-                background: rgba(0, 255, 255, 0.2);
-                border: 2px solid rgba(0, 255, 255, 0.5);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: rgba(0, 255, 255, 0.8);
-                font-size: 24px;
-                pointer-events: auto;
-            }
-            
-            .control-pad.active {
-                background: rgba(255, 0, 255, 0.3);
-                border-color: rgba(255, 0, 255, 0.8);
-            }
-            
-            .control-button.active {
-                background: rgba(0, 255, 255, 0.3);
-                border-color: rgba(0, 255, 255, 0.8);
-            }
-        `;
-        document.head.appendChild(style);
     }
     
     handleMovementTouch(touch) {
-        if (!this.isMobile) return;
-        
-        const pad = document.getElementById('movement-pad');
-        if (!pad) return;
-        
-        const rect = pad.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        
-        // Calculate direction from center of pad
-        const deltaX = touch.clientX - centerX;
-        const deltaY = touch.clientY - centerY;
-        
-        // Normalize the deltas
-        const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        const normalizedX = deltaX / length;
-        const normalizedY = deltaY / length;
-        
-        // Set movement based on touch position
-        this.keys.forward = normalizedY < -0.3;
-        this.keys.backward = normalizedY > 0.3;
-        this.keys.left = normalizedX < -0.3;
-        this.keys.right = normalizedX > 0.3;
+        try {
+            if (!this.isMobile || !touch) return;
+            
+            const pad = document.getElementById('movement-pad');
+            if (!pad) return;
+            
+            const rect = pad.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            // Calculate direction from center of pad
+            const deltaX = touch.clientX - centerX;
+            const deltaY = touch.clientY - centerY;
+            
+            // Check if the keys object exists
+            if (!this.keys) {
+                this.keys = {
+                    forward: false,
+                    backward: false,
+                    left: false,
+                    right: false
+                };
+            }
+            
+            // Normalize the deltas
+            const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            if (length < 10) {
+                // If touch is very close to center, don't move
+                this.resetMovementControls();
+                return;
+            }
+            
+            const normalizedX = deltaX / length;
+            const normalizedY = deltaY / length;
+            
+            // Set movement based on touch position
+            this.keys.forward = normalizedY < -0.3;
+            this.keys.backward = normalizedY > 0.3;
+            this.keys.left = normalizedX < -0.3;
+            this.keys.right = normalizedX > 0.3;
+        } catch (error) {
+            console.error("Error handling movement touch:", error);
+            this.resetMovementControls();
+        }
     }
     
     resetMovementControls() {
-        this.keys.forward = false;
-        this.keys.backward = false;
-        this.keys.left = false;
-        this.keys.right = false;
+        try {
+            if (!this.keys) return;
+            
+            this.keys.forward = false;
+            this.keys.backward = false;
+            this.keys.left = false;
+            this.keys.right = false;
+        } catch (error) {
+            console.error("Error resetting movement controls:", error);
+        }
     }
     
     setupTouchListeners() {
@@ -3699,72 +3831,111 @@ class ObjectPoolManager {
     
     // Create a new pool
     createPool(name, createFunc, initialSize = 20) {
-        if (this.pools.has(name)) {
-            console.warn(`Pool ${name} already exists`);
+        if (!name || typeof createFunc !== 'function') {
+            console.error(`Cannot create pool: invalid parameters`);
             return;
         }
         
-        const pool = {
-            available: [],
-            active: [],
-            createFunc: createFunc
-        };
-        
-        // Pre-create objects
-        for (let i = 0; i < initialSize; i++) {
-            const obj = createFunc();
-            obj.__poolIndex = i;
-            pool.available.push(obj);
+        try {
+            if (this.pools.has(name)) {
+                console.warn(`Pool ${name} already exists`);
+                return;
+            }
+            
+            const pool = {
+                available: [],
+                active: [],
+                createFunc: createFunc
+            };
+            
+            // Pre-create objects
+            for (let i = 0; i < initialSize; i++) {
+                try {
+                    const obj = createFunc();
+                    if (obj) {
+                        obj.__poolIndex = i;
+                        pool.available.push(obj);
+                    }
+                } catch (e) {
+                    console.error(`Error creating object for pool ${name}:`, e);
+                }
+            }
+            
+            this.pools.set(name, pool);
+            console.log(`Created object pool '${name}' with ${pool.available.length} objects`);
+        } catch (e) {
+            console.error(`Error creating pool ${name}:`, e);
         }
-        
-        this.pools.set(name, pool);
-        console.log(`Created object pool '${name}' with ${initialSize} objects`);
     }
     
     // Get an object from pool
     get(name) {
-        const pool = this.pools.get(name);
-        if (!pool) {
-            console.error(`Pool ${name} doesn't exist`);
+        try {
+            const pool = this.pools.get(name);
+            if (!pool) {
+                console.warn(`Pool ${name} doesn't exist`);
+                return null;
+            }
+            
+            let obj;
+            if (pool.available.length > 0) {
+                obj = pool.available.pop();
+            } else {
+                // Create new object if none available
+                try {
+                    obj = pool.createFunc();
+                    if (obj) {
+                        obj.__poolIndex = pool.active.length + pool.available.length;
+                    }
+                } catch (e) {
+                    console.error(`Error creating new object for pool ${name}:`, e);
+                    return null;
+                }
+            }
+            
+            if (obj) {
+                pool.active.push(obj);
+                return obj;
+            }
+            return null;
+        } catch (e) {
+            console.error(`Error getting object from pool ${name}:`, e);
             return null;
         }
-        
-        let obj;
-        if (pool.available.length > 0) {
-            obj = pool.available.pop();
-        } else {
-            // Create new object if none available
-            obj = pool.createFunc();
-            obj.__poolIndex = pool.active.length + pool.available.length;
-            console.log(`Growing pool ${name}`);
-        }
-        
-        pool.active.push(obj);
-        return obj;
     }
     
     // Return object to pool
     release(name, obj) {
-        const pool = this.pools.get(name);
-        if (!pool) {
-            console.error(`Pool ${name} doesn't exist`);
-            return;
-        }
-        
-        const index = pool.active.indexOf(obj);
-        if (index !== -1) {
-            pool.active.splice(index, 1);
-            pool.available.push(obj);
+        try {
+            if (!name || !obj) return;
+            
+            const pool = this.pools.get(name);
+            if (!pool) {
+                console.warn(`Pool ${name} doesn't exist`);
+                return;
+            }
+            
+            const index = pool.active.indexOf(obj);
+            if (index !== -1) {
+                pool.active.splice(index, 1);
+                pool.available.push(obj);
+            }
+        } catch (e) {
+            console.error(`Error releasing object to pool ${name}:`, e);
         }
     }
     
     // Clear all pools
     clear() {
-        this.pools.forEach((pool, name) => {
-            pool.active.length = 0;
-            pool.available.length = 0;
-        });
-        this.pools.clear();
+        try {
+            this.pools.forEach((pool, name) => {
+                pool.active.length = 0;
+                pool.available.length = 0;
+            });
+            this.pools.clear();
+        } catch (e) {
+            console.error("Error clearing object pools:", e);
+        }
     }
 }
 

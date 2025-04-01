@@ -4,6 +4,8 @@
     <title>Monster Truck Arena - Game</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="shortcut icon" href="favicon.svg" type="image/svg+xml">
     <style>
         body {
             margin: 0;
@@ -639,8 +641,26 @@
         // Simple logging for debugging
         const logStatus = (message) => {
             console.log(message);
-            if (window.gameReadyState.overlayTapped) {
-                document.getElementById('loading-text').textContent = message;
+            
+            // Safe element access
+            try {
+                const loadingText = document.getElementById('loading-text');
+                if (loadingText) {
+                    loadingText.textContent = message;
+                } else if (window.gameReadyState?.overlayTapped) {
+                    // Create loading text if it doesn't exist
+                    const loadingScreen = document.getElementById('loadingScreen');
+                    if (loadingScreen) {
+                        const newLoadingText = document.createElement('div');
+                        newLoadingText.id = 'loading-text';
+                        newLoadingText.className = 'loading-text';
+                        newLoadingText.textContent = message;
+                        loadingScreen.innerHTML = '';
+                        loadingScreen.appendChild(newLoadingText);
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not update loading text:", err);
             }
         };
         
