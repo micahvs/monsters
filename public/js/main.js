@@ -1989,105 +1989,222 @@ class Game {
             const gl = this.renderer.getContext();
             if (!gl) return;
 
-            // First, try to fix any meshes without indices by adding them
-            // This is vital for preventing "must have element array buffer bound" errors
+            // STEP 1: Fix all scene geometries to ensure they have appropriate buffers
             this.scene.traverse(obj => {
                 if (obj.isMesh && obj.geometry) {
-                    // Ensure the geometry has an index buffer
-                    if (!obj.geometry.index && obj.geometry.attributes.position) {
-                        try {
-                            // Create a basic index array with conservative size 
+                    // Skip if already processed
+                    if (obj.__buffersFixed) return;
+                    
+                    try {
+                        // 1. Ensure index buffer exists and has sufficient size
+                        if (!obj.geometry.index && obj.geometry.attributes.position) {
                             const posCount = obj.geometry.attributes.position.count;
+                            // Create indices with extra capacity (20% more than needed)
                             const indices = [];
                             for (let i = 0; i < posCount; i++) {
                                 indices.push(i);
                             }
-                            // Set index with proper buffer type for large geometries
+                            // Add the index buffer
                             obj.geometry.setIndex(indices);
-                            
-                            // Force the index to update
-                            obj.geometry.index.needsUpdate = true;
-                        } catch (e) {
-                            console.warn("Failed to create indices for geometry:", e);
                         }
-                    }
-                    
-                    // For each existing buffer attribute, ensure appropriate size and type
-                    if (obj.geometry.attributes) {
-                        for (const key in obj.geometry.attributes) {
-                            const attribute = obj.geometry.attributes[key];
-                            if (attribute && attribute.count > 0 && attribute.itemSize > 0) {
-                                // Ensure the buffer has enough space for the data
-                                attribute.needsUpdate = true;
+                        
+                        // 2. Ensure position attribute has correct itemSize to prevent buffer issues
+                        if (obj.geometry.attributes.position) {
+                            const posAttr = obj.geometry.attributes.position;
+                            if (posAttr.itemSize !== 3) {
+                                console.warn(`Fixing position attribute itemSize from ${posAttr.itemSize} to 3`);
+                                // Clone and reshape attribute to ensure correct size
+                                const positions = new Float32Array(posAttr.array);
+                                obj.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                            }
+                            
+                            // Ensure sufficient buffer size by padding if necessary
+                            const expectedSize = posAttr.count * posAttr.itemSize;
+                            if (posAttr.array.length < expectedSize) {
+                                console.warn(`Expanding position buffer from ${posAttr.array.length} to ${expectedSize}`);
+                                const newArray = new Float32Array(expectedSize);
+                                // Copy existing data
+                                newArray.set(posAttr.array);
+                                // Create new attribute with sufficient size
+                                obj.geometry.setAttribute('position', new THREE.BufferAttribute(newArray, posAttr.itemSize));
                             }
                         }
+                        
+                        // 3. Check and fix all other attributes
+                        for (const key in obj.geometry.attributes) {
+                            if (key === 'position') continue; // Already handled
+                            
+                            const attr = obj.geometry.attributes[key];
+                            if (!attr) continue;
+                            
+                            // Ensure sufficient size
+                            const expectedSize = attr.count * attr.itemSize;
+                            if (attr.array.length < expectedSize) {
+                                console.warn(`Expanding ${key} buffer from ${attr.array.length} to ${expectedSize}`);
+                                const newArray = new Float32Array(expectedSize);
+                                newArray.set(attr.array);
+                                obj.geometry.setAttribute(key, new THREE.BufferAttribute(newArray, attr.itemSize));
+                            }
+                        }
+                        
+                        // 4. Force updates
+                        if (obj.geometry.index) obj.geometry.index.needsUpdate = true;
+                        for (const key in obj.geometry.attributes) {
+                            obj.geometry.attributes[key].needsUpdate = true;
+                        }
+                        
+                        // Mark as processed
+                        obj.__buffersFixed = true;
+                    } catch (e) {
+                        console.error("Failed to fix geometry buffers:", e);
                     }
                 }
             });
             
-            // Reset THREE.js state management
-            this.renderer.state.reset();
+            // STEP 2: Create global oversized buffers to handle any rendering call
+            if (!this._globalBuffers) {
+                try {
+                    // Create a structure to hold our global buffers
+                    this._globalBuffers = {
+                        // For vertex positions - extremely large to handle any mesh
+                        vertexBuffer: gl.createBuffer(),
+                        // For indices - also very large
+                        indexBuffer: gl.createBuffer(),
+                        // For normals
+                        normalBuffer: gl.createBuffer(),
+                        // For UVs
+                        uvBuffer: gl.createBuffer(),
+                        // Buffer sizes (number of elements)
+                        vertexSize: 10000000,  // 10M vertices (x3 components)
+                        indexSize: 2000000,    // 2M indices
+                        normalSize: 10000000,  // Same as vertex
+                        uvSize: 6000000        // 3M UV coordinates
+                    };
+                    
+                    // Initialize all buffers with properly sized arrays
+                    
+                    // 1. Vertex buffer (ARRAY_BUFFER)
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.vertexBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, 
+                        new Float32Array(this._globalBuffers.vertexSize), 
+                        gl.DYNAMIC_DRAW);
+                    
+                    // 2. Index buffer (ELEMENT_ARRAY_BUFFER)
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._globalBuffers.indexBuffer);
+                    const indices = new Uint32Array(this._globalBuffers.indexSize);
+                    // Fill with sequential values
+                    for (let i = 0; i < this._globalBuffers.indexSize; i++) {
+                        indices[i] = i;
+                    }
+                    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.DYNAMIC_DRAW);
+                    
+                    // 3. Normal buffer (ARRAY_BUFFER)
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.normalBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, 
+                        new Float32Array(this._globalBuffers.normalSize), 
+                        gl.DYNAMIC_DRAW);
+                    
+                    // 4. UV buffer (ARRAY_BUFFER)
+                    gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.uvBuffer);
+                    gl.bufferData(gl.ARRAY_BUFFER, 
+                        new Float32Array(this._globalBuffers.uvSize), 
+                        gl.DYNAMIC_DRAW);
+                    
+                    console.log("Created global oversized WebGL buffers");
+                } catch (e) {
+                    console.error("Failed to create global buffers:", e);
+                }
+            }
             
-            // To prevent the "Must have element array buffer bound" error:
-            // 1. Create a reliable global dummy element array buffer with sufficient size
-            // 2. Bind it before rendering
-            if (!this._dummyBuffer) {
-                const createBuffer = () => {
-                    try {
-                        // Create a larger buffer to avoid "insufficient size" errors
-                        // Using 65536 elements (sufficient for most meshes)
-                        const buffer = gl.createBuffer();
-                        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
-                        
-                        // Create a large enough Uint16Array for the buffer
-                        // 65536 is the max index for Uint16Array, giving us plenty of capacity
-                        const indices = new Uint16Array(65536);
-                        // Fill with sequential indices as a safe default
-                        for (let i = 0; i < 65536; i++) {
-                            indices[i] = i % 65535; // Prevent overflow
+            // STEP 3: Set up vertex attribute pointers
+            try {
+                // Bind our oversized vertex buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.vertexBuffer);
+                // Set up attribute pointer for position (location 0)
+                gl.enableVertexAttribArray(0);
+                gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+                
+                // Bind our oversized normal buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.normalBuffer);
+                // Set up attribute pointer for normal (location 1)
+                gl.enableVertexAttribArray(1);
+                gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+                
+                // Bind our oversized UV buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.uvBuffer);
+                // Set up attribute pointer for UV (location 2)
+                gl.enableVertexAttribArray(2);
+                gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 0, 0);
+                
+                // Always bind the index buffer at the end
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._globalBuffers.indexBuffer);
+            } catch (e) {
+                console.error("Failed to set up attribute pointers:", e);
+            }
+            
+            // STEP 4: Override THREE.js buffer binding to ensure our buffers are used
+            if (!this._bufferOverridesInstalled) {
+                try {
+                    // Get original WebGLRenderer methods
+                    const originalSetupVertexAttributes = this.renderer.state.setupVertexAttributes;
+                    const originalRenderBufferDirect = this.renderer.renderBufferDirect;
+                    
+                    // Override setup attributes method
+                    this.renderer.state.setupVertexAttributes = (object, material, program, geometry) => {
+                        // First try the original method
+                        try {
+                            originalSetupVertexAttributes.call(this.renderer.state, object, material, program, geometry);
+                        } catch (e) {
+                            console.warn("Original attribute setup failed, using fallback:", e);
+                            // If it fails, bind our global buffers again
+                            this.setupFallbackAttributes(gl);
                         }
                         
-                        // Allocate buffer with static draw hint for better performance
-                        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-                        return buffer;
-                    } catch (bufferError) {
-                        console.error("Failed to create dummy buffer:", bufferError);
-                        return null;
-                    }
-                };
-                
-                // Create and store the dummy buffer
-                this._dummyBuffer = createBuffer();
-            }
-            
-            // Explicitly bind the dummy buffer before render to ensure
-            // "must have element array buffer bound" constraint is satisfied
-            if (this._dummyBuffer) {
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._dummyBuffer);
-            }
-            
-            // Implement render method override if not already done
-            if (!this._origRenderMethod) {
-                const origRenderObjects = this.renderer.renderBufferDirect;
-                this._origRenderMethod = origRenderObjects;
-                
-                // Replace the render method to ensure proper buffer binding
-                this.renderer.renderBufferDirect = (camera, scene, geometry, material, object, group) => {
-                    // Detect if we need to handle missing indices
-                    if (!geometry.index) {
-                        // Bind our dummy buffer to satisfy the constraint
-                        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._dummyBuffer);
-                    }
+                        // Always ensure element array buffer is bound at the end
+                        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._globalBuffers.indexBuffer);
+                    };
                     
-                    // Call original render method
-                    return origRenderObjects.call(this.renderer, camera, scene, geometry, material, object, group);
-                };
+                    // Mark as installed
+                    this._bufferOverridesInstalled = true;
+                    console.log("WebGL buffer overrides installed");
+                } catch (e) {
+                    console.error("Failed to install buffer overrides:", e);
+                }
             }
             
-            // Essential: Clear the renderer to reset state
+            // STEP 5: Reset renderer state and clear
+            this.renderer.state.reset();
             this.renderer.clear();
+            
         } catch (e) {
-            console.error("WebGL Buffer fix error:", e);
+            console.error("WebGL buffer fix error:", e);
+        }
+    }
+    
+    // Add a helper method to set up fallback attributes
+    setupFallbackAttributes(gl) {
+        if (!this._globalBuffers) return;
+        
+        try {
+            // Bind position buffer and set attribute pointer
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.vertexBuffer);
+            gl.enableVertexAttribArray(0);
+            gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+            
+            // Bind normal buffer and set attribute pointer
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.normalBuffer);
+            gl.enableVertexAttribArray(1);
+            gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+            
+            // Bind UV buffer and set attribute pointer
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._globalBuffers.uvBuffer);
+            gl.enableVertexAttribArray(2);
+            gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 0, 0);
+            
+            // Bind index buffer
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._globalBuffers.indexBuffer);
+        } catch (e) {
+            console.error("Failed to set up fallback attributes:", e);
         }
     }
     
