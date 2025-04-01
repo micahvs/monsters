@@ -73,88 +73,192 @@ export class Weapon {
         this.projectiles = [];
     }
     
-    shoot(position, direction, source = 'player') {
-        if (this.cooldownTimer > 0 || this.ammo <= 0 || this.isReloading) {
-            return null; // Can't shoot
+    shoot(position, direction, source = 'player', playerId = null) {
+        // Check if can shoot (ammo, cooldown)
+        if (!this.canShoot()) {
+            return null;
+        }
+
+        // Get game instance (may be passed or global)
+        const game = this.game || window.gameInstance;
+        
+        // Create multiple projectiles for shotgun, single for other weapons
+        const projectiles = [];
+        
+        // Ensure the game and objectPools exist
+        if (!game || !game.objectPools) {
+            console.warn("Weapon.shoot: Game or objectPools not available");
+            return null;
         }
         
-        // Set cooldown
-        this.cooldownTimer = this.type.cooldown;
-        
-        // Use ammo
-        this.ammo--;
-        
-        // Acquire projectiles from the pool
-        const pooledProjectiles = [];
-        
-        for (let i = 0; i < this.type.projectilesPerShot; i++) {
-            const pooledProjectile = this.game.objectPools.get('projectiles');
-            if (!pooledProjectile) {
-                console.warn("Weapon.shoot: Failed to acquire projectile from pool.");
-                continue; // Skip if pool is exhausted
-            }
-
-            let shotDirection = direction.clone();
+        // Ensure the projectiles pool exists
+        if (!game.objectPools.pools || !game.objectPools.pools.has('projectiles')) {
+            console.warn("Weapon.shoot: No projectiles pool found - creating one");
             
-            // Apply spread if needed
-            if (this.type.spread > 0) {
-                const spreadX = (Math.random() - 0.5) * this.type.spread;
-                const spreadY = (Math.random() - 0.5) * this.type.spread * 0.5; // Less vertical spread
-                const spreadZ = (Math.random() - 0.5) * this.type.spread;
+            // Attempt to initialize the pool if missing
+            try {
+                if (typeof game.initObjectPools === 'function') {
+                    game.initObjectPools();
+                } else {
+                    // Simple fallback to create a basic pool
+                    game.objectPools.createPool('projectiles', () => {
+                        // Check if Projectile class is available
+                        if (typeof Projectile !== 'function') {
+                            console.warn("Projectile class not found, creating fallback");
+                            
+                            // Define a fallback projectile object
+                            return {
+                                mesh: (() => {
+                                    const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 4);
+                                    geometry.rotateX(Math.PI / 2);
+                                    const material = new THREE.MeshBasicMaterial({
+                                        color: 0xff00ff,
+                                        transparent: true,
+                                        opacity: 0.8
+                                    });
+                                    const mesh = new THREE.Mesh(geometry, material);
+                                    mesh.visible = false;
+                                    if (game.scene) game.scene.add(mesh);
+                                    return mesh;
+                                })(),
+                                scene: game.scene,
+                                direction: new THREE.Vector3(0, 0, 1),
+                                speed: 0.5,
+                                damage: 10,
+                                alive: false,
+                                setup: function(position, direction, speed, damage, lifetime, source, weaponType, playerId) {
+                                    if (!position || !direction) return this;
+                                    this.mesh.position.copy(position);
+                                    this.direction = direction.normalize();
+                                    this.speed = speed || 0.5;
+                                    this.damage = damage || 10;
+                                    this.lifetime = lifetime || 200;
+                                    this.source = source || 'player';
+                                    this.playerId = playerId;
+                                    this.alive = true;
+                                    this.mesh.visible = true;
+                                    this.mesh.quaternion.setFromUnitVectors(
+                                        new THREE.Vector3(0, 0, 1),
+                                        this.direction
+                                    );
+                                    return this;
+                                },
+                                update: function(delta) {
+                                    if (!this.alive) return false;
+                                    const effectiveSpeed = this.speed * (delta ? delta * 60 : 1);
+                                    const movement = this.direction.clone().multiplyScalar(effectiveSpeed);
+                                    this.mesh.position.add(movement);
+                                    this.lifetime--;
+                                    if (this.lifetime <= 0) this.alive = false;
+                                    return this.alive;
+                                },
+                                hide: function() {
+                                    this.mesh.visible = false;
+                                    this.alive = false;
+                                }
+                            };
+                        }
+                        
+                        // Use the actual Projectile class if available
+                        return new Projectile(game.scene);
+                    }, 10);
+                }
+            } catch (e) {
+                console.error("Failed to create projectiles pool:", e);
+                return null;
+            }
+        }
+        
+        // Track if we successfully created all projectiles
+        let allProjectilesCreated = true;
+        
+        // Create projectiles based on weapon type
+        if (this.type === WeaponTypes.SHOTGUN) {
+            // For shotgun, create multiple projectiles with spread
+            const spreadCount = 5;
+            const spreadAngle = 0.2; // In radians
+            
+            for (let i = 0; i < spreadCount; i++) {
+                // Calculate spread direction
+                const spreadDirection = direction.clone();
+                const angle = (i / (spreadCount - 1) - 0.5) * spreadAngle;
                 
-                shotDirection.x += spreadX;
-                shotDirection.y += spreadY;
-                shotDirection.z += spreadZ;
-                shotDirection.normalize();
+                // Apply spread using quaternion rotation
+                const rotationAxis = new THREE.Vector3(0, 1, 0);
+                spreadDirection.applyAxisAngle(rotationAxis, angle);
+                
+                // Get projectile from pool
+                const projectile = game.objectPools.get('projectiles');
+                
+                if (projectile) {
+                    // Setup projectile with weapon properties
+                    projectile.setup(
+                        position.clone(),
+                        spreadDirection,
+                        this.type.speed,
+                        this.type.damage * this.damageMultiplier,
+                        this.type === WeaponTypes.MINES ? 600 : 100, // lifetime
+                        source,
+                        this.type,
+                        playerId
+                    );
+                    
+                    projectiles.push(projectile);
+                } else {
+                    console.warn("Weapon.shoot: Failed to acquire projectile from pool for shotgun spread");
+                    allProjectilesCreated = false;
+                }
+            }
+        } else {
+            // For other weapons, create a single projectile
+            // Get projectile from pool
+            const projectile = game.objectPools.get('projectiles');
+            
+            if (projectile) {
+                // Setup projectile with weapon properties
+                projectile.setup(
+                    position.clone(),
+                    direction.clone(),
+                    this.type.speed,
+                    this.type.damage * this.damageMultiplier,
+                    this.type === WeaponTypes.MINES ? 600 : 100, // lifetime
+                    source,
+                    this.type,
+                    playerId
+                );
+                
+                projectiles.push(projectile);
+            } else {
+                console.warn("Weapon.shoot: Failed to acquire projectile from pool");
+                allProjectilesCreated = false;
+            }
+        }
+        
+        // If we have projectiles, update weapon state
+        if (projectiles.length > 0) {
+            // Reduce ammo
+            this.ammo--;
+            
+            // Start cooldown
+            this.cooldownTimer = this.type.cooldown;
+            
+            // Track projectiles
+            this.projectiles = this.projectiles.concat(projectiles);
+            
+            // Add muzzle flash effect if the game supports it
+            if (game && game.createSimpleEffect) {
+                game.createSimpleEffect(position, 0xffff00, 5);
             }
             
-            // Configure the acquired projectile
-            pooledProjectile.setup(
-                position, 
-                shotDirection, 
-                this.type.speed, 
-                this.type.damage * this.damageMultiplier, 
-                this.type === WeaponTypes.MINES ? 600 : 100, // lifetime
-                source, 
-                this.type // Pass weapon type for visuals/behavior
-            );
-
-            // Specific setup for mines
-            if (this.type === WeaponTypes.MINES) {
-                pooledProjectile.armed = false;
-                pooledProjectile.armTimer = 30;
-            } else {
-                 pooledProjectile.armed = true;
-                 pooledProjectile.armTimer = 0;
-            }
-
-            // Ensure mesh is visible and positioned correctly
-            // Note: The pool's acquire/setup might handle scene add/visibility
-            pooledProjectile.mesh.position.copy(position);
-             // Offset for multiple projectiles
-            const offsetX = this.type.projectilesPerShot > 1 ? (i - Math.floor(this.type.projectilesPerShot / 2)) * 0.2 : 0;
-            pooledProjectile.mesh.position.x += offsetX;
-
-            // Update mesh appearance based on weapon type (assuming setup does this)
-            // pooledProjectile.updateAppearance(this.type); 
-
-            pooledProjectiles.push(pooledProjectile);
-            // REMOVED: Don't add to internal this.projectiles array
-            // this.projectiles.push(projectileData);
+            // Play sound
+            this.playSound('shoot');
+        } else if (!allProjectilesCreated) {
+            // If we failed to create projectiles due to pool issues but otherwise could shoot,
+            // don't put weapon on cooldown - let the player try again
+            console.warn("Weapon.shoot: No projectiles created due to pool issues");
         }
         
-        // Create muzzle flash based on weapon type
-        if (this.type !== WeaponTypes.MINES) {
-            this.createMuzzleFlash(position, direction);
-        }
-        
-        // Auto reload if needed
-        if (this.ammo === 0 && !this.isReloading) {
-            this.startReload();
-        }
-        
-        // Return the list of POOLED projectiles
-        return pooledProjectiles.length > 0 ? pooledProjectiles : null;
+        return projectiles;
     }
     
     update() {

@@ -9,6 +9,67 @@ if (!THREE || !THREE.Scene) {
     console.log("THREE.js Scene class found:", THREE.Scene);
 }
 
+// Define a simple buffer geometry utility for computing normals if not available
+if (THREE && !THREE.BufferGeometryUtils) {
+    THREE.BufferGeometryUtils = {
+        computeVertexNormals: function(geometry) {
+            // Skip if no position attribute
+            if (!geometry.attributes.position) return;
+            
+            try {
+                // Get position attribute
+                const positions = geometry.attributes.position;
+                const itemSize = positions.itemSize;
+                
+                // Create normal attribute if it doesn't exist
+                if (!geometry.attributes.normal) {
+                    const normals = new Float32Array(positions.count * 3);
+                    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+                }
+                
+                // Get normal attribute
+                const normals = geometry.attributes.normal;
+                
+                // Create temporary arrays
+                const tempVec1 = new THREE.Vector3();
+                const tempVec2 = new THREE.Vector3();
+                const tempNormal = new THREE.Vector3();
+                
+                // For each face, compute normal
+                for (let i = 0; i < positions.count; i += 3) {
+                    // Get vertices of face
+                    const vA = new THREE.Vector3();
+                    const vB = new THREE.Vector3();
+                    const vC = new THREE.Vector3();
+                    
+                    vA.fromBufferAttribute(positions, i);
+                    vB.fromBufferAttribute(positions, i + 1);
+                    vC.fromBufferAttribute(positions, i + 2);
+                    
+                    // Compute normal
+                    tempVec1.subVectors(vB, vA);
+                    tempVec2.subVectors(vC, vA);
+                    tempNormal.crossVectors(tempVec1, tempVec2).normalize();
+                    
+                    // Set normal for each vertex of the face
+                    normals.setXYZ(i, tempNormal.x, tempNormal.y, tempNormal.z);
+                    normals.setXYZ(i + 1, tempNormal.x, tempNormal.y, tempNormal.z);
+                    normals.setXYZ(i + 2, tempNormal.x, tempNormal.y, tempNormal.z);
+                }
+                
+                // Mark normals as needing update
+                normals.needsUpdate = true;
+                
+                console.log("Computed vertex normals");
+            } catch (e) {
+                console.warn("Error computing vertex normals:", e);
+            }
+        }
+    };
+    
+    console.log("Created fallback BufferGeometryUtils for computing normals");
+}
+
 // Global variables
 let gameInstance = null;
 let audioInitialized = false;
@@ -2048,7 +2109,8 @@ class Game {
                                 map: obj.material.map || null,
                                 transparent: obj.material.transparent || false,
                                 opacity: obj.material.opacity || 1.0,
-                                wireframe: obj.material.wireframe || false
+                                wireframe: obj.material.wireframe || false,
+                                side: THREE.DoubleSide // Ensure double-sided rendering
                             });
                             
                             // Store original material for potential restoration
@@ -2059,9 +2121,69 @@ class Game {
                             // Force update
                             newMaterial.needsUpdate = true;
                         }
+                    } else if (obj.material && !obj.__materialPropertiesChecked) {
+                        // Ensure all materials have their needsUpdate flag set
+                        obj.material.needsUpdate = true;
+                        obj.__materialPropertiesChecked = true;
+                    }
+                }
+                
+                // Ensure all geometries have proper element array buffers
+                if (obj.geometry && !obj.__geometryBufferChecked) {
+                    try {
+                        // Force index buffer creation if needed
+                        if (!obj.geometry.index && obj.geometry.attributes.position) {
+                            // Simplify geometry to avoid buffer binding issues
+                            obj.geometry.setAttribute('position', obj.geometry.attributes.position);
+                            
+                            // Ensure normal attribute exists
+                            if (!obj.geometry.attributes.normal && obj.geometry.attributes.position) {
+                                THREE.BufferGeometryUtils.computeVertexNormals(obj.geometry);
+                            }
+                        }
+                        
+                        // Force buffer update
+                        if (obj.geometry.attributes) {
+                            for (const key in obj.geometry.attributes) {
+                                if (obj.geometry.attributes[key]) {
+                                    obj.geometry.attributes[key].needsUpdate = true;
+                                }
+                            }
+                        }
+                        
+                        obj.__geometryBufferChecked = true;
+                    } catch (e) {
+                        console.warn("Error fixing geometry buffers:", e);
                     }
                 }
             });
+            
+            // Get the WebGL context directly
+            const gl = this.renderer.getContext();
+            if (gl) {
+                try {
+                    // Force WebGL to use our buffer binding
+                    const ext = gl.getExtension('OES_vertex_array_object');
+                    if (ext) {
+                        // If extension is available, it helps with state management
+                        console.log("Using OES_vertex_array_object for better buffer management");
+                    }
+                    
+                    // Reset WebGL state manually
+                    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+                    
+                    // Create and bind a dummy buffer to ensure something is bound
+                    const dummyBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, dummyBuffer);
+                    
+                    // Fill with minimal data
+                    const dummyData = new Uint16Array([0, 1, 2]);
+                    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, dummyData, gl.STATIC_DRAW);
+                } catch (glErr) {
+                    console.warn("WebGL buffer manipulation error:", glErr);
+                }
+            }
             
             // Force renderer state reset
             this.renderer.state.reset();
@@ -2069,12 +2191,15 @@ class Game {
             // Clear buffers
             this.renderer.clear();
             
-            // If using high-performance mode, use simpler rendering
+            // Simplify renderer settings further for compatibility
+            this.renderer.shadowMap.enabled = false;
+            this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+            this.renderer.toneMapping = THREE.NoToneMapping;
+            
+            // Set to basic rendering mode for maximum compatibility
             if (!window.lowPerformanceMode) {
-                // Simplify renderer settings further for compatibility
-                this.renderer.shadowMap.enabled = false;
-                this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
-                this.renderer.toneMapping = THREE.NoToneMapping;
+                window.lowPerformanceMode = true;
+                console.log("Enabled compatibility rendering mode for stability");
             }
         } catch (e) {
             console.error("Error in prepareWebGLForRendering:", e);
