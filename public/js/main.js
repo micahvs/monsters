@@ -339,364 +339,300 @@ class Projectile {
     }
 }
 
+// Define the Turret class
 class Turret {
-    constructor(position, scene, type = {
-        name: "Standard",
-        color: 0x666666,
-        activeColor: 0xff0000,
-        warningColor: 0xffff00,
-        health: 5,
-        damage: 10,
-        fireRate: 60,
-        projectileSpeed: 0.3,
-        scale: 15 // Added default scale
-    }) {
-        // Save type
-        this.type = type;
+    constructor(position, scene, type = null) {
+        this.position = position;
+        this.scene = scene;
+        this.type = type || {
+            name: "Standard",
+            color: 0x00ffff,
+            activeColor: 0xff00ff,
+            warningColor: 0xff8800,
+            health: 5,
+            damage: 10,
+            fireRate: 180,
+            projectileSpeed: 4.5,
+            rotationSpeed: 0.015,
+            scale: 15
+        };
         
-        // Apply scale factor - use type.scale or default to 15 (1.5x the original 10)
-        const turretScale = type.scale || 15;
+        this.health = this.type.health;
+        this.alive = true;
+        this.activated = false;
+        this.activationDelay = Math.floor(Math.random() * 360) + 240; // Random delay before activation
+        this.activationTimer = 0;
         
-        // Create turret base - adjust size based on type
-        const baseScale = type.name === "Heavy" ? 1.3 : (type.name === "Rapid" ? 0.8 : 1);
+        this.base = null;
+        this.gun = null;
+        this.projectiles = [];
+        this.cooldown = 0;
+        
+        this.fireRate = this.type.fireRate || 180; // Time between shots (frames)
+        this.projectileSpeed = this.type.projectileSpeed || 4.5;
+        this.rotationSpeed = this.type.rotationSpeed || 0.015;
+        
+        // Create 3D model
+        this.createModel();
+    }
+    
+    createModel() {
+        // Create base
         const baseGeometry = new THREE.CylinderGeometry(
-            1 * baseScale * turretScale, 
-            1 * baseScale * turretScale, 
-            1 * turretScale, 
-            8
+            this.type.scale * 0.8, // Top radius
+            this.type.scale, // Bottom radius
+            this.type.scale * 0.4, // Height
+            16 // Segments
         );
-        // Use MeshPhongMaterial with emissive for neon cyberpunk glow
-        const baseMaterial = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color(type.color),
-            emissive: type.color,
-            emissiveIntensity: 0.8,
-            shininess: 30,
-            transparent: false // Make turrets fully opaque
+        const baseMaterial = new THREE.MeshPhongMaterial({
+            color: this.type.color,
+            emissive: this.type.color,
+            emissiveIntensity: 0.2,
+            shininess: 70
         });
         this.base = new THREE.Mesh(baseGeometry, baseMaterial);
-        this.base.position.copy(position);
+        this.base.position.copy(this.position);
+        this.base.position.y = this.type.scale * 0.2; // Half height
+        this.scene.add(this.base);
         
-        // Set the height correctly
-        this.base.position.y = 0.5 * turretScale;
-
-        // Create turret gun - adjust shape based on type
-        let gunGeometry;
-        
-        if (type.name === "Heavy") {
-            // Larger, shorter gun for heavy turret
-            gunGeometry = new THREE.BoxGeometry(0.4 * turretScale, 0.4 * turretScale, 1.5 * turretScale);
-        } else if (type.name === "Rapid") {
-            // Thinner, longer gun for rapid turret
-            gunGeometry = new THREE.BoxGeometry(0.2 * turretScale, 0.2 * turretScale, 2.2 * turretScale);
-        } else {
-            // Standard gun
-            gunGeometry = new THREE.BoxGeometry(0.3 * turretScale, 0.3 * turretScale, 2 * turretScale);
-        }
-        
-        // Use MeshPhongMaterial with emissive for neon cyberpunk glow on the gun
-        const gunMaterial = new THREE.MeshPhongMaterial({ 
-            color: new THREE.Color(type.color),
-            emissive: type.color,
-            emissiveIntensity: 0.8,
-            shininess: 30,
-            transparent: false // Make turret guns fully opaque
+        // Create gun turret
+        const gunGeometry = new THREE.BoxGeometry(
+            this.type.scale * 0.2, // Width
+            this.type.scale * 0.2, // Height
+            this.type.scale * 1.2 // Length
+        );
+        const gunMaterial = new THREE.MeshPhongMaterial({
+            color: this.type.color,
+            emissive: this.type.color,
+            emissiveIntensity: 0.4,
+            shininess: 90
         });
         this.gun = new THREE.Mesh(gunGeometry, gunMaterial);
-        this.gun.position.y = 0.5 * turretScale;
-        this.gun.position.z = 0.5 * turretScale;
+        this.gun.position.set(0, this.type.scale * 0.3, this.type.scale * 0.4);
         this.base.add(this.gun);
-
-        // Set health to a small value that's easily destroyable
-        this.health = 5; // Simplified - makes every turret destroyable in a few hits
-        this.shootCooldown = 0;
-        this.maxShootCooldown = type.fireRate; // Cooldown between shots
-        this.alive = true;
-        this.scene = scene;
-        this.activated = false;
-        this.activationDelay = 180; // Default delay (3 seconds)
-        
-        // Add turret to scene
-        scene.add(this.base);
-        
-        // Keep track of fired projectiles
-        this.projectiles = [];
     }
-
+    
     update(playerPosition) {
-        // Handle respawn timer for destroyed turrets
-        if (!this.alive && this.respawning) {
-            this.respawnTimer--;
-            
-            // Respawn the turret after timer reaches zero
-            if (this.respawnTimer <= 0) {
-                this.respawn();
-            }
-            
-            // Pulse the turret when it's about to respawn (last 3 seconds)
-            if (this.respawnTimer <= 180 && this.respawnTimer % 20 === 0) {
-                const pulseColor = this.respawnTimer % 40 === 0 ? 0x222222 : 0x444444;
-                this.base.material.color.setHex(pulseColor);
-            }
-            
-            return; // Skip normal update while respawning
-        }
-        
-        if (!this.alive) return;
-        
-        // Handle activation delay
-        if (!this.activated) {
-            if (this.activationDelay > 0) {
-                // Reduce activation delay faster (decrement by 2 instead of 1)
-                this.activationDelay -= 2;
-                
-                // Change color to yellow when about to activate (last second)
-                if (this.activationDelay < 60) {
-                    this.base.material.color.setHex(this.type.warningColor);
-                    
-                    // Create pulsing effect
-                    if (this.activationDelay % 10 === 0) {
-                        // Flash between yellow and orange
-                        const color = this.activationDelay % 20 === 0 ? this.type.warningColor : 0xff8800;
-                        this.base.material.color.setHex(color);
-                    }
+        if (!this.alive) {
+            // If respawning, check timer
+            if (this.respawning) {
+                this.respawnTimer--;
+                if (this.respawnTimer <= 0) {
+                    this.respawn();
                 }
+            }
+            return;
+        }
+        
+        // Activation timer
+        if (!this.activated) {
+            this.activationTimer++;
+            if (this.activationTimer >= this.activationDelay) {
+                this.activate();
+            }
+            
+            // Waiting animation - pulse
+            if (this.base && this.base.material) {
+                const pulseIntensity = 0.1 + (Math.sin(this.activationTimer * 0.05) * 0.05);
+                this.base.material.emissiveIntensity = pulseIntensity;
                 
-                return; // Don't do anything until activated
-            } else {
-                // Activate the turret
-                this.activated = true;
-                this.base.material.color.setHex(this.type.activeColor); // Change to active color
-                
-                // Randomize initial cooldown to prevent all turrets from firing at once
-                this.shootCooldown = Math.floor(Math.random() * this.maxShootCooldown);
+                // Change color as activation approaches
+                if (this.activationTimer > this.activationDelay * 0.7) {
+                    this.base.material.color.setHex(this.type.warningColor);
+                    this.base.material.emissive.setHex(this.type.warningColor);
+                }
+            }
+            
+            return;
+        }
+        
+        // Track player
+        if (playerPosition && this.base) {
+            // Calculate angle to player
+            const dx = playerPosition.x - this.base.position.x;
+            const dz = playerPosition.z - this.base.position.z;
+            const targetAngle = Math.atan2(dx, dz);
+            
+            // Get current angle
+            let currentAngle = this.base.rotation.y;
+            
+            // Smoothly rotate towards target
+            const angleDiff = (targetAngle - currentAngle + Math.PI) % (Math.PI * 2) - Math.PI;
+            this.base.rotation.y += Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), this.rotationSpeed);
+            
+            // Decrease cooldown
+            if (this.cooldown > 0) {
+                this.cooldown--;
+            }
+            
+            // Check if can fire
+            const isAiming = Math.abs(angleDiff) < 0.2; // Target within sight
+            if (isAiming && this.cooldown <= 0) {
+                this.fire(playerPosition);
             }
         }
-
-        // Calculate direction to player
-        const direction = new THREE.Vector3()
-            .subVectors(playerPosition, this.base.position)
-            .normalize();
         
-        // Calculate target rotation (angle in Y-axis)
-        const targetRotation = Math.atan2(direction.x, direction.z);
-        
-        // Get current rotation as angle
-        let currentRotation = this.base.rotation.y;
-        
-        // Normalize angles to -PI to PI range
-        while (currentRotation > Math.PI) currentRotation -= Math.PI * 2;
-        while (currentRotation < -Math.PI) currentRotation += Math.PI * 2;
-        
-        // Calculate shortest rotation direction
-        let deltaRotation = targetRotation - currentRotation;
-        
-        // Ensure we rotate the shortest way
-        if (deltaRotation > Math.PI) deltaRotation -= Math.PI * 2;
-        if (deltaRotation < -Math.PI) deltaRotation += Math.PI * 2;
-        
-        // Apply rotation speed limit
-        const rotationSpeed = this.type.rotationSpeed || 0.01; // Default if not defined
-        
-        // Clamp rotation amount to maximum rotation speed
-        if (Math.abs(deltaRotation) > rotationSpeed) {
-            deltaRotation = Math.sign(deltaRotation) * rotationSpeed;
-        }
-        
-        // Apply rotation
-        this.base.rotation.y += deltaRotation;
-
-        // Update shooting cooldown
-        if (this.shootCooldown > 0) this.shootCooldown--;
-        
-        // Only shoot if facing close enough to the player
-        const facingPlayer = Math.abs(deltaRotation) < 0.1; // About 5.7 degrees
-        
-        // Shoot if possible and facing player
-        if (this.canShoot() && facingPlayer) {
-            this.shoot(direction);
-        }
-        
-        // Update projectiles
-        this.updateProjectiles();
-    }
-    
-    shoot(direction) {
-        // Add slight randomness to aiming (imperfect aim)
-        const randomSpread = 0.1; // Max 0.1 radians spread (about 5.7 degrees)
-        const randomX = (Math.random() * 2 - 1) * randomSpread;
-        const randomY = (Math.random() * 2 - 1) * randomSpread * 0.5; // Less vertical spread
-        const randomZ = (Math.random() * 2 - 1) * randomSpread;
-        
-        // Apply randomness to direction
-        const shootDir = direction.clone();
-        shootDir.x += randomX;
-        shootDir.y += randomY; 
-        shootDir.z += randomZ;
-        shootDir.normalize();
-        
-        // Calculate position at the end of the gun
-        const gunTip = new THREE.Vector3(0, 0, 1.5);
-        // Transform to world coordinates
-        gunTip.applyMatrix4(this.gun.matrixWorld);
-        
-        // Create projectile
-        const projectile = new Projectile(
-            gunTip, 
-            shootDir, 
-            this.type.projectileSpeed, // speed
-            this.type.damage,  // damage
-            'turret' // source
-        );
-        
-        // Add projectile meshes to scene
-        this.scene.add(projectile.mesh);
-        // No light to add
-        // this.scene.add(projectile.light);
-        
-        // Add to our tracked projectiles
-        this.projectiles.push(projectile);
-        
-        // Reset cooldown
-        this.shootCooldown = this.maxShootCooldown;
-    }
-    
-    updateProjectiles() {
-        for (let i = 0; i < this.projectiles.length; i++) {
+        // Update existing projectiles
+        for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const projectile = this.projectiles[i];
             
-            // Update projectile
-            projectile.update();
+            // Move projectile
+            projectile.mesh.position.x += projectile.direction.x * this.projectileSpeed;
+            projectile.mesh.position.z += projectile.direction.z * this.projectileSpeed;
             
-            // Remove dead projectiles
-            if (!projectile.alive) {
+            // Check if out of bounds or expired
+            projectile.life--;
+            if (projectile.life <= 0 || !projectile.alive ||
+                Math.abs(projectile.mesh.position.x) > 1000 ||
+                Math.abs(projectile.mesh.position.z) > 1000) {
+                
+                // Remove from scene
                 this.scene.remove(projectile.mesh);
-                // No light to remove
-                // this.scene.remove(projectile.light);
                 this.projectiles.splice(i, 1);
-                i--;
             }
         }
     }
-
-    damage(damageAmount = 2) {
-        // Always do a reasonable amount of damage
-        this.health -= damageAmount;
+    
+    activate() {
+        this.activated = true;
         
-        // Flash the turret red to show damage
+        // Change base color to active color
         if (this.base && this.base.material) {
-            // Flash red
-            this.base.material.color.setHex(0xff0000);
-            
-            // Make the gun flash too if it exists
-            if (this.gun && this.gun.material) {
-                this.gun.material.color.setHex(0xff0000);
-            }
-            
-            // Reset colors after flash
-            setTimeout(() => {
-                if (this.base && this.base.material && this.alive) {
-                    this.base.material.color.setHex(this.type.color);
-                }
-                
-                if (this.gun && this.gun.material && this.alive) {
-                    this.gun.material.color.setHex(this.type.color);
-                }
-            }, 150);
+            this.base.material.color.setHex(this.type.activeColor);
+            this.base.material.emissive.setHex(this.type.activeColor);
+            this.base.material.emissiveIntensity = 0.5;
         }
         
-        // Check if destroyed
+        // Change gun color to active color
+        if (this.gun && this.gun.material) {
+            this.gun.material.color.setHex(this.type.activeColor);
+            this.gun.material.emissive.setHex(this.type.activeColor);
+            this.gun.material.emissiveIntensity = 0.5;
+        }
+    }
+    
+    fire(targetPosition) {
+        // Calculate direction to player
+        const direction = new THREE.Vector3()
+            .subVectors(targetPosition, this.base.position)
+            .normalize();
+        
+        // Slight randomization for difficulty adjustment
+        direction.x += (Math.random() - 0.5) * 0.1;
+        direction.z += (Math.random() - 0.5) * 0.1;
+        direction.normalize();
+        
+        // Create projectile
+        const projectileGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+        const projectileMaterial = new THREE.MeshBasicMaterial({ 
+            color: this.type.activeColor, 
+            emissive: this.type.activeColor, 
+            emissiveIntensity: 1.0 
+        });
+        
+        const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
+        
+        // Position at gun tip
+        const gunDirection = new THREE.Vector3(0, 0, 1);
+        gunDirection.applyQuaternion(this.base.quaternion);
+        
+        // Position at end of gun
+        const gunTip = new THREE.Vector3(
+            this.base.position.x + gunDirection.x * this.type.scale * 0.6,
+            this.base.position.y + this.type.scale * 0.3,
+            this.base.position.z + gunDirection.z * this.type.scale * 0.6
+        );
+        
+        projectileMesh.position.copy(gunTip);
+        
+        // Add to scene
+        this.scene.add(projectileMesh);
+        
+        // Add to projectiles array
+        this.projectiles.push({
+            mesh: projectileMesh,
+            direction: { x: direction.x, y: 0, z: direction.z },
+            life: 120, // Lifespan in frames
+            damage: this.type.damage,
+            alive: true
+        });
+        
+        // Start cooldown
+        this.cooldown = this.fireRate;
+        
+        // Create muzzle flash
+        this.createMuzzleFlash(gunTip);
+    }
+    
+    createMuzzleFlash(position) {
+        // Create muzzle flash
+        const flashGeometry = new THREE.SphereGeometry(1, 8, 8);
+        const flashMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xffff00,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+        flash.position.copy(position);
+        this.scene.add(flash);
+        
+        // Add light
+        const light = new THREE.PointLight(0xffff00, 2, 10);
+        light.position.copy(position);
+        this.scene.add(light);
+        
+        // Remove after short time
+        setTimeout(() => {
+            if (this.scene) {
+                this.scene.remove(flash);
+                this.scene.remove(light);
+            }
+        }, 100);
+    }
+    
+    takeDamage(amount) {
+        this.health -= amount;
+        
+        // Check for destruction
         if (this.health <= 0) {
             this.alive = false;
-            
-            // Death effects
-            if (this.base && this.base.material) {
-                this.base.material.color.setHex(0x333333);
-                this.base.material.emissive.setHex(0x000000);
-            }
-            
-            if (this.gun && this.gun.material) {
-                this.gun.material.color.setHex(0x333333);
-                this.gun.material.emissive.setHex(0x000000);
-            }
-            
-            // Setup for respawn
-            this.respawning = true;
-            this.respawnTimer = 30 * 60; // 30 seconds at 60fps
-            
-            // Tilt to show destruction
-            if (this.base) {
-                this.base.rotation.x = Math.random() * 0.8 - 0.4;
-                this.base.rotation.z = Math.random() * 0.8 - 0.4;
-            }
+            return true; // Destroyed
         }
         
-        return this.health;
+        return false; // Still alive
     }
-
-    canShoot() {
-        return this.alive && this.activated && this.shootCooldown <= 0;
+    
+    respawn() {
+        // Reset turret
+        this.alive = true;
+        this.health = this.type.health;
+        this.activated = false;
+        this.activationTimer = 0;
+        this.activationDelay = Math.floor(Math.random() * 360) + 240;
+        this.cooldown = 0;
+        this.respawning = false;
+        
+        // Reset visual appearance
+        if (this.base && this.base.material) {
+            this.base.material.color.setHex(this.type.color);
+            this.base.material.emissive.setHex(this.type.color);
+            this.base.material.emissiveIntensity = 0.2;
+            
+            // Reset rotation
+            this.base.rotation.x = 0;
+            this.base.rotation.z = 0;
+        }
+        
+        if (this.gun && this.gun.material) {
+            this.gun.material.color.setHex(this.type.color);
+            this.gun.material.emissive.setHex(this.type.color);
+            this.gun.material.emissiveIntensity = 0.2;
+        }
     }
     
     getProjectiles() {
         return this.projectiles;
-    }
-    
-    removeFromScene() {
-        // Remove all projectiles
-        for (const projectile of this.projectiles) {
-            this.scene.remove(projectile.mesh);
-            // No light to remove
-            // this.scene.remove(projectile.light);
-        }
-        
-        // Remove turret
-        this.scene.remove(this.base);
-    }
-    
-    respawn() {
-        // Reset turret state
-        this.alive = true;
-        this.respawning = false;
-        this.health = this.originalHealth;
-        this.type = { ...this.originalType };
-        this.activated = false;
-        this.activationDelay = Math.floor(Math.random() * 300) + 120; // 120-420 frames (2-7 seconds)
-        
-        // Reset appearance
-        this.base.material.color.setHex(this.type.color);
-        this.base.rotation.x = 0;
-        this.base.rotation.z = 0;
-        
-        // Create respawn effect
-        this.createRespawnEffect();
-    }
-    
-    createRespawnEffect() {
-        // Create a simple flash effect
-        const flashColor = this.type.color;
-        const flashLight = new THREE.PointLight(flashColor, 2, 20);
-        flashLight.position.copy(this.base.position);
-        flashLight.position.y += 5;
-        this.scene.add(flashLight);
-        
-        // Auto-remove light after flash
-        setTimeout(() => {
-            this.scene.remove(flashLight);
-        }, 1000);
-        
-        // Create particles using game's particle system if available
-        if (this.scene.game && this.scene.game.createSimpleEffect) {
-            // Create a burst of particles at the turret position
-            this.scene.game.createSimpleEffect(
-                new THREE.Vector3(
-                    this.base.position.x,
-                    this.base.position.y + 10,
-                    this.base.position.z
-                ),
-                flashColor,
-                15
-            );
-        }
     }
 }
 
@@ -2582,6 +2518,99 @@ class Game {
         }
         
         console.log("Resources disposed successfully");
+    }
+
+    // Restore the createTurrets method that was accidentally removed
+    createTurrets() {
+        // Create turrets at random positions in the arena
+        const arenaSize = 1200; // 2x the original game area size
+        const minDistanceFromCenter = 240; // Adjusted for larger arena
+        const numTurrets = 4; // Keep the same number of turrets
+        
+        // Define turret types with cyberpunk/synthwave colors
+        const turretTypes = [
+            {
+                name: "Standard",
+                color: 0x00ffff, // Cyan base color
+                activeColor: 0xff00ff, // Magenta active color
+                warningColor: 0xff8800, // Orange warning color
+                health: 5,
+                damage: 10,
+                fireRate: 180,
+                projectileSpeed: 4.5, // Adjusted for larger arena
+                rotationSpeed: 0.015,
+                scale: 15 // 1.5x bigger (original was 10)
+            },
+            {
+                name: "Heavy",
+                color: 0x0088ff, // Blue base color
+                activeColor: 0xff00ff, // Magenta active color
+                warningColor: 0xff8800, // Orange warning color
+                health: 8,
+                damage: 20,
+                fireRate: 240,
+                projectileSpeed: 3.75, // Adjusted for larger arena
+                rotationSpeed: 0.008,
+                scale: 15 // 1.5x bigger (original was 10)
+            }
+        ];
+        
+        for (let i = 0; i < numTurrets; i++) {
+            // Generate random position, ensuring it's not too close to center
+            let x, z;
+            do {
+                x = (Math.random() * 2 - 1) * arenaSize/2;
+                z = (Math.random() * 2 - 1) * arenaSize/2;
+            } while (Math.sqrt(x*x + z*z) < minDistanceFromCenter);
+            
+            const position = new THREE.Vector3(x, 0, z);
+            
+            // Select random turret type
+            const typeIndex = Math.floor(Math.random() * turretTypes.length);
+            const turretType = turretTypes[typeIndex];
+            
+            // Create turret with type
+            const turret = new Turret(position, this.scene, turretType);
+            
+            // Use shorter activation delay (120-240 frames instead of 240-600)
+            turret.activationDelay = Math.floor(Math.random() * 120) + 120;
+            
+            this.turrets.push(turret);
+        }
+    }
+    
+    // Also restore the updateTurrets method
+    updateTurrets() {
+        // Track if any turrets activated this frame
+        let newActivations = 0;
+        
+        // Update each turret
+        for (let i = 0; i < this.turrets.length; i++) {
+            const turret = this.turrets[i];
+            if (!turret) continue;
+            
+            // Check if turret is about to activate
+            const wasActive = turret.activated;
+            
+            // Pass player position
+            if (this.truck) {
+                turret.update(this.truck.position);
+            }
+            
+            // Check if turret just activated
+            if (!wasActive && turret.activated) {
+                newActivations++;
+                // Show notification when a turret activates to alert the player
+                this.showNotification('Turret activated!', 'warning');
+            }
+        }
+        
+        // Show notification if turrets activated
+        if (newActivations === 1) {
+            this.showNotification("Warning: Turret activated!", 2000);
+        } else if (newActivations > 1) {
+            this.showNotification(`Warning: ${newActivations} turrets activated!`, 2000);
+        }
     }
 }
 
