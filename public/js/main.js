@@ -23,24 +23,57 @@ function setupMobileAudioHandling() {
     // Only show the overlay on mobile devices
     if (isMobileDevice) {
         console.log("Mobile device detected, showing tap-to-start overlay");
-        overlay.classList.remove('hidden');
+        
+        // Create overlay if it doesn't exist
+        if (!overlay) {
+            const newOverlay = document.createElement('div');
+            newOverlay.id = 'tap-to-start-overlay';
+            newOverlay.className = 'overlay';
+            newOverlay.innerHTML = '<div class="overlay-content"><div class="tap-icon"></div><div class="tap-text">TAP TO START</div></div>';
+            newOverlay.style.position = 'fixed';
+            newOverlay.style.top = '0';
+            newOverlay.style.left = '0';
+            newOverlay.style.width = '100%';
+            newOverlay.style.height = '100%';
+            newOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+            newOverlay.style.zIndex = '10000';
+            newOverlay.style.display = 'flex';
+            newOverlay.style.justifyContent = 'center';
+            newOverlay.style.alignItems = 'center';
+            newOverlay.style.color = '#ff00ff';
+            newOverlay.style.fontFamily = 'Arial, sans-serif';
+            newOverlay.style.fontSize = '24px';
+            document.body.appendChild(newOverlay);
+        }
         
         // Handle the tap event
-        overlay.addEventListener('click', () => {
+        (overlay || document.getElementById('tap-to-start-overlay'))?.addEventListener('click', () => {
             console.log("Tap-to-start overlay clicked, initializing audio");
             audioInitialized = true;
             
             // Hide the overlay
-            overlay.classList.add('hidden');
+            (overlay || document.getElementById('tap-to-start-overlay'))?.classList.add('hidden');
             
             // Initialize audio manager
             if (!window.audioManager) {
                 console.log("Creating AudioManager on user interaction");
-                window.audioManager = new AudioManager(null);
-                
-                // Immediately trigger the audio initialization
-                if (window.audioManager) {
-                    window.audioManager.handleUserInteraction();
+                try {
+                    window.audioManager = new AudioManager(null);
+                    
+                    // Immediately trigger the audio initialization
+                    if (window.audioManager) {
+                        window.audioManager.handleUserInteraction();
+                    }
+                } catch (e) {
+                    console.error("Error creating AudioManager:", e);
+                    // Create dummy audio manager to prevent null errors
+                    window.audioManager = {
+                        playSound: () => {},
+                        stopSound: () => {},
+                        handleUserInteraction: () => {},
+                        playMusic: () => {},
+                        stopMusic: () => {}
+                    };
                 }
             }
             
@@ -53,6 +86,10 @@ function setupMobileAudioHandling() {
                 // Force game to update audio manager reference
                 if (gameInstance.monsterTruck) {
                     gameInstance.monsterTruck.audioManager = window.audioManager;
+                }
+                if (gameInstance.truck) {
+                    // Force truck to get an audio reference too
+                    gameInstance.truck.audioManager = window.audioManager;
                 }
             } else {
                 console.log("Game not yet started, will initialize when ready");
@@ -740,7 +777,9 @@ class Game {
                     playSound: () => {},
                     stopSound: () => {},
                     playMusic: () => {},
-                    stopMusic: () => {}
+                    stopMusic: () => {},
+                    handleUserInteraction: () => {},
+                    camera: this.camera
                 };
                 
                 // If audio was already initialized through tap-to-start, update reference
@@ -773,8 +812,13 @@ class Game {
                 playSound: () => {},
                 stopSound: () => {},
                 playMusic: () => {},
-                stopMusic: () => {}
+                stopMusic: () => {},
+                handleUserInteraction: () => {},
+                camera: this.camera
             };
+            
+            // Also set global reference to prevent null errors elsewhere
+            window.audioManager = this.audioManager;
         }
         
         // Create shared geometries for better performance

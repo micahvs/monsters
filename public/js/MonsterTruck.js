@@ -668,7 +668,9 @@ export class MonsterTruck {
         const wasMoving = Math.abs(this.speed) >= 0.05;
         
         // Get audio manager reference safely
-        const audioManager = window.audioManager || this.audioManager;
+        const audioManager = window.audioManager || this.audioManager || {
+            playSound: () => {}
+        };
         
         // Acceleration and braking
         if (accelerating) {
@@ -686,10 +688,15 @@ export class MonsterTruck {
                 audioManager.playSound('engine_deceleration');
             }
         } else {
-            // Natural deceleration
-            this.speed *= (1 - this.deceleration);
+            // Apply natural deceleration (friction)
+            this.speed *= this.friction;
             
-            // Check if the vehicle is almost stopped (idle)
+            // Ensure speed gets to zero when very slow
+            if (Math.abs(this.speed) < 0.005) {
+                this.speed = 0;
+            }
+            
+            // Idle sound
             if (Math.abs(this.speed) < 0.05) {
                 // Only play idle sound occasionally
                 if (audioManager && (!this._lastIdleSound || performance.now() - this._lastIdleSound > 2000)) {
@@ -713,139 +720,71 @@ export class MonsterTruck {
             audioManager.playSound('engine_rev');
         }
         
-        // Turning (more effective at lower speeds)
-        const turnFactor = 1 - (Math.abs(this.speed) / this.maxSpeed) * 0.5;
-        if (turningLeft) {
-            this.rotation -= this.turnSpeed * turnFactor * Math.sign(this.speed);
-        }
-        if (turningRight) {
-            this.rotation += this.turnSpeed * turnFactor * Math.sign(this.speed);
+        // Turning (apply based on speed for more realistic steering)
+        const actualTurnSpeed = this.turnSpeed * Math.min(1, Math.abs(this.speed) / (this.maxSpeed * 0.5));
+        
+        if (this.speed !== 0) {
+            const turnDirection = Math.sign(this.speed); // Reverse steering when going backwards
+            if (turningLeft) {
+                this.rotation.y += actualTurnSpeed * turnDirection;
+                if (this.steeringAngle !== undefined) {
+                    this.steeringAngle = Math.min(this.maxSteeringAngle, this.steeringAngle + 0.1);
+                }
+            } else if (turningRight) {
+                this.rotation.y -= actualTurnSpeed * turnDirection;
+                if (this.steeringAngle !== undefined) {
+                    this.steeringAngle = Math.max(-this.maxSteeringAngle, this.steeringAngle - 0.1);
+                }
+            } else if (this.steeringAngle !== undefined) {
+                // Return to center
+                this.steeringAngle *= 0.8;
+                if (Math.abs(this.steeringAngle) < 0.05) this.steeringAngle = 0;
+            }
         }
         
-        // Apply movement
+        // Return if truck mesh doesn't exist
+        if (!this.body) return;
+        
+        // Calculate forward direction based on rotation
         const direction = new THREE.Vector3(
-            Math.sin(this.rotation),
-            0,
-            Math.cos(this.rotation)
+            Math.sin(this.rotation.y), 
+            0, 
+            Math.cos(this.rotation.y)
         );
         
-        // VALIDATION: Check for NaN values in direction and speed
-        if (isNaN(direction.x) || isNaN(direction.z) || isNaN(this.speed)) {
-            direction.set(0, 0, 1);
-            this.resetMovementState();
+        // Apply movement based on speed and direction
+        this.body.position.x += direction.x * this.speed;
+        this.body.position.z += direction.z * this.speed;
+        
+        // Apply banking during turns (visual effect)
+        if (turningLeft && this.speed > 0.1) {
+            this.body.rotation.z = Math.min(this.body.rotation.z + 0.01, 0.1);
+        } else if (turningRight && this.speed > 0.1) {
+            this.body.rotation.z = Math.max(this.body.rotation.z - 0.01, -0.1);
+        } else {
+            // Return to level
+            this.body.rotation.z *= 0.9;
         }
         
-        // Update velocity based on direction and speed
-        this.velocity.x = direction.x * this.speed;
-        this.velocity.z = direction.z * this.speed;
-        
-        // Apply velocity to position
-        this.body.position.add(this.velocity);
-        
-        // VALIDATION: Final check for position validity
-        if (isNaN(this.body.position.x) || isNaN(this.body.position.y) || isNaN(this.body.position.z)) {
-            this.body.position.set(0, 0.5, 0);
-            this.resetMovementState();
-        }
-        
-        // Update truck rotation
-        this.body.rotation.y = this.rotation;
-        
-        // Update wheel rotation and suspension
-        this.updateWheels();
-    }
-    
-    updateWheels() {
-        const speedRotation = this.speed * 0.5;
-        const machineType = this.config.machineType || 'grid-ripper';
-        const time = Date.now() * 0.001;
-        
-        // Different vehicles have different suspension characteristics
-        const suspensionSettings = {
-            'neon-crusher': {
-                stiffness: 0.05,    // Stiffer suspension (less movement)
-                frequency: 3,       // Slower oscillation
-                amplitude: 0.07     // Lesser movement
-            },
-            'cyber-beast': {
-                stiffness: 0.12,    // Looser suspension (more movement)
-                frequency: 5,       // Faster oscillation
-                amplitude: 0.15     // More dramatic movement
-            },
-            'grid-ripper': {
-                stiffness: 0.08,    // Medium suspension
-                frequency: 4,       // Medium oscillation
-                amplitude: 0.1      // Medium movement
-            }
-        };
-        
-        // Get settings based on vehicle type or fall back to grid-ripper
-        const settings = suspensionSettings[machineType] || suspensionSettings['grid-ripper'];
-        
-        this.wheels.forEach((wheel, index) => {
-            // Rotate wheels based on speed with some randomness for realism
-            wheel.mesh.rotation.x += speedRotation * (1 + Math.sin(time + index) * 0.05);
-            
-            // Simulate suspension with type-specific characteristics
-            const offset = Math.sin(time * settings.frequency + index) * settings.amplitude;
-            const speedFactor = Math.min(1, Math.abs(this.speed) * 5); // More suspension movement at higher speeds
-            wheel.suspension = wheel.baseY + (offset * speedFactor);
-            wheel.mesh.position.y = wheel.suspension;
-            
-            // Add wheel effects based on vehicle type
-            if (machineType === 'cyber-beast' && this.speed > 0.3) {
-                // Add wheel trail/glow for Cyber Beast at high speeds
-                const children = wheel.mesh.children;
-                for (let i = 0; i < children.length; i++) {
-                    if (children[i].isPointLight) {
-                        children[i].intensity = 0.3 + (Math.abs(this.speed) * 0.5);
-                        children[i].distance = 2 + (Math.abs(this.speed) * 1.5);
-                    }
-                }
-            }
-        });
-        
-        // Enhanced vehicle body physics based on speed, turning and machine type
-        
-        // Side tilt when turning (more pronounced for Grid Ripper)
-        let tiltAngleZ = this.velocity.x * 0.1;
-        if (machineType === 'grid-ripper') tiltAngleZ *= 1.5;
-        if (machineType === 'neon-crusher') tiltAngleZ *= 0.7;
-        
-        // Forward/backward tilt
-        let tiltAngleX = -this.speed * 0.1;
-        
-        // Add some oscillation for better physical feel
-        const oscillation = Math.sin(time * 10) * 0.01 * Math.min(1, Math.abs(this.speed) * 10);
-        
-        // Apply rotation to body with some damping/smoothing
-        this.body.rotation.z = tiltAngleZ + (machineType === 'cyber-beast' ? oscillation * 0.5 : 0);
-        this.body.rotation.x = tiltAngleX + oscillation;
-        
-        // Vehicle-specific effects
-        if (machineType === 'cyber-beast' && Math.abs(this.speed) > 0.5) {
-            // Find flame objects for cyber-beast and adjust based on speed
-            this.body.traverse(child => {
-                // Look for flame objects (cones at the back)
-                if (child.geometry && 
-                    child.geometry.type === 'ConeGeometry' &&
-                    child.position.z < -0.3) {
-                    
-                    // Adjust scale based on speed
-                    const baseScale = 1.0;
-                    const speedScale = Math.min(2, 1 + (Math.abs(this.speed) * 1.5));
-                    
-                    child.scale.set(
-                        baseScale,
-                        baseScale * speedScale, // Make flame longer with speed
-                        baseScale
-                    );
-                    
-                    // Randomly flicker flames
-                    child.material.opacity = 0.5 + Math.random() * 0.5;
-                }
+        // Update wheel rotation based on speed
+        if (this.wheels) {
+            const wheelRotationSpeed = this.speed * 0.5;
+            this.wheels.forEach(wheel => {
+                wheel.mesh.rotation.x += wheelRotationSpeed;
             });
+            
+            // Apply steering to front wheels
+            if (this.steeringAngle !== undefined) {
+                if (this.wheels.length >= 2) {
+                    this.wheels[0].mesh.rotation.y = this.steeringAngle;
+                    this.wheels[1].mesh.rotation.y = this.steeringAngle;
+                }
+            }
         }
+        
+        // Update mesh position to match vehicle
+        this.body.position.copy(this.body.position);
+        this.body.rotation.y = this.rotation.y;
     }
     
     shoot() {
@@ -872,49 +811,32 @@ export class MonsterTruck {
     }
     
     takeDamage(amount) {
-        // If we're already showing damage effect, skip
-        if (this.damageTimeout > 0) return;
+        // Initialize health if it doesn't exist
+        if (this.health === undefined) {
+            this.health = 100;
+        }
         
-        // Apply armor rating to reduce damage (higher armor = less damage)
-        const actualDamage = Math.floor(amount / this.armorRating);
-        this.health = Math.max(0, this.health - actualDamage);
+        // Apply damage
+        this.health = Math.max(0, this.health - amount);
         
-        // Visual effect for damage - flash the vehicle
-        const originalMaterials = [];
-        const flashMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff0000,
-            emissive: 0xff0000,
-            emissiveIntensity: 0.5,
-            transparent: true,
-            opacity: 0.8
-        });
+        // Create damage effect
+        this.showDamageEffect();
         
-        // Store original materials and apply flash
-        this.body.traverse(child => {
-            if (child.isMesh) {
-                originalMaterials.push({
-                    mesh: child,
-                    material: child.material
-                });
-                child.material = flashMaterial;
-            }
-        });
+        // Play sound
+        const audioManager = window.audioManager || this.audioManager || {
+            playSound: () => {}
+        };
         
-        // Reset cooldown
-        this.damageTimeout = 15; // 15 frames
+        if (audioManager) {
+            audioManager.playSound('vehicle_hit');
+        }
         
-        // Reset materials after flash
-        setTimeout(() => {
-            originalMaterials.forEach(item => {
-                item.mesh.material = item.material;
-            });
-            this.damageTimeout = 0;
-        }, 200);
+        // Check if destroyed
+        if (this.health <= 0) {
+            this.handleDestruction();
+        }
         
-        // Create spark particles from impact
-        this.createDamageParticles(actualDamage);
-        
-        return actualDamage;
+        return this.health;
     }
     
     createDamageParticles(amount) {

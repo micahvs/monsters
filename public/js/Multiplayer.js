@@ -48,7 +48,7 @@ export default class Multiplayer {
             
             // Initialize socket with better connection settings
             this.socket = io(this.serverUrl, {
-                transports: ['websocket', 'polling'],
+                transports: ['polling', 'websocket'], // Try polling first for reliability
                 timeout: 10000,
                 reconnection: true,
                 reconnectionAttempts: 5,
@@ -61,59 +61,8 @@ export default class Multiplayer {
                 }
             });
             
-            // Connection event handlers
-            this.socket.on('connect', () => {
-                console.log('🎮 [Multiplayer] Connected to server!');
-                this.isConnecting = false;
-                this.isConnected = true;
-                this.isOfflineMode = false;
-                this.localPlayerId = this.socket.id;
-                
-                // Join game
-                this.socket.emit('joinGame', {
-                    id: this.socket.id,
-                    position: this.game.monsterTruck ? {
-                        x: this.game.monsterTruck.mesh.position.x,
-                        y: this.game.monsterTruck.mesh.position.y,
-                        z: this.game.monsterTruck.mesh.position.z
-                    } : { x: 0, y: 0, z: 0 }
-                });
-            });
-            
-            this.socket.on('connect_error', (error) => {
-                console.error('🎮 [Multiplayer] Connection error:', error);
-                this.handleConnectionError(error);
-            });
-            
-            this.socket.on('connect_timeout', (timeout) => {
-                console.error('🎮 [Multiplayer] Connection timeout:', timeout);
-                this.handleConnectionError(new Error('Connection timeout'));
-            });
-            
-            this.socket.on('disconnect', (reason) => {
-                console.log('🎮 [Multiplayer] Disconnected:', reason);
-                this.isConnected = false;
-                this.handleDisconnect(reason);
-            });
-            
-            this.socket.on('reconnect', (attemptNumber) => {
-                console.log('🎮 [Multiplayer] Reconnected after', attemptNumber, 'attempts');
-                this.isConnected = true;
-                this.isOfflineMode = false;
-            });
-            
-            this.socket.on('reconnect_error', (error) => {
-                console.error('🎮 [Multiplayer] Reconnection error:', error);
-                this.handleConnectionError(error);
-            });
-            
-            this.socket.on('reconnect_failed', () => {
-                console.error('🎮 [Multiplayer] Failed to reconnect');
-                this.enableOfflineMode();
-            });
-            
-            // Game event handlers
-            this.setupGameEventHandlers();
+            // Setup socket events
+            this.setupSocketEvents();
             
         } catch (error) {
             console.error('🎮 [Multiplayer] Connection error:', error);
@@ -121,66 +70,10 @@ export default class Multiplayer {
         }
     }
     
-    handleConnectionError(error) {
-        this.isConnecting = false;
-        console.error('🎮 [Multiplayer] Connection error:', error);
-        
-        // Show error notification
-        if (this.game && this.game.showNotification) {
-            this.game.showNotification('Connection error. Retrying...', 3000);
-        }
-        
-        // Try backup server if main server fails
-        if (!this.isConnected && !this.isOfflineMode) {
-            this.tryBackupServer();
-        }
-    }
-    
-    handleDisconnect(reason) {
-        // If the disconnect was intentional, don't try to reconnect
-        if (reason === 'io client disconnect') {
-            return;
-        }
-        
-        // Show notification
-        if (this.game && this.game.showNotification) {
-            this.game.showNotification('Lost connection to server. Attempting to reconnect...', 3000);
-        }
-        
-        // Try to reconnect after a short delay
-        setTimeout(() => {
-            if (!this.isConnected && !this.isOfflineMode) {
-                this.connect();
-            }
-        }, 2000);
-    }
-    
-    tryBackupServer() {
-        if (this.serverUrl === this.fallbackUrl) {
-            console.log('🎮 [Multiplayer] Already using backup server, enabling offline mode');
-            this.enableOfflineMode();
-            return;
-        }
-        
-        console.log('🎮 [Multiplayer] Trying backup server');
-        this.serverUrl = this.fallbackUrl;
-        this.connect();
-    }
-    
-    enableOfflineMode() {
-        if (!this.isOfflineMode) {
-            console.log('🎮 [Multiplayer] Enabling offline mode');
-            this.isOfflineMode = true;
-            this.isConnected = false;
-            
-            if (this.game && this.game.showNotification) {
-                this.game.showNotification('Unable to connect. Playing in offline mode.', 5000);
-            }
-            
-            // Clear existing players
-            this.players.clear();
-            this.remoteProjectiles.clear();
-        }
+    // CRITICAL: Setup socket events (essential for connection)
+    setupGameEventHandlers() {
+        // This is just a compatibility wrapper to avoid errors
+        this.setupSocketEvents();
     }
     
     setupSocketEvents() {
@@ -195,6 +88,7 @@ export default class Multiplayer {
         this.socket.on('connect', () => {
             console.log('🎮 [Multiplayer] Connected to multiplayer server');
             this.isConnected = true;
+            this.isConnecting = false;
             this.localPlayerId = this.socket.id;
             
             // Set global multiplayer initialization status
@@ -214,19 +108,50 @@ export default class Multiplayer {
             // Send initial player data
             this.sendPlayerInfo();
             
+            // Send join game event
+            this.socket.emit('joinGame', {
+                id: this.socket.id,
+                position: this.game.monsterTruck ? {
+                    x: this.game.monsterTruck.mesh.position.x,
+                    y: this.game.monsterTruck.mesh.position.y,
+                    z: this.game.monsterTruck.mesh.position.z
+                } : { x: 0, y: 0, z: 0 }
+            });
+            
             // Show connected message
             this.showNotification(`Connected to multiplayer server`);
         });
         
         // When a connection error occurs
         this.socket.on('connect_error', (error) => {
-            console.error('Connection error:', error);
-            console.log('Connection error details:', {
-                errorMessage: error.message,
-                errorType: error.type,
-                errorDescription: error.description
-            });
-            this.showNotification('Connection error, retrying...', 'error');
+            console.error('🎮 [Multiplayer] Connection error:', error);
+            this.handleConnectionError(error);
+        });
+        
+        // Handle disconnect
+        this.socket.on('disconnect', (reason) => {
+            console.log('🎮 [Multiplayer] Disconnected:', reason);
+            this.isConnected = false;
+            this.handleDisconnect(reason);
+        });
+        
+        // Handle reconnection
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log('🎮 [Multiplayer] Reconnected after', attemptNumber, 'attempts');
+            this.isConnected = true;
+            this.isOfflineMode = false;
+        });
+        
+        // Handle reconnection error
+        this.socket.on('reconnect_error', (error) => {
+            console.error('🎮 [Multiplayer] Reconnection error:', error);
+            this.handleConnectionError(error);
+        });
+        
+        // Handle reconnection failure
+        this.socket.on('reconnect_failed', () => {
+            console.error('🎮 [Multiplayer] Failed to reconnect');
+            this.enableOfflineMode();
         });
         
         // When receiving full game state
@@ -291,17 +216,6 @@ export default class Multiplayer {
             }
         });
         
-        // CRITICAL FIX: Add handler for hit confirmation
-        this.socket.on('hitConfirmed', (hitData) => {
-            // Show visual feedback
-            this.showNotification(`Hit confirmed on player! Damage: ${hitData.damage}`, 'success');
-            
-            // Update UI
-            if (this.game && this.game.updateScore) {
-                this.game.updateScore(hitData.damage);
-            }
-        });
-
         // When a player takes damage
         this.socket.on('playerDamaged', (damageData) => {
             const isLocalPlayerHit = damageData.id === this.localPlayerId;
@@ -310,43 +224,13 @@ export default class Multiplayer {
             if (isLocalPlayerHit) {
                 // Only apply damage if it came from someone else
                 if (damageData.sourceId !== this.localPlayerId) {
-                    // Force health update with server value (MISSION CRITICAL)
+                    // Force health update with server value
                     if (this.game) {
-                        // Immediately apply the health update for consistency
-                        const oldHealth = this.game.health;
-                        
-                        // Update game health
                         this.game.health = Math.max(0, damageData.health);
                         
                         // Update monster truck health
                         if (this.game.monsterTruck) {
                             this.game.monsterTruck.health = Math.max(0, damageData.health);
-                            
-                            // Force visual damage effect
-                            if (typeof this.game.monsterTruck.showDamageEffect === 'function') {
-                                this.game.monsterTruck.showDamageEffect();
-                            }
-                        }
-                        
-                        // Try standard HUD update - SIMPLIFIED
-                        try {
-                            if (typeof this.game.updateHUD === 'function') {
-                                this.game.updateHUD(); 
-                            }
-                        } catch (e) {
-                            console.error('Error updating HUD:', e);
-                        }
-                        
-                        // Add screen effect
-                        if (typeof this.game.addDamageScreenEffect === 'function') {
-                            this.game.addDamageScreenEffect(damageData.damage);
-                        }
-                        
-                        // Shake camera
-                        if (typeof this.game.shakeCamera === 'function') {
-                            // Scale shake based on damage, capped
-                            const shakeIntensity = Math.min(damageData.damage * 0.1, 1.0); 
-                            this.game.shakeCamera(shakeIntensity);
                         }
                     }
                     
@@ -372,132 +256,70 @@ export default class Multiplayer {
             }
         });
         
-        // When a player dies
-        this.socket.on('playerDied', (deathData) => {
-            if (deathData.id === this.localPlayerId) {
-                // Local player died
-                this.game.health = 0;
-                this.game.monsterTruck.health = 0;
-                
-                if (this.players.get(deathData.killedBy)) {
-                    this.showNotification(`You were destroyed by ${this.players.get(deathData.killedBy).nickname}!`, 'error');
-                }
-                
-                // Wait for respawn from server
-            } else if (this.players.get(deathData.id)) {
-                // Remote player died
-                this.showExplosion(this.players.get(deathData.id).truckMesh.position);
-                
-                if (deathData.killedBy === this.localPlayerId) {
-                    this.game.score += 100;
-                    this.showNotification(`You destroyed ${this.players.get(deathData.id).nickname}!`, 'success');
-                } else {
-                    this.showNotification(`${this.players.get(deathData.id).nickname} was destroyed!`);
-                }
-            }
-        });
+        // Start sending updates
+        this.startUpdates();
+    }
+    
+    handleConnectionError(error) {
+        this.isConnecting = false;
+        console.error('🎮 [Multiplayer] Connection error:', error);
         
-        // When a player respawns
-        this.socket.on('playerRespawned', (respawnData) => {
-            if (respawnData.id === this.localPlayerId) {
-                // Local player respawned
-                this.game.health = respawnData.health;
-                this.game.monsterTruck.health = respawnData.health;
-                
-                // Move to respawn position
-                if (this.game.truck && respawnData.position) {
-                    this.game.truck.position.copy(new THREE.Vector3(
-                        respawnData.position.x,
-                        respawnData.position.y,
-                        respawnData.position.z
-                    ));
-                }
-                
-                this.showNotification('You have respawned!', 'success');
-            } else if (this.players.get(respawnData.id)) {
-                // Remote player respawned - update their position
-                const player = this.players.get(respawnData.id);
-                if (player.truckMesh && respawnData.position) {
-                    player.truckMesh.position.copy(new THREE.Vector3(
-                        respawnData.position.x,
-                        respawnData.position.y,
-                        respawnData.position.z
-                    ));
-                }
-            }
-        });
+        // Show error notification
+        if (this.game && this.game.showNotification) {
+            this.game.showNotification('Connection error. Retrying...', 3000);
+        }
         
-        // When turrets are updated
-        this.socket.on('turretsUpdated', (turrets) => {
-            // Update turret states from host
-            if (this.game.turrets) {
-                this.updateTurrets(turrets);
-            }
-        });
+        // Try backup server if main server fails
+        if (!this.isConnected && !this.isOfflineMode) {
+            this.tryBackupServer();
+        }
+    }
+    
+    handleDisconnect(reason) {
+        // If the disconnect was intentional, don't try to reconnect
+        if (reason === 'io client disconnect') {
+            return;
+        }
         
-        // When receiving a chat message
-        this.socket.on('chat', (chatData) => {
-            // Validate the chat data
-            if (!chatData || !chatData.message) {
-                console.error('Invalid chat data received in socket event:', chatData);
-                return;
+        // Show notification
+        if (this.game && this.game.showNotification) {
+            this.game.showNotification('Lost connection to server. Attempting to reconnect...', 3000);
+        }
+        
+        // Try to reconnect after a short delay
+        setTimeout(() => {
+            if (!this.isConnected && !this.isOfflineMode) {
+                this.connect();
+            }
+        }, 2000);
+    }
+    
+    tryBackupServer() {
+        if (this.serverUrl === this.fallbackUrl) {
+            console.log('🎮 [Multiplayer] Already using backup server, enabling offline mode');
+            this.enableOfflineMode();
+            return;
+        }
+        
+        console.log('🎮 [Multiplayer] Trying backup server');
+        this.serverUrl = this.fallbackUrl;
+        this.connect();
+    }
+    
+    enableOfflineMode() {
+        if (!this.isOfflineMode) {
+            console.log('🎮 [Multiplayer] Enabling offline mode');
+            this.isOfflineMode = true;
+            this.isConnected = false;
+            
+            if (this.game && this.game.showNotification) {
+                this.game.showNotification('Unable to connect. Playing in offline mode.', 5000);
             }
             
-            // Always process the message, regardless of who sent it
-            this.receiveChatMessage(chatData);
-            
-            // If we have the global chat function from game.html, use it
-            if (window.addChatMessage && typeof window.addChatMessage === 'function') {
-                const sender = chatData.playerId === this.localPlayerId ? 'You' : chatData.nickname;
-                window.addChatMessage(sender, chatData.message);
-                return;
-            }
-            
-            // Otherwise use our own chat UI
-            if (!this.chatMessages) {
-                console.error('Chat messages container not found');
-                return;
-            }
-            
-            console.log('Using internal chat UI to display message');
-            
-            // Add message to chat history if it's an array
-            if (Array.isArray(this.chatMessages)) {
-                this.chatMessages.push(chatData);
-                return; // If it's an array, we can't append DOM elements to it
-            }
-            
-            // Create message element
-            const messageElement = document.createElement('div');
-            messageElement.style.marginBottom = '5px';
-            
-            // Format timestamp
-            const timestamp = new Date(chatData.timestamp).toLocaleTimeString();
-            
-            // Determine player color
-            let playerColor = '#ff00ff'; // Default color
-            if (chatData.playerId === this.localPlayerId) {
-                playerColor = this.game.playerColor || '#ff00ff';
-            } else if (this.players.has(chatData.playerId)) {
-                playerColor = this.players.get(chatData.playerId).color;
-            }
-            
-            // Format message with timestamp, nickname, and message
-            messageElement.innerHTML = `
-                <span style="color: #888;">[${timestamp}]</span> 
-                <span style="color: ${playerColor}; font-weight: bold;">${chatData.nickname}</span>: 
-                <span>${this.escapeHTML(chatData.message)}</span>
-            `;
-            
-            // Add to chat container and scroll to bottom
-            this.chatMessages.appendChild(messageElement);
-            this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
-            
-            // Show notification if chat is hidden
-            if (!this.isChatVisible) {
-                this.showNotification(`${chatData.nickname}: ${chatData.message}`, 'chat');
-            }
-        });
+            // Clear existing players
+            this.players.clear();
+            this.remoteProjectiles.clear();
+        }
     }
     
     startUpdates() {
