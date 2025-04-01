@@ -2040,8 +2040,8 @@ class Game {
         // Process keyboard input for more realistic driving
         const acceleration = 0.008; // Balanced between original 0.01 and slower 0.006
         const deceleration = 0.98; // Friction
-        const maxSpeed = 0.5;
-        const turnSpeed = 0.027; // Changed from 0.03 to 0.027
+        const maxSpeed = 0.9; // Changed from 0.5 to 0.9
+        const turnSpeed = 0.05; // Changed from 0.03 to 0.05
         
         // Initialize steering angle if not present
         if (this.truck.steeringAngle === undefined) {
@@ -2049,9 +2049,9 @@ class Game {
         }
         
         // Maximum steering angle in radians (about 30 degrees)
-        const maxSteeringAngle = 0.5;
+        const maxSteeringAngle = 0.13;
         // How quickly steering centers when not turning
-        const steeringReturnSpeed = 0.05;
+        const steeringReturnSpeed = 0.09;
         // How quickly steering responds to input
         const steeringResponseSpeed = 0.09;
         
