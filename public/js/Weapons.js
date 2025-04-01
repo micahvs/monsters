@@ -269,14 +269,14 @@ export class Weapon {
             const projectile = this.projectiles[i];
             
             // Update position if not a mine or if mine is being placed
-            if (projectile.type !== WeaponTypes.MINES || projectile.armTimer > 0) {
+            if (!projectile.type || projectile.type !== WeaponTypes.MINES || projectile.armTimer > 0) {
                 projectile.mesh.position.x += projectile.direction.x * projectile.speed;
                 projectile.mesh.position.y += projectile.direction.y * projectile.speed;
                 projectile.mesh.position.z += projectile.direction.z * projectile.speed;
             }
             
             // Handle mine arming
-            if (projectile.type === WeaponTypes.MINES && projectile.armTimer > 0) {
+            if (projectile.type && projectile.type === WeaponTypes.MINES && projectile.armTimer > 0) {
                 projectile.armTimer--;
                 
                 // When finished placing, set to ground level and arm
@@ -290,7 +290,7 @@ export class Weapon {
             }
             
             // Create trail for rockets and energy weapons
-            if (projectile.type === WeaponTypes.ROCKETS || projectile.type === WeaponTypes.MACHINE_GUN) {
+            if (projectile.type && (projectile.type === WeaponTypes.ROCKETS || projectile.type === WeaponTypes.MACHINE_GUN)) {
                 this.createProjectileTrail(projectile);
             }
             
@@ -299,8 +299,9 @@ export class Weapon {
             
             // Remove if lifetime ended
             if (projectile.lifetime <= 0) {
-                // Create explosion for rockets and mines
-                if (projectile.type.name === "Rockets" || projectile.type.name === "Mines") {
+                // Create explosion for rockets and mines - add safety check for type
+                if (projectile.type && projectile.type.name && 
+                    (projectile.type.name === "Rockets" || projectile.type.name === "Mines")) {
                     this.createExplosion(projectile.mesh.position.clone(), projectile.type);
                 }
                 
@@ -668,7 +669,7 @@ export class Weapon {
     
     createProjectileTrail(projectile) {
         // Skip trail for mines
-        if (projectile.type === WeaponTypes.MINES) return;
+        if (projectile.type && projectile.type === WeaponTypes.MINES) return;
         
         // Initialize trail pool if needed
         if (!this.trailPool) {
@@ -676,13 +677,18 @@ export class Weapon {
         }
         
         // Get trail from pool
-        const isRocket = projectile.type === WeaponTypes.ROCKETS;
+        const isRocket = projectile.type && projectile.type === WeaponTypes.ROCKETS;
         const trailObj = this.getTrailFromPool(isRocket);
         
         // Set trail properties
         const trail = trailObj.mesh;
         trail.position.copy(projectile.mesh.position);
-        trail.material.color.set(projectile.type.color);
+        // Safely set color
+        if (projectile.type && projectile.type.color) {
+            trail.material.color.set(projectile.type.color);
+        } else {
+            trail.material.color.set(0xffffff); // Default white color
+        }
         trail.material.opacity = 0.7;
         trail.scale.set(1, 1, 1);
         
@@ -829,17 +835,17 @@ export class Weapon {
             const projectile = this.projectiles[i];
             
             // Skip unarmed mines
-            if (projectile.type.name === "Mines" && !projectile.armed) {
+            if (projectile.type && projectile.type.name === "Mines" && !projectile.armed) {
                 continue;
             }
             
             const distance = position.distanceTo(projectile.mesh.position);
-            const hitRadius = projectile.type.name === "Mines" ? 3 : radius;
+            const hitRadius = (projectile.type && projectile.type.name === "Mines") ? 3 : radius;
             
             if (distance < hitRadius) {
                 // Calculate damage based on distance for explosives
                 let damage = projectile.damage;
-                if (projectile.type.name === "Mines" || projectile.type.name === "Rockets") {
+                if (projectile.type && (projectile.type.name === "Mines" || projectile.type.name === "Rockets")) {
                     // Damage falls off with distance
                     const falloff = 1 - (distance / hitRadius);
                     damage = projectile.damage * falloff;
@@ -861,7 +867,7 @@ export class Weapon {
                 // Return damage and impact data
                 return {
                     damage: Math.max(5, Math.round(damage)),
-                    explosive: projectile.type === WeaponTypes.MINES || projectile.type === WeaponTypes.ROCKETS
+                    explosive: projectile.type && (projectile.type === WeaponTypes.MINES || projectile.type === WeaponTypes.ROCKETS)
                 };
             }
         }
@@ -871,12 +877,14 @@ export class Weapon {
     
     createImpactEffect(projectile) {
         // Create different effects based on weapon type
-        if (projectile.type.name === "Rockets" || projectile.type.name === "Mines") {
+        if (projectile.type && projectile.type.name && 
+            (projectile.type.name === "Rockets" || projectile.type.name === "Mines")) {
             // For explosives, create explosion
             this.createExplosion(projectile.mesh.position.clone(), projectile.type);
         } else {
             // For non-explosives, create simpler impact
-            const light = new THREE.PointLight(projectile.type.color, 1, 5);
+            const color = projectile.type && projectile.type.color ? projectile.type.color : 0xffffff;
+            const light = new THREE.PointLight(color, 1, 5);
             light.position.copy(projectile.mesh.position);
             this.scene.add(light);
             
@@ -887,7 +895,7 @@ export class Weapon {
             for (let i = 0; i < particleCount; i++) {
                 const particleGeometry = new THREE.SphereGeometry(0.1, 6, 6);
                 const particleMaterial = new THREE.MeshBasicMaterial({
-                    color: projectile.type.color,
+                    color: color,
                     transparent: true,
                     opacity: 0.8
                 });
