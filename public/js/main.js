@@ -1979,28 +1979,47 @@ class Game {
                 this.multiplayer.interpolateRemotePlayers();
             }
             
-            // Render the scene
+            // Render the scene with WebGL safeguards
             if (this.renderer && this.scene && this.camera) {
                 // Check if renderer is valid before rendering
                 if (this.renderer.getContext() && !this.renderer.getContext().isContextLost()) {
-                    // Apply frustum culling for better performance
-                    // Only render objects in view
-                    const frustum = new THREE.Frustum();
-                    const projScreenMatrix = new THREE.Matrix4();
-                    projScreenMatrix.multiplyMatrices(
-                        this.camera.projectionMatrix, 
-                        this.camera.matrixWorldInverse
-                    );
-                    frustum.setFromProjectionMatrix(projScreenMatrix);
-                    
-                    // Render only if active
-                    this.renderer.render(this.scene, this.camera);
+                    try {
+                        // WebGL error prevention - Set specific rendering state  
+                        this.prepareWebGLForRendering();
+                        
+                        // Apply frustum culling for better performance
+                        // Only render objects in view
+                        const frustum = new THREE.Frustum();
+                        const projScreenMatrix = new THREE.Matrix4();
+                        projScreenMatrix.multiplyMatrices(
+                            this.camera.projectionMatrix, 
+                            this.camera.matrixWorldInverse
+                        );
+                        frustum.setFromProjectionMatrix(projScreenMatrix);
+                        
+                        // Render with error handling
+                        try {
+                            this.renderer.render(this.scene, this.camera);
+                        } catch (renderError) {
+                            console.warn("Render error caught:", renderError);
+                            // Force material updates on next frame
+                            this.scene.traverse(obj => {
+                                if (obj.material) {
+                                    if (Array.isArray(obj.material)) {
+                                        obj.material.forEach(m => m.needsUpdate = true);
+                                    } else {
+                                        obj.material.needsUpdate = true;
+                                    }
+                                }
+                            });
+                        }
+                    } catch (e) {
+                        console.warn("WebGL render preparation error:", e);
+                    }
                 } else {
                     console.warn("Skipping render - WebGL context is lost");
                 }
             }
-            
-            // Debug info update removed
             
             // Update stats if available
             if (this.stats) this.stats.end();
@@ -2009,14 +2028,150 @@ class Game {
             // Don't break the animation loop on error
         }
     }
+    
+    // Prepare the WebGL context for rendering to prevent uniform/buffer errors
+    prepareWebGLForRendering() {
+        // Only proceed if we have a valid renderer
+        if (!this.renderer || !this.scene) return;
+        
+        try {
+            // Reset material properties for consistent shader binding
+            this.scene.traverse(obj => {
+                if (obj.isMesh && obj.material) {
+                    // Ensure materials use basic shader programs where possible
+                    if (obj.material.type === 'MeshPhongMaterial' || obj.material.type === 'MeshStandardMaterial') {
+                        // Check if we already converted this material
+                        if (!obj.__materialSimplified) {
+                            // Create a simpler material (for desktop browsers with WebGL issues)
+                            const newMaterial = new THREE.MeshBasicMaterial({
+                                color: obj.material.color ? obj.material.color.clone() : 0xffffff,
+                                map: obj.material.map || null,
+                                transparent: obj.material.transparent || false,
+                                opacity: obj.material.opacity || 1.0,
+                                wireframe: obj.material.wireframe || false
+                            });
+                            
+                            // Store original material for potential restoration
+                            obj.__originalMaterial = obj.material;
+                            obj.material = newMaterial;
+                            obj.__materialSimplified = true;
+                            
+                            // Force update
+                            newMaterial.needsUpdate = true;
+                        }
+                    }
+                }
+            });
+            
+            // Force renderer state reset
+            this.renderer.state.reset();
+            
+            // Clear buffers
+            this.renderer.clear();
+            
+            // If using high-performance mode, use simpler rendering
+            if (!window.lowPerformanceMode) {
+                // Simplify renderer settings further for compatibility
+                this.renderer.shadowMap.enabled = false;
+                this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+                this.renderer.toneMapping = THREE.NoToneMapping;
+            }
+        } catch (e) {
+            console.error("Error in prepareWebGLForRendering:", e);
+        }
+    }
 
+    // Simplified WebGL Error-Resilient Material Creator
+    createErrorResilientMaterial(options = {}) {
+        // Default to basic material which has fewer uniforms and simpler shaders
+        const type = options.type || 'basic';
+        let material;
+        
+        try {
+            switch (type.toLowerCase()) {
+                case 'phong':
+                    material = new THREE.MeshBasicMaterial({
+                        color: options.color || 0xffffff,
+                        wireframe: options.wireframe || false,
+                        transparent: options.transparent || false,
+                        opacity: options.opacity || 1.0,
+                        side: options.side || THREE.FrontSide
+                    });
+                    break;
+                    
+                case 'standard':
+                    material = new THREE.MeshBasicMaterial({
+                        color: options.color || 0xffffff,
+                        wireframe: options.wireframe || false,
+                        transparent: options.transparent || false,
+                        opacity: options.opacity || 1.0,
+                        side: options.side || THREE.FrontSide
+                    });
+                    break;
+                    
+                case 'basic':
+                default:
+                    material = new THREE.MeshBasicMaterial({
+                        color: options.color || 0xffffff,
+                        wireframe: options.wireframe || false,
+                        transparent: options.transparent || false,
+                        opacity: options.opacity || 1.0,
+                        side: options.side || THREE.FrontSide
+                    });
+                    break;
+            }
+            
+            // Always set this flag for new materials
+            material.needsUpdate = true;
+            
+            return material;
+        } catch (e) {
+            console.error("Error creating material:", e);
+            // Absolute fallback for error cases
+            return new THREE.MeshBasicMaterial({ color: 0xff00ff });
+        }
+    }
+
+    // Helper method for creating meshes with error-resilient WebGL handling
+    createErrorResilientMesh(geometry, materialOptions = {}, position = { x: 0, y: 0, z: 0 }) {
+        // Create a material that won't cause WebGL errors
+        const material = this.createErrorResilientMaterial(materialOptions);
+        
+        // Create mesh
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        // Set position
+        mesh.position.set(position.x, position.y, position.z);
+        
+        // Add to scene
+        if (this.scene) {
+            this.scene.add(mesh);
+        }
+        
+        return mesh;
+    }
+
+    // Replace any existing updateRendererSettings with this more robust version
     updateRendererSettings() {
         if (!this.renderer) return;
         
-        // Apply shadow settings
-        this.renderer.shadowMap.enabled = this.shadowsEnabled;
-        if (this.shadowsEnabled) {
-            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        try {
+            // Basic renderer settings that won't cause WebGL errors
+            this.renderer.shadowMap.enabled = this.shadowsEnabled;
+            
+            // Disable problematic features that can cause uniform errors
+            this.renderer.physicallyCorrectLights = false;
+            
+            // Simple tone mapping that works on most browsers
+            this.renderer.toneMapping = THREE.NoToneMapping;
+            
+            // Force clean state
+            this.renderer.state.reset();
+            
+            // Clear to ensure clean state
+            this.renderer.clear();
+        } catch (e) {
+            console.error("Error updating renderer settings:", e);
         }
     }
 
