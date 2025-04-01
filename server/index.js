@@ -8,37 +8,69 @@ import cors from 'cors';
 const app = express();
 const httpServer = createServer(app);
 
+// Add healthcheck endpoint
+app.get('/healthcheck', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Send a simple response
+    res.json({
+        status: 'ok',
+        timestamp: Date.now(),
+        serverTime: new Date().toISOString()
+    });
+});
+
+// Handle OPTIONS requests for healthcheck
+app.options('/healthcheck', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.sendStatus(200);
+});
+
 // Define allowed origins
 const allowedOrigins = [
-    "https://monsters-kappa.vercel.app",
-    "https://monsters-micahvs.vercel.app",
-    "https://monsters-drab.vercel.app",
-    "https://monster-truck-game.vercel.app",
-    "https://monster-truck-stadium.fly.dev",
-    "https://monsters-git-main-micahvallardsmith-gmailcoms-projects.vercel.app",
-    "https://micahvs.github.io",
-    "http://localhost:3000",
-    "http://localhost:5000",
-    "http://localhost:8080",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5000", 
-    "http://127.0.0.1:8080",
-    "http://192.168.1.100:3000",
-    "file://"
+    'https://monsters-drab.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'http://127.0.0.1:5000'
 ];
 
-// Enable CORS with specific origins
-app.use(cors({
-    origin: allowedOrigins,
-    credentials: true
-}));
+// CORS middleware
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    }
+    next();
+});
 
-// Create Socket.IO server with optimized settings
+// Handle OPTIONS requests
+app.options('*', (req, res) => {
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.sendStatus(200);
+    } else {
+        res.sendStatus(403);
+    }
+});
+
+// Create Socket.IO server with CORS settings
 const io = new Server(httpServer, {
     cors: {
         origin: allowedOrigins,
-        methods: ["GET", "POST"],
-        credentials: true
+        methods: ['GET', 'POST'],
+        credentials: true,
+        allowedHeaders: ['Content-Type', 'Authorization']
     },
     pingTimeout: 120000,
     pingInterval: 30000,

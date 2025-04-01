@@ -21,6 +21,10 @@ export default class Multiplayer {
         // Track projectiles that need multiplayer collision checks
         this.activeProjectiles = new Set(); 
 
+        // Force enable multiplayer for all devices
+        window.multiplayerEnabled = true;
+        localStorage.setItem('monsterTruckMultiplayer', 'true');
+
         // Connect to the server
         this.connect();
     }
@@ -34,20 +38,12 @@ export default class Multiplayer {
                 throw new Error('Socket.io not found when attempting to connect');
             }
             
-            // CRITICAL FIX: Test server reachability before connecting
-            this.testServerConnection()
-                .then(serverReachable => {
-                    if (serverReachable) {
-                        // Initialize socket with better error handling
-                        console.log('🎮 [Multiplayer] Server is reachable, creating socket connection');
-                        this.initializeSocketConnection(this.serverUrl);
-                    } else {
-                        // Try using a different server URL
-                        console.log('🎮 [Multiplayer] Primary server not reachable, trying alternative URLs');
-                        this.tryBackupServers();
-                    }
-                });
+            // Always try to connect, even on mobile
+            console.log('🎮 [Multiplayer] Creating socket connection');
+            this.initializeSocketConnection(this.serverUrl);
+            
         } catch (error) {
+            console.error('🎮 [Multiplayer] Connection error:', error);
             this.handleConnectionError(error);
         }
     }
@@ -152,16 +148,17 @@ export default class Multiplayer {
             this.socket = io(serverUrl, {
                 withCredentials: true,
                 transports: ['polling', 'websocket'], // Try polling first for better mobile compatibility
-                timeout: 20000, // Increased timeout for mobile
+                timeout: 30000, // Increased timeout for mobile
                 reconnection: true,
-                reconnectionAttempts: 10, // More reconnection attempts
+                reconnectionAttempts: 15, // More reconnection attempts
                 reconnectionDelay: 1000, // Start with 1 second delay
-                reconnectionDelayMax: 5000, // Max 5 second delay
+                reconnectionDelayMax: 10000, // Max 10 second delay
                 autoConnect: true,
                 forceNew: true,
                 path: '/socket.io/', // Explicit path
                 query: {
-                    clientType: 'mobile' // Help server optimize for mobile
+                    clientType: 'mobile', // Help server optimize for mobile
+                    timestamp: Date.now() // Prevent caching
                 }
             });
             
