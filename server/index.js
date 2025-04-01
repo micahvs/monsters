@@ -15,6 +15,7 @@ const allowedOrigins = [
     "https://monsters-drab.vercel.app",
     "https://monster-truck-game.vercel.app",
     "https://monster-truck-stadium.fly.dev",
+    "https://monsters-git-main-micahvallardsmith-gmailcoms-projects.vercel.app",
     "https://micahvs.github.io",
     "http://localhost:3000",
     "http://localhost:5000",
@@ -39,9 +40,14 @@ const io = new Server(httpServer, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    pingTimeout: 60000,
-    pingInterval: 25000,
-    connectTimeout: 10000
+    pingTimeout: 120000,
+    pingInterval: 30000,
+    connectTimeout: 20000,
+    maxHttpBufferSize: 1e8,
+    transports: ['polling', 'websocket'],
+    allowEIO3: true,
+    allowUpgrades: true,
+    upgradeTimeout: 30000
 });
 
 // Game state storage with optimized cleanup
@@ -53,9 +59,22 @@ const gameState = {
     cleanupThreshold: 60000 // 60 seconds
 };
 
-// Handle socket connections
+// Handle socket connections with mobile optimization
 io.on('connection', (socket) => {
-  console.log(`Player connected: ${socket.id}`);
+    console.log(`Player connected: ${socket.id}`);
+    
+    // Log client type for debugging
+    const clientType = socket.handshake.query.clientType || 'unknown';
+    console.log(`Client type: ${clientType}`);
+    
+    // Optimize settings for mobile clients
+    if (clientType === 'mobile') {
+        socket.emit('mobileOptimizations', {
+            updateRate: 100,
+            maxPlayers: 10,
+            effectsEnabled: false
+        });
+    }
 
   // Send current game state to new player
   socket.emit('gameState', gameState);

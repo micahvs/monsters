@@ -780,21 +780,21 @@ class Game {
         // Detect mobile for performance optimizations
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
-        // Enable lower quality settings for mobile
+        // Optimize settings for mobile while keeping multiplayer enabled
         if (this.isMobile) {
-            console.log("Mobile device detected - using performance settings");
-            this.drawDistance = 600; // Doubled for larger arena
+            console.log("Mobile device detected - using optimized settings");
+            this.drawDistance = 600;
             this.maxParticles = 10;
             this.shadowsEnabled = false;
             this.effectsEnabled = false;
-            this.gridEnabled = true; // Always enable grid for neon effect
+            this.gridEnabled = true;
             
-            // Disable multiplayer on mobile for better performance
-            window.multiplayerEnabled = false;
+            // Keep multiplayer enabled on mobile
+            window.multiplayerEnabled = true;
         } else {
-            this.drawDistance = 2000; // Doubled for larger arena
+            this.drawDistance = 2000;
             this.maxParticles = 30;
-            this.shadowsEnabled = false; // Disabled shadows by default
+            this.shadowsEnabled = false;
             this.effectsEnabled = true;
             this.gridEnabled = true;
             

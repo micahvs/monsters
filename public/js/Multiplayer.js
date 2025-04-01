@@ -148,15 +148,21 @@ export default class Multiplayer {
         try {
             console.log(`🎮 [Multiplayer] Creating socket connection to ${serverUrl}`);
             
-            // Initialize socket with better error handling
+            // Initialize socket with mobile-optimized settings
             this.socket = io(serverUrl, {
                 withCredentials: true,
-                transports: ['websocket', 'polling'],
-                timeout: 10000,
+                transports: ['polling', 'websocket'], // Try polling first for better mobile compatibility
+                timeout: 20000, // Increased timeout for mobile
                 reconnection: true,
-                reconnectionAttempts: 5,
+                reconnectionAttempts: 10, // More reconnection attempts
+                reconnectionDelay: 1000, // Start with 1 second delay
+                reconnectionDelayMax: 5000, // Max 5 second delay
                 autoConnect: true,
-                forceNew: true // Force a new connection to avoid sharing issues
+                forceNew: true,
+                path: '/socket.io/', // Explicit path
+                query: {
+                    clientType: 'mobile' // Help server optimize for mobile
+                }
             });
             
             // Add missing error handler method if needed
