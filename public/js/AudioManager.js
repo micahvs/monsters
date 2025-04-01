@@ -105,22 +105,15 @@ export class AudioManager {
             // If Web Audio API is supported, create an oscillator
             if (window.AudioContext || window.webkitAudioContext) {
                 try {
-                    // Generate a sound with unique frequencies for different sound types
-                    let frequency = 440; // Default A note
-                    
-                    // Assign different frequencies to different sound types
-                    if (type.includes('weapon')) frequency = 880;  // Higher pitch for weapons
-                    else if (type.includes('engine')) frequency = 220; // Lower for engine
-                    else if (type.includes('hit')) frequency = 330; // Medium for hits
-                    
-                    return `data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU${btoa(type)}`;
+                    // Return a properly formatted silent WAV that's guaranteed to work
+                    return 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
                 } catch (e) {
                     console.warn("Error creating oscillator sound:", e);
                 }
             }
             
-            // Fallback to an empty audio element
-            return 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU';
+            // Fallback to a properly formatted silent WAV
+            return 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
         };
         
         // Set up sound paths with oscillator-generated sounds
@@ -305,9 +298,9 @@ export class AudioManager {
             // Create a unique identifier for this track
             return {
                 name: name,
-                // This is a data URL that contains an audio wave with the track name encoded
-                // It won't actually play music but it will be a unique, valid audio file
-                url: `data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU${btoa(name + '-' + tone)}`
+                // Create a valid minimal silent audio file
+                // This uses a proper WAV format that will actually play in browsers
+                url: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=='
             };
         };
         
@@ -348,14 +341,33 @@ export class AudioManager {
         if (!this.musicTracks.length) return;
         
         this.currentTrackIndex = ((index % this.musicTracks.length) + this.musicTracks.length) % this.musicTracks.length;
-        const trackPath = this.musicTracks[this.currentTrackIndex];
+        
+        // Use a guaranteed valid silent audio file
+        const silentWav = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
         
         try {
-            this.audioElement.src = trackPath;
+            // First, remove any event listeners to prevent error cascades
+            const oldSrc = this.audioElement.src;
+            this.audioElement.src = '';
+            this.audioElement.removeAttribute('src');
+            
+            // Add error handler before setting source
+            const errorHandler = (e) => {
+                console.warn("Audio loading error, falling back to silent audio", e);
+                this.audioElement.src = silentWav;
+            };
+            
+            this.audioElement.addEventListener('error', errorHandler, { once: true });
+            
+            // Set the new source - use the silent WAV regardless of what's in the tracks array
+            this.audioElement.src = silentWav;
             this.audioElement.load();
-            console.log("Audio track loaded successfully");
+            
+            console.log("Silent audio track loaded successfully");
         } catch (e) {
-            console.warn("Could not load audio track:", e);
+            console.warn("Could not load audio track, using fallback:", e);
+            // Final fallback - direct assignment of silent audio
+            this.audioElement.src = silentWav;
         }
         
         this.updateTrackDisplay();
