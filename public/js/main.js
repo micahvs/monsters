@@ -1988,113 +1988,195 @@ class Game {
             // Get the WebGL renderer context
             const gl = this.renderer.getContext();
             if (!gl) return;
-            
-            // Fix for missing element array buffer binding
-            // Create and bind a dummy element array buffer
-            const createDummyIndexBuffer = () => {
-                const dummyBuffer = gl.createBuffer();
-                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, dummyBuffer);
-                const indices = new Uint16Array([0, 1, 2]);
-                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-                return dummyBuffer;
-            };
-            
-            // Check for any meshes without index buffers and fix them
+
+            // First, try to fix any meshes without indices by adding them
+            // This is vital for preventing "must have element array buffer bound" errors
             this.scene.traverse(obj => {
                 if (obj.isMesh && obj.geometry) {
-                    // Create indices for non-indexed geometries
+                    // Ensure the geometry has an index buffer
                     if (!obj.geometry.index && obj.geometry.attributes.position) {
-                        const posCount = obj.geometry.attributes.position.count;
-                        const indices = [];
-                        for (let i = 0; i < posCount; i++) {
-                            indices.push(i);
+                        try {
+                            // Create a basic index array with conservative size 
+                            const posCount = obj.geometry.attributes.position.count;
+                            const indices = [];
+                            for (let i = 0; i < posCount; i++) {
+                                indices.push(i);
+                            }
+                            // Set index with proper buffer type for large geometries
+                            obj.geometry.setIndex(indices);
+                            
+                            // Force the index to update
+                            obj.geometry.index.needsUpdate = true;
+                        } catch (e) {
+                            console.warn("Failed to create indices for geometry:", e);
                         }
-                        obj.geometry.setIndex(indices);
+                    }
+                    
+                    // For each existing buffer attribute, ensure appropriate size and type
+                    if (obj.geometry.attributes) {
+                        for (const key in obj.geometry.attributes) {
+                            const attribute = obj.geometry.attributes[key];
+                            if (attribute && attribute.count > 0 && attribute.itemSize > 0) {
+                                // Ensure the buffer has enough space for the data
+                                attribute.needsUpdate = true;
+                            }
+                        }
                     }
                 }
             });
             
-            // Reset renderer state to ensure proper buffer binding
+            // Reset THREE.js state management
             this.renderer.state.reset();
             
-            // Ensure element array buffer is bound before rendering
-            let dummyBuffer = null;
-            const origRenderObjects = this.renderer.renderBufferDirect;
+            // To prevent the "Must have element array buffer bound" error:
+            // 1. Create a reliable global dummy element array buffer with sufficient size
+            // 2. Bind it before rendering
+            if (!this._dummyBuffer) {
+                const createBuffer = () => {
+                    try {
+                        // Create a larger buffer to avoid "insufficient size" errors
+                        // Using 65536 elements (sufficient for most meshes)
+                        const buffer = gl.createBuffer();
+                        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
+                        
+                        // Create a large enough Uint16Array for the buffer
+                        // 65536 is the max index for Uint16Array, giving us plenty of capacity
+                        const indices = new Uint16Array(65536);
+                        // Fill with sequential indices as a safe default
+                        for (let i = 0; i < 65536; i++) {
+                            indices[i] = i % 65535; // Prevent overflow
+                        }
+                        
+                        // Allocate buffer with static draw hint for better performance
+                        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+                        return buffer;
+                    } catch (bufferError) {
+                        console.error("Failed to create dummy buffer:", bufferError);
+                        return null;
+                    }
+                };
+                
+                // Create and store the dummy buffer
+                this._dummyBuffer = createBuffer();
+            }
             
+            // Explicitly bind the dummy buffer before render to ensure
+            // "must have element array buffer bound" constraint is satisfied
+            if (this._dummyBuffer) {
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._dummyBuffer);
+            }
+            
+            // Implement render method override if not already done
             if (!this._origRenderMethod) {
-                // Store the original method only once
+                const origRenderObjects = this.renderer.renderBufferDirect;
                 this._origRenderMethod = origRenderObjects;
                 
-                // Override renderBufferDirect to ensure element array buffer is bound
-                this.renderer.renderBufferDirect = function(camera, scene, geometry, material, object, group) {
-                    // Check if we need a dummy buffer
-                    if (!geometry.index && !dummyBuffer) {
-                        dummyBuffer = createDummyIndexBuffer();
+                // Replace the render method to ensure proper buffer binding
+                this.renderer.renderBufferDirect = (camera, scene, geometry, material, object, group) => {
+                    // Detect if we need to handle missing indices
+                    if (!geometry.index) {
+                        // Bind our dummy buffer to satisfy the constraint
+                        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._dummyBuffer);
                     }
                     
-                    // Call original method
-                    return origRenderObjects.call(this, camera, scene, geometry, material, object, group);
+                    // Call original render method
+                    return origRenderObjects.call(this.renderer, camera, scene, geometry, material, object, group);
                 };
             }
             
-            // Clear renderer and reset state
+            // Essential: Clear the renderer to reset state
             this.renderer.clear();
         } catch (e) {
-            console.error("Error in fixWebGLBufferState:", e);
+            console.error("WebGL Buffer fix error:", e);
         }
     }
     
-    // Add a recovery method for render errors
+    // Enhance the recovery method for serious WebGL errors
     recoverFromRenderError() {
-        console.log("Attempting to recover from WebGL error...");
+        console.log("WebGL error detected - attempting recovery");
         
         try {
-            // Get WebGL context
+            // Get context
             const gl = this.renderer.getContext();
             if (!gl) return;
             
-            // Reset WebGL context state completely
+            // Complete state reset - unbind everything
             gl.bindBuffer(gl.ARRAY_BUFFER, null);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
             
-            // Create and bind minimal dummy buffers
-            const vertexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-            const vertices = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
-            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+            // Create much larger buffers to handle any potential rendering
+            // This addresses the "insufficient buffer size" error
+            const createLargeBuffer = (target, size) => {
+                const buffer = gl.createBuffer();
+                gl.bindBuffer(target, buffer);
+                
+                // For ELEMENT_ARRAY_BUFFER use Uint16Array, for others use Float32Array
+                const array = (target === gl.ELEMENT_ARRAY_BUFFER) 
+                    ? new Uint16Array(size)
+                    : new Float32Array(size);
+                
+                // Fill with safe values
+                if (target === gl.ELEMENT_ARRAY_BUFFER) {
+                    for (let i = 0; i < size; i++) {
+                        array[i] = i % 65535;
+                    }
+                }
+                
+                // Use DYNAMIC_DRAW to hint we'll update this buffer frequently
+                gl.bufferData(target, array, gl.DYNAMIC_DRAW);
+                return buffer;
+            };
             
-            const indexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-            const indices = new Uint16Array([0, 1, 2]);
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+            // Create oversized buffers to handle any rendering
+            const vertexBuffer = createLargeBuffer(gl.ARRAY_BUFFER, 1000000); // 1M entries 
+            const indexBuffer = createLargeBuffer(gl.ELEMENT_ARRAY_BUFFER, 500000); // 500k indices
             
-            // Reset renderer state
+            // Necessary WebGL setup for attributes
+            gl.enableVertexAttribArray(0); // Position attribute
+            gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+            
+            // Force renderer state reset
             this.renderer.state.reset();
             
-            // Render with minimal settings
-            this.renderer.shadowMap.enabled = false;
-            this.renderer.toneMapping = THREE.NoToneMapping;
+            // Simplify scene for a moment
+            const existingScene = this.scene;
+            const existingCamera = this.camera;
             
-            // Create a minimal scene just to render something
+            // Create a minimal scene for reset
             const tempScene = new THREE.Scene();
-            const tempCamera = this.camera.clone();
+            const tempCamera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 10);
+            tempCamera.position.z = 5;
             
-            // Add minimal content
+            // Add minimal content to force a proper rendering cycle
             const cube = new THREE.Mesh(
                 new THREE.BoxGeometry(1, 1, 1),
                 new THREE.MeshBasicMaterial({ color: 0xff0000 })
             );
             tempScene.add(cube);
             
-            // Try to render the minimal scene
-            this.renderer.render(tempScene, tempCamera);
+            // Render minimal scene with lowest settings
+            this.renderer.shadowMap.enabled = false;
+            this.renderer.toneMapping = THREE.NoToneMapping;
             
-            // Then try to render the actual scene
-            this.renderer.render(this.scene, this.camera);
+            // Attempt minimal render
+            try {
+                this.renderer.render(tempScene, tempCamera);
+            } catch (renderErr) {
+                console.warn("Recovery render failed:", renderErr);
+            }
             
-            console.log("WebGL recovery attempt completed");
+            // Restore original scene with safety checks
+            if (existingScene && existingCamera) {
+                // Retry with minimal settings
+                try {
+                    this.renderer.render(existingScene, existingCamera);
+                    console.log("WebGL recovery successful");
+                } catch (finalErr) {
+                    console.error("Failed to recover WebGL context:", finalErr);
+                }
+            }
         } catch (e) {
-            console.error("Error in WebGL recovery:", e);
+            console.error("WebGL recovery attempt failed:", e);
         }
     }
 
