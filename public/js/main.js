@@ -166,13 +166,13 @@ class Projectile {
                 return;
             }
             
-            const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 6);
+            // Use a lower-poly geometry to reduce buffer size
+            const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 4); // Reduced from 6 to 4 segments
             geometry.rotateX(Math.PI / 2);
             
-            const material = new THREE.MeshPhongMaterial({
+            // Use simpler material to avoid shader compilation issues
+            const material = new THREE.MeshBasicMaterial({  // Changed from MeshPhongMaterial to MeshBasicMaterial
                 color: 0xff00ff,
-                emissive: 0xff00ff,
-                emissiveIntensity: 1,
                 transparent: true,
                 opacity: 0.8
             });
@@ -1010,17 +1010,16 @@ class Game {
             
             if (!this.sharedParticleGeometry) {
                 console.log("Creating shared particle geometry");
-                this.sharedParticleGeometry = new THREE.SphereGeometry(1, 8, 6);
+                // Use low-poly geometry to reduce buffer size
+                this.sharedParticleGeometry = new THREE.SphereGeometry(1, 6, 4); // Reduced from 8, 6
             }
             
             // Create particle pool
             this.objectPools.createPool('particles', () => {
                 try {
                     // Use shared geometry instead of creating new ones each time
-                    const material = new THREE.MeshPhongMaterial({
+                    const material = new THREE.MeshBasicMaterial({  // Changed from MeshPhongMaterial to MeshBasicMaterial
                         color: 0xff00ff,
-                        emissive: 0xff00ff,
-                        emissiveIntensity: 0.5,
                         transparent: true,
                         opacity: 0.8
                     });
@@ -1039,7 +1038,6 @@ class Game {
                             this.mesh.position.copy(position);
                             if (color && this.mesh.material) {
                                 this.mesh.material.color.set(color || 0xff00ff);
-                                this.mesh.material.emissive.set(color || 0xff00ff);
                             }
                             this.mesh.material.opacity = 0.8;
                             this.mesh.scale.set(0.2, 0.2, 0.2); // Scale the shared geometry
@@ -1076,7 +1074,7 @@ class Game {
                         hide: function() {}
                     };
                 }
-            }, this.isMobile ? 20 : 50); // Fewer particles for mobile
+            }, this.isMobile ? 10 : 30); // Reduced pool size from 20/50 to 10/30
             
             // Create projectile pool
             this.objectPools.createPool('projectiles', () => {
@@ -1113,7 +1111,7 @@ class Game {
                         hide: function() { this.alive = false; }
                     };
                 }
-            }, this.isMobile ? 15 : 30); // Fewer projectiles for mobile
+            }, this.isMobile ? 10 : 20); // Reduced pool size from 15/30 to 10/20
         } catch (error) {
             console.error("Error initializing object pools:", error);
         }
@@ -1121,6 +1119,9 @@ class Game {
 
     init() {
         try {
+            // Try to dispose any previous resources first
+            this.disposeResources();
+            
             // Initialize renderer
             try {
                 // Get the canvas element
@@ -1145,11 +1146,18 @@ class Game {
                     canvas: targetCanvas,
                     antialias: false, // Disable antialiasing initially for all devices
                     alpha: false, // Disable alpha for performance
-                    preserveDrawingBuffer: false
+                    preserveDrawingBuffer: false,
+                    powerPreference: "default" // Let browser decide power profile
                 };
                 
                 // Create the renderer with basic settings first
                 try {
+                    // Dispose old renderer if it exists
+                    if (this.renderer) {
+                        this.renderer.dispose();
+                        this.renderer = null;
+                    }
+                    
                     this.renderer = new THREE.WebGLRenderer(rendererOptions);
                     console.log("WebGL renderer created successfully");
                     
@@ -1166,7 +1174,13 @@ class Game {
                     } else {
                         // Desktop can use higher pixel ratio if available
                         const pixelRatio = window.devicePixelRatio || 1;
-                        this.renderer.setPixelRatio(Math.min(pixelRatio, 2));
+                        this.renderer.setPixelRatio(Math.min(pixelRatio, 1.5)); // Reduced from 2 to 1.5
+                    }
+                    
+                    // Explicitly initialize WebGL and create context
+                    const gl = this.renderer.getContext();
+                    if (!gl) {
+                        throw new Error("Unable to get WebGL context");
                     }
                     
                     // Basic color settings (in try-catch for compatibility)
@@ -1176,7 +1190,7 @@ class Game {
                         }
                         
                         // Simplified tone mapping for all devices
-                        this.renderer.toneMapping = THREE.LinearToneMapping;
+                        this.renderer.toneMapping = THREE.NoToneMapping; // Changed from LinearToneMapping
                         this.renderer.toneMappingExposure = 1.0;
                     } catch (renderPropsErr) {
                         console.warn("Could not set all renderer properties:", renderPropsErr);
@@ -1204,13 +1218,16 @@ class Game {
                     targetCanvas.addEventListener('webglcontextrestored', () => {
                         console.log("WebGL context restored");
                         
+                        // Recreate all materials to ensure proper WebGL state
+                        this.recreateMaterials();
+                        
                         // Hide the loading screen after restoration
                         const loadingElement = document.getElementById('loadingScreen');
                         if (loadingElement) {
                             loadingElement.style.display = 'none';
                         }
                         
-                        // Basic reinitialization - just resize the renderer
+                        // Basic reinitialization - resize the renderer
                         if (this.renderer && this.camera) {
                             this.renderer.setSize(window.innerWidth, window.innerHeight);
                             this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -1389,6 +1406,56 @@ class Game {
         }
     }
 
+    // New helper method to recreate materials after context loss
+    recreateMaterials() {
+        try {
+            // Only run if scene exists
+            if (!this.scene) return;
+            
+            console.log("Recreating materials after context restoration");
+            
+            // Traverse all objects in the scene
+            this.scene.traverse((object) => {
+                if (object.isMesh && object.material) {
+                    const oldMaterial = object.material;
+                    
+                    // Create new material with same properties
+                    let newMaterial;
+                    
+                    if (oldMaterial.isMeshBasicMaterial) {
+                        newMaterial = new THREE.MeshBasicMaterial();
+                    } else if (oldMaterial.isMeshPhongMaterial) {
+                        newMaterial = new THREE.MeshPhongMaterial();
+                    } else if (oldMaterial.isMeshStandardMaterial) {
+                        newMaterial = new THREE.MeshStandardMaterial();
+                    } else {
+                        // Default to basic material if unknown type
+                        newMaterial = new THREE.MeshBasicMaterial();
+                    }
+                    
+                    // Copy essential properties
+                    if (oldMaterial.color) newMaterial.color = oldMaterial.color.clone();
+                    if (oldMaterial.emissive) newMaterial.emissive = oldMaterial.emissive.clone();
+                    if (oldMaterial.emissiveIntensity) newMaterial.emissiveIntensity = oldMaterial.emissiveIntensity;
+                    if (oldMaterial.map) newMaterial.map = oldMaterial.map;
+                    newMaterial.transparent = oldMaterial.transparent;
+                    newMaterial.opacity = oldMaterial.opacity;
+                    newMaterial.wireframe = oldMaterial.wireframe;
+                    
+                    // Assign the new material
+                    object.material = newMaterial;
+                    
+                    // Dispose of old material to free GPU memory
+                    if (oldMaterial.dispose) {
+                        oldMaterial.dispose();
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error recreating materials:", error);
+        }
+    }
+
     createArena() {
         console.log("Creating arena...");
         
@@ -1401,8 +1468,8 @@ class Game {
         // Use MeshBasicMaterial for floor for better performance and colors
         const groundMaterial = new THREE.MeshBasicMaterial({ 
             color: 0x000033, // Dark blue base for neon grid effect
-            transparent: true,
-            opacity: 0.8
+            transparent: false, // Changed from true to false to avoid WebGL blending issues
+            opacity: 1.0      // Changed from 0.8 to 1.0 since transparency is disabled
         });
         
         const ground = new THREE.Mesh(groundGeometry, groundMaterial);
@@ -1410,8 +1477,8 @@ class Game {
         ground.receiveShadow = false; // Disabled shadows
         this.scene.add(ground);
         
-        // Add grid helper for neon grid effect
-        const gridHelper = new THREE.GridHelper(arenaSize, 50, 0xff00ff, 0x00ffff);
+        // Add grid helper for neon grid effect - use simpler grid with fewer segments
+        const gridHelper = new THREE.GridHelper(arenaSize, 30, 0xff00ff, 0x00ffff); // Reduced from 50 to 30
         this.scene.add(gridHelper);
         
         // Create walls - now 50% shorter (height reduced from 100 to 50)
@@ -1858,79 +1925,89 @@ class Game {
         
         if (!this.isInitialized) return;
         
-        // Update stats if available
-        if (this.stats) this.stats.begin();
-        
-        // Calculate delta time for stable physics updates
-        const now = performance.now();
-        let deltaTime = 0;
-        if (this.lastUpdateTime) {
-            deltaTime = (now - this.lastUpdateTime) / 1000; // Convert ms to seconds
-            // Limit max delta to avoid large jumps on performance hiccups
-            if (deltaTime > 0.1) deltaTime = 0.1;
-        }
-        this.lastUpdateTime = now;
-        
-        // FPS calculation
-        this.frameCount++;
-        
-        // Calculate FPS but don't display (counter removed as requested)
-        if (now - this.lastFpsUpdate > this.fpsUpdateInterval) {
-            this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
-            this.lastFpsUpdate = now;
-            this.frameCount = 0;
+        try {
+            // Update stats if available
+            if (this.stats) this.stats.begin();
             
-            // If FPS is low, reduce effects further
-            if (this.fps < 30) {
-                this.maxParticles = Math.max(10, this.maxParticles - 5);
-                console.log("Reducing effects due to low FPS:", this.maxParticles);
+            // Calculate delta time for stable physics updates
+            const now = performance.now();
+            let deltaTime = 0;
+            if (this.lastUpdateTime) {
+                deltaTime = (now - this.lastUpdateTime) / 1000; // Convert ms to seconds
+                // Limit max delta to avoid large jumps on performance hiccups
+                if (deltaTime > 0.1) deltaTime = 0.1;
+            }
+            this.lastUpdateTime = now;
+            
+            // FPS calculation
+            this.frameCount++;
+            
+            // Calculate FPS but don't display (counter removed as requested)
+            if (now - this.lastFpsUpdate > this.fpsUpdateInterval) {
+                this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
+                this.lastFpsUpdate = now;
+                this.frameCount = 0;
                 
-                // Severe performance issues - disable additional features
-                if (this.fps < 20) {
-                    if (this.shadowsEnabled) {
-                        console.log("Low FPS - disabling shadows");
-                        this.shadowsEnabled = false;
-                        this.updateRendererSettings();
+                // If FPS is low, reduce effects further
+                if (this.fps < 30) {
+                    this.maxParticles = Math.max(10, this.maxParticles - 5);
+                    console.log("Reducing effects due to low FPS:", this.maxParticles);
+                    
+                    // Severe performance issues - disable additional features
+                    if (this.fps < 20) {
+                        if (this.shadowsEnabled) {
+                            console.log("Low FPS - disabling shadows");
+                            this.shadowsEnabled = false;
+                            this.updateRendererSettings();
+                        }
+                        // FPS is low but we keep multiplayer on
+                        console.log("Low FPS detected but keeping multiplayer enabled");
+                        // Show a performance notification without disabling multiplayer
+                        this.showNotification("Performance optimizations active");
                     }
-                    // FPS is low but we keep multiplayer on
-                    console.log("Low FPS detected but keeping multiplayer enabled");
-                    // Show a performance notification without disabling multiplayer
-                    this.showNotification("Performance optimizations active");
                 }
             }
-        }
-        
-        // Update game state with delta time
-        this.update(deltaTime);
-        
-        // Update pooled objects (particles and projectiles)
-        this.updatePooledObjects(deltaTime);
-        
-        // Update multiplayer player positions every frame for smoother movement
-        if (this.multiplayer && window.multiplayerEnabled) {
-            this.multiplayer.interpolateRemotePlayers();
-        }
-        
-        // Render the scene
-        if (this.renderer && this.scene && this.camera) {
-            // Apply frustum culling for better performance
-            // Only render objects in view
-            const frustum = new THREE.Frustum();
-            const projScreenMatrix = new THREE.Matrix4();
-            projScreenMatrix.multiplyMatrices(
-                this.camera.projectionMatrix, 
-                this.camera.matrixWorldInverse
-            );
-            frustum.setFromProjectionMatrix(projScreenMatrix);
             
-            // Render only if active
-            this.renderer.render(this.scene, this.camera);
+            // Update game state with delta time
+            this.update(deltaTime);
+            
+            // Update pooled objects (particles and projectiles)
+            this.updatePooledObjects(deltaTime);
+            
+            // Update multiplayer player positions every frame for smoother movement
+            if (this.multiplayer && window.multiplayerEnabled) {
+                this.multiplayer.interpolateRemotePlayers();
+            }
+            
+            // Render the scene
+            if (this.renderer && this.scene && this.camera) {
+                // Check if renderer is valid before rendering
+                if (this.renderer.getContext() && !this.renderer.getContext().isContextLost()) {
+                    // Apply frustum culling for better performance
+                    // Only render objects in view
+                    const frustum = new THREE.Frustum();
+                    const projScreenMatrix = new THREE.Matrix4();
+                    projScreenMatrix.multiplyMatrices(
+                        this.camera.projectionMatrix, 
+                        this.camera.matrixWorldInverse
+                    );
+                    frustum.setFromProjectionMatrix(projScreenMatrix);
+                    
+                    // Render only if active
+                    this.renderer.render(this.scene, this.camera);
+                } else {
+                    console.warn("Skipping render - WebGL context is lost");
+                }
+            }
+            
+            // Debug info update removed
+            
+            // Update stats if available
+            if (this.stats) this.stats.end();
+        } catch (e) {
+            console.error("Error in animation loop:", e);
+            // Don't break the animation loop on error
         }
-        
-        // Debug info update removed
-        
-        // Update stats if available
-        if (this.stats) this.stats.end();
     }
 
     updateRendererSettings() {
@@ -3685,6 +3762,49 @@ class Game {
     enableDebugLogs() {}
     updateDebugInfo() {}
     toggleDebugMode() {}
+
+    // Helper method to properly dispose and clean up resources
+    disposeResources() {
+        // Only run if this.scene exists
+        if (!this.scene) return;
+        
+        console.log("Disposing Three.js resources...");
+        
+        // Traverse the scene to dispose geometries and materials
+        this.scene.traverse((object) => {
+            // Check for meshes to dispose materials and geometries
+            if (object.isMesh) {
+                if (object.geometry) {
+                    object.geometry.dispose();
+                }
+                
+                // Handle materials (could be an array or a single material)
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(material => material.dispose());
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            }
+        });
+        
+        // Clear object pools
+        if (this.objectPools) {
+            this.objectPools.clear();
+        }
+        
+        // Dispose renderer
+        if (this.renderer) {
+            this.renderer.dispose();
+            if (this.renderer.forceContextLoss) {
+                this.renderer.forceContextLoss();
+            }
+            this.renderer = null;
+        }
+        
+        console.log("Resources disposed successfully");
+    }
 }
 
 // Implement a preloader
