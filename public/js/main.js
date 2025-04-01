@@ -1930,114 +1930,174 @@ class Game {
     }
 
     animate() {
+        this.__clearedThisFrame = false; // Reset for each frame
         requestAnimationFrame(() => this.animate());
         
         if (!this.isInitialized) return;
         
         try {
-            // Update stats if available
+            // Performance monitoring
             if (this.stats) this.stats.begin();
             
-            // Calculate delta time for stable physics updates
+            // Calculate delta time for stable physics
             const now = performance.now();
             let deltaTime = 0;
             if (this.lastUpdateTime) {
-                deltaTime = (now - this.lastUpdateTime) / 1000; // Convert ms to seconds
-                // Limit max delta to avoid large jumps on performance hiccups
-                if (deltaTime > 0.1) deltaTime = 0.1;
+                deltaTime = (now - this.lastUpdateTime) / 1000;
+                if (deltaTime > 0.1) deltaTime = 0.1; // Cap delta time
             }
             this.lastUpdateTime = now;
             
             // FPS calculation
             this.frameCount++;
-            
-            // Calculate FPS but don't display (counter removed as requested)
             if (now - this.lastFpsUpdate > this.fpsUpdateInterval) {
                 this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
                 this.lastFpsUpdate = now;
                 this.frameCount = 0;
-                
-                // If FPS is low, reduce effects further
-                if (this.fps < 30) {
-                    this.maxParticles = Math.max(10, this.maxParticles - 5);
-                    console.log("Reducing effects due to low FPS:", this.maxParticles);
-                    
-                    // Severe performance issues - disable additional features
-                    if (this.fps < 20) {
-                        if (this.shadowsEnabled) {
-                            console.log("Low FPS - disabling shadows");
-                            this.shadowsEnabled = false;
-                            this.updateRendererSettings();
-                        }
-                        // FPS is low but we keep multiplayer on
-                        console.log("Low FPS detected but keeping multiplayer enabled");
-                        // Show a performance notification without disabling multiplayer
-                        this.showNotification("Performance optimizations active");
-                    }
-                }
             }
             
-            // Update game state with delta time
+            // Game logic updates
             this.update(deltaTime);
             
-            // Update pooled objects (particles and projectiles)
-            this.updatePooledObjects(deltaTime);
-            
-            // Update multiplayer player positions every frame for smoother movement
-            if (this.multiplayer && window.multiplayerEnabled) {
-                this.multiplayer.interpolateRemotePlayers();
-            }
-            
-            // Render the scene with WebGL safeguards
+            // Render with proper error handling
             if (this.renderer && this.scene && this.camera) {
-                // Check if renderer is valid before rendering
-                if (this.renderer.getContext() && !this.renderer.getContext().isContextLost()) {
-                    try {
-                        // WebGL error prevention - Set specific rendering state  
-                        this.prepareWebGLForRendering();
-                        
-                        // Apply frustum culling for better performance
-                        // Only render objects in view
-                        const frustum = new THREE.Frustum();
-                        const projScreenMatrix = new THREE.Matrix4();
-                        projScreenMatrix.multiplyMatrices(
-                            this.camera.projectionMatrix, 
-                            this.camera.matrixWorldInverse
-                        );
-                        frustum.setFromProjectionMatrix(projScreenMatrix);
-                        
-                        // Render with error handling
-                        try {
-                            this.renderer.render(this.scene, this.camera);
-                        } catch (renderError) {
-                            console.warn("Render error caught:", renderError);
-                            // Force material updates on next frame
-                            this.scene.traverse(obj => {
-                                if (obj.material) {
-                                    if (Array.isArray(obj.material)) {
-                                        obj.material.forEach(m => m.needsUpdate = true);
-                                    } else {
-                                        obj.material.needsUpdate = true;
-                                    }
-                                }
-                            });
-                        }
-                    } catch (e) {
-                        console.warn("WebGL render preparation error:", e);
-                    }
-                } else {
-                    console.warn("Skipping render - WebGL context is lost");
+                try {
+                    // Fix for WebGL "must have element array buffer bound" error
+                    this.fixWebGLBufferState();
+                    
+                    // Standard rendering
+                    this.renderer.render(this.scene, this.camera);
+                } catch (renderError) {
+                    console.warn("Render error caught:", renderError);
+                    
+                    // Try to recover by fixing WebGL state and rendering with simplified scene
+                    this.recoverFromRenderError();
                 }
             }
             
-            // Update stats if available
+            // Performance monitoring end
             if (this.stats) this.stats.end();
         } catch (e) {
             console.error("Error in animation loop:", e);
-            // Don't break the animation loop on error
         }
     }
     
+    // Add this method to fix WebGL buffer state
+    fixWebGLBufferState() {
+        try {
+            // Get the WebGL renderer context
+            const gl = this.renderer.getContext();
+            if (!gl) return;
+            
+            // Fix for missing element array buffer binding
+            // Create and bind a dummy element array buffer
+            const createDummyIndexBuffer = () => {
+                const dummyBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, dummyBuffer);
+                const indices = new Uint16Array([0, 1, 2]);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+                return dummyBuffer;
+            };
+            
+            // Check for any meshes without index buffers and fix them
+            this.scene.traverse(obj => {
+                if (obj.isMesh && obj.geometry) {
+                    // Create indices for non-indexed geometries
+                    if (!obj.geometry.index && obj.geometry.attributes.position) {
+                        const posCount = obj.geometry.attributes.position.count;
+                        const indices = [];
+                        for (let i = 0; i < posCount; i++) {
+                            indices.push(i);
+                        }
+                        obj.geometry.setIndex(indices);
+                    }
+                }
+            });
+            
+            // Reset renderer state to ensure proper buffer binding
+            this.renderer.state.reset();
+            
+            // Ensure element array buffer is bound before rendering
+            let dummyBuffer = null;
+            const origRenderObjects = this.renderer.renderBufferDirect;
+            
+            if (!this._origRenderMethod) {
+                // Store the original method only once
+                this._origRenderMethod = origRenderObjects;
+                
+                // Override renderBufferDirect to ensure element array buffer is bound
+                this.renderer.renderBufferDirect = function(camera, scene, geometry, material, object, group) {
+                    // Check if we need a dummy buffer
+                    if (!geometry.index && !dummyBuffer) {
+                        dummyBuffer = createDummyIndexBuffer();
+                    }
+                    
+                    // Call original method
+                    return origRenderObjects.call(this, camera, scene, geometry, material, object, group);
+                };
+            }
+            
+            // Clear renderer and reset state
+            this.renderer.clear();
+        } catch (e) {
+            console.error("Error in fixWebGLBufferState:", e);
+        }
+    }
+    
+    // Add a recovery method for render errors
+    recoverFromRenderError() {
+        console.log("Attempting to recover from WebGL error...");
+        
+        try {
+            // Get WebGL context
+            const gl = this.renderer.getContext();
+            if (!gl) return;
+            
+            // Reset WebGL context state completely
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+            
+            // Create and bind minimal dummy buffers
+            const vertexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            const vertices = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+            
+            const indexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+            const indices = new Uint16Array([0, 1, 2]);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+            
+            // Reset renderer state
+            this.renderer.state.reset();
+            
+            // Render with minimal settings
+            this.renderer.shadowMap.enabled = false;
+            this.renderer.toneMapping = THREE.NoToneMapping;
+            
+            // Create a minimal scene just to render something
+            const tempScene = new THREE.Scene();
+            const tempCamera = this.camera.clone();
+            
+            // Add minimal content
+            const cube = new THREE.Mesh(
+                new THREE.BoxGeometry(1, 1, 1),
+                new THREE.MeshBasicMaterial({ color: 0xff0000 })
+            );
+            tempScene.add(cube);
+            
+            // Try to render the minimal scene
+            this.renderer.render(tempScene, tempCamera);
+            
+            // Then try to render the actual scene
+            this.renderer.render(this.scene, this.camera);
+            
+            console.log("WebGL recovery attempt completed");
+        } catch (e) {
+            console.error("Error in WebGL recovery:", e);
+        }
+    }
+
     // Prepare the WebGL context for rendering to prevent uniform/buffer errors
     prepareWebGLForRendering() {
         // Only proceed if we have a valid renderer
