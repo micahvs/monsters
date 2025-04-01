@@ -249,13 +249,11 @@ class Projectile {
             const geometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 6); // Increased size and segments
             geometry.rotateX(Math.PI / 2);
             
-            // Use brighter material with higher opacity
+            // Use brighter material with higher opacity - MeshBasicMaterial doesn't support emissive
             const material = new THREE.MeshBasicMaterial({
                 color: 0xff00ff,
                 transparent: true,
-                opacity: 1.0, // Full opacity
-                emissive: 0xff00ff,
-                emissiveIntensity: 1.0
+                opacity: 1.0 // Full opacity
             });
             
             this.mesh = new THREE.Mesh(geometry, material);
@@ -341,11 +339,6 @@ class Projectile {
                     this.mesh.material.color.copy(projectileColor);
                 } else {
                     this.mesh.material.color = projectileColor.clone();
-                }
-                
-                // Safely set emissive if it exists
-                if (this.mesh.material.emissive) {
-                    this.mesh.material.emissive.copy(projectileColor);
                 }
                 
                 // Set high opacity to ensure visibility
