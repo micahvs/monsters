@@ -2612,6 +2612,38 @@ class Game {
             this.showNotification(`Warning: ${newActivations} turrets activated!`, 2000);
         }
     }
+    
+    // Restore the missing createWeapon method
+    createWeapon() {
+        // Create a weapon for the player using the WeaponTypes from the imported Weapons.js
+        this.weapon = new Weapon(this, this.scene, WeaponTypes.MACHINE_GUN);
+        
+        // Add a simple weapon model attached to the truck
+        const weaponGeometry = new THREE.BoxGeometry(0.3, 0.3, 1);
+        const weaponMaterial = new THREE.MeshPhongMaterial({ 
+            color: 0x00ffff,
+            emissive: 0x005555
+        });
+        
+        this.weaponMesh = new THREE.Mesh(weaponGeometry, weaponMaterial);
+        this.weaponMesh.position.set(0, 0.5, -1); // Mount on front of truck
+        
+        // Add weapon to truck if truck exists
+        if (this.truck) {
+            this.truck.add(this.weaponMesh);
+        } else {
+            console.warn("Truck not available, weapon will not be attached");
+            this.scene.add(this.weaponMesh);
+        }
+        
+        // Update ammo display
+        if (this.ammoDisplay) {
+            this.ammoDisplay.textContent = `Ammo: ${this.weapon.ammo}/${this.weapon.maxAmmo}`;
+        }
+        
+        console.log("Weapon created successfully");
+        return this.weapon;
+    }
 }
 
 // Implement a preloader
