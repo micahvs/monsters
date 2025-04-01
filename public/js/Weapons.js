@@ -116,71 +116,40 @@ export class Weapon {
             
             // Attempt to initialize the pool if missing
             try {
+                // First try using the existing initObjectPools method
                 if (typeof game.initObjectPools === 'function') {
                     game.initObjectPools();
-                } else {
-                    // Simple fallback to create a basic pool
+                } 
+                
+                // If pool still doesn't exist, create it directly
+                if (!game.objectPools.pools || !game.objectPools.pools.has('projectiles')) {
+                    // Create projectile pool with simplified implementation
                     game.objectPools.createPool('projectiles', () => {
-                        // Check if Projectile class is available
-                        if (typeof Projectile !== 'function') {
-                            console.warn("Projectile class not found, creating fallback");
-                            
-                            // Define a fallback projectile object
+                        // Safe projectile creation with error handling
+                        try {
+                            const projectile = new Projectile(game.scene);
+                            return projectile;
+                        } catch (e) {
+                            console.error("Error creating projectile for pool:", e);
+                            // Return a dummy projectile with required methods
                             return {
-                                mesh: (() => {
-                                    const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 4);
-                                    geometry.rotateX(Math.PI / 2);
-                                    const material = new THREE.MeshBasicMaterial({
-                                        color: 0xff00ff,
-                                        transparent: true,
-                                        opacity: 0.8
-                                    });
-                                    const mesh = new THREE.Mesh(geometry, material);
-                                    mesh.visible = false;
-                                    if (game.scene) game.scene.add(mesh);
-                                    return mesh;
-                                })(),
-                                scene: game.scene,
+                                mesh: { position: new THREE.Vector3(), visible: false },
                                 direction: new THREE.Vector3(0, 0, 1),
                                 speed: 0.5,
                                 damage: 10,
                                 alive: false,
-                                setup: function(position, direction, speed, damage, lifetime, source, weaponType, playerId) {
-                                    if (!position || !direction) return this;
-                                    this.mesh.position.copy(position);
-                                    this.direction = direction.normalize();
-                                    this.speed = speed || 0.5;
-                                    this.damage = damage || 10;
-                                    this.lifetime = lifetime || 200;
-                                    this.source = source || 'player';
-                                    this.playerId = playerId;
+                                setup: function(position, direction) { 
+                                    if (position) this.mesh.position.copy(position);
+                                    this.direction = direction || this.direction;
                                     this.alive = true;
-                                    this.mesh.visible = true;
-                                    this.mesh.quaternion.setFromUnitVectors(
-                                        new THREE.Vector3(0, 0, 1),
-                                        this.direction
-                                    );
-                                    return this;
+                                    return this; 
                                 },
-                                update: function(delta) {
-                                    if (!this.alive) return false;
-                                    const effectiveSpeed = this.speed * (delta ? delta * 60 : 1);
-                                    const movement = this.direction.clone().multiplyScalar(effectiveSpeed);
-                                    this.mesh.position.add(movement);
-                                    this.lifetime--;
-                                    if (this.lifetime <= 0) this.alive = false;
-                                    return this.alive;
-                                },
-                                hide: function() {
-                                    this.mesh.visible = false;
-                                    this.alive = false;
-                                }
+                                update: function() { return false; },
+                                hide: function() { this.alive = false; },
+                                updateAppearance: function() {}
                             };
                         }
-                        
-                        // Use the actual Projectile class if available
-                        return new Projectile(game.scene);
-                    }, 10);
+                    }, 20); // Create a pool with 20 projectiles
                 }
             } catch (e) {
                 console.error("Failed to create projectiles pool:", e);

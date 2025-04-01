@@ -300,10 +300,22 @@ class Projectile {
                 projectileColor = this.source === 'player' ? new THREE.Color(0xff00ff) : new THREE.Color(0x00ffff);
             }
 
-            // Update color/emissive
-            this.mesh.material.color.copy(projectileColor);
-            this.mesh.material.emissive.copy(projectileColor);
-            this.mesh.material.needsUpdate = true;
+            // Update color/emissive - with safeguards
+            if (projectileColor && this.mesh.material) {
+                // Safely set color if it exists
+                if (this.mesh.material.color) {
+                    this.mesh.material.color.copy(projectileColor);
+                } else {
+                    this.mesh.material.color = projectileColor.clone();
+                }
+                
+                // Safely set emissive if it exists
+                if (this.mesh.material.emissive) {
+                    this.mesh.material.emissive.copy(projectileColor);
+                }
+                
+                this.mesh.material.needsUpdate = true;
+            }
         } catch (e) {
             console.error("Error updating projectile appearance:", e);
         }
