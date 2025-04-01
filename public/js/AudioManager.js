@@ -97,22 +97,27 @@ export class AudioManager {
     }
     
     initializeSoundPaths() {
-        // Direct loading of engine sounds
-        this.sounds.engine_rev = '/sounds/engine_rev.mp3';
-        this.sounds.engine_deceleration = '/sounds/engine_deceleration.mp3';
-        this.sounds.engine_idle = '/sounds/engine_idle.mp3';
+        // Use root relative paths for local development and absolute paths for production
+        const baseUrl = window.location.hostname === 'localhost' ? '' : '';
         
-        // Weapon sounds
-        this.sounds.weapon_fire = '/sounds/weapon_fire.mp3';
+        // Direct loading of engine sounds with the pattern bar live music as fallback
+        this.sounds.engine_rev = baseUrl + '/pattern_bar_live.mp3';
+        this.sounds.engine_deceleration = baseUrl + '/pattern_bar_live.mp3';
+        this.sounds.engine_idle = baseUrl + '/pattern_bar_live.mp3';
         
-        // Vehicle and game sounds
-        this.sounds.suspension_bounce = '/sounds/suspension_bounce.mp3';
-        this.sounds.tire_screech = '/sounds/tire_screech.mp3';
-        this.sounds.tire_dirt = '/sounds/tire_dirt.mp3';
-        this.sounds.vehicle_hit = '/sounds/vehicle_hit.mp3';
-        this.sounds.vehicle_explosion = '/sounds/vehicle_explosion.mp3';
-        this.sounds.powerup_pickup = '/sounds/powerup_pickup.mp3';
-        this.sounds.powerup_activate = '/sounds/powerup_activate.mp3';
+        // Weapon sounds with pattern bar live music as fallback
+        this.sounds.weapon_fire = baseUrl + '/pattern_bar_live.mp3';
+        
+        // Vehicle and game sounds with pattern bar live music as fallback
+        this.sounds.suspension_bounce = baseUrl + '/pattern_bar_live.mp3';
+        this.sounds.tire_screech = baseUrl + '/pattern_bar_live.mp3';
+        this.sounds.tire_dirt = baseUrl + '/pattern_bar_live.mp3';
+        this.sounds.vehicle_hit = baseUrl + '/pattern_bar_live.mp3';
+        this.sounds.vehicle_explosion = baseUrl + '/pattern_bar_live.mp3';
+        this.sounds.powerup_pickup = baseUrl + '/pattern_bar_live.mp3';
+        this.sounds.powerup_activate = baseUrl + '/pattern_bar_live.mp3';
+        
+        console.log("Sound paths initialized with pattern_bar_live.mp3 as fallback");
     }
     
     initControlListeners() {
@@ -277,19 +282,20 @@ export class AudioManager {
     // Music methods
     scanForMusicFiles() {
         const foundTracks = [];
+        
+        // Use main pattern_bar_live directly from root directory
+        console.log("Adding pattern_bar_live.mp3 to music tracks");
+        foundTracks.push('/pattern_bar_live.mp3');
+        
+        // Also use any music that might be in the /music/ directory
         const basePath = '/music/';
         
-        // Add fallback track first
+        // Add fallback track
         foundTracks.push(`${basePath}fallback.mp3`);
         
-        // Load all music tracks from the pattern_bar_live series
-        for (let i = 0; i <= 18; i++) {
-            const trackNum = i.toString().padStart(2, '0');
-            const trackName = `pattern_bar_live_part${trackNum}`;
-            foundTracks.push(`${basePath}${trackName}.mp3`);
-        }
-        
         this.musicTracks = foundTracks;
+        
+        console.log("Music tracks loaded:", this.musicTracks);
         
         // Don't autoplay - wait for user interaction
         if (this.musicTracks.length > 0) {

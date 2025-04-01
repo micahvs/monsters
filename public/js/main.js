@@ -163,7 +163,25 @@ function setupMobileAudioHandling() {
 }
 
 // Call this on page load
-document.addEventListener('DOMContentLoaded', setupMobileAudioHandling);
+document.addEventListener('DOMContentLoaded', () => {
+    // Setup mobile audio handling 
+    setupMobileAudioHandling();
+    
+    // Create global audio manager early
+    if (!window.audioManager && typeof AudioManager === 'function') {
+        try {
+            console.log("Creating early AudioManager instance");
+            window.audioManager = new AudioManager(null);
+            
+            // Force an early audio initialization attempt for desktop browsers
+            if (!isMobileDevice) {
+                window.audioManager.handleUserInteraction();
+            }
+        } catch (e) {
+            console.error("Error creating early AudioManager:", e);
+        }
+    }
+});
 
 import { MonsterTruck } from './MonsterTruck.js'
 import { World } from './World.js'
@@ -227,20 +245,29 @@ class Projectile {
                 return;
             }
             
-            // Use a lower-poly geometry to reduce buffer size
-            const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 4); // Reduced from 6 to 4 segments
+            // Use a larger, more visible geometry
+            const geometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 6); // Increased size and segments
             geometry.rotateX(Math.PI / 2);
             
-            // Use simpler material to avoid shader compilation issues
-            const material = new THREE.MeshBasicMaterial({  // Changed from MeshPhongMaterial to MeshBasicMaterial
+            // Use brighter material with higher opacity
+            const material = new THREE.MeshBasicMaterial({
                 color: 0xff00ff,
                 transparent: true,
-                opacity: 0.8
+                opacity: 1.0, // Full opacity
+                emissive: 0xff00ff,
+                emissiveIntensity: 1.0
             });
             
             this.mesh = new THREE.Mesh(geometry, material);
             this.mesh.visible = false; // Start invisible
-            this.scene.add(this.mesh); // Add mesh to scene once
+            
+            // Ensure it's added to the scene
+            if (this.scene && this.scene.add) {
+                this.scene.add(this.mesh);
+                console.log("✅ Projectile mesh added to scene successfully");
+            } else {
+                console.error("⚠️ Could not add projectile mesh to scene - scene is invalid");
+            }
         } catch (e) {
             console.error("Error creating projectile mesh:", e);
             this.mesh = { position: new THREE.Vector3(), visible: false };
@@ -287,8 +314,15 @@ class Projectile {
 
     updateAppearance(weaponType, colorOverride = undefined) {
         try {
-            if (!this.mesh || !this.mesh.material) return;
+            if (!this.mesh || !this.mesh.material) {
+                console.warn("Cannot update appearance - mesh or material missing");
+                return;
+            }
             
+            // Ensure mesh is visible
+            this.mesh.visible = true;
+            
+            // Get projectile color with fallbacks
             let projectileColor;
             
             if (colorOverride) {
@@ -314,8 +348,19 @@ class Projectile {
                     this.mesh.material.emissive.copy(projectileColor);
                 }
                 
+                // Set high opacity to ensure visibility
+                this.mesh.material.opacity = 1.0;
+                
+                // Increase size based on weapon type
+                const sizeMultiplier = weaponType && weaponType.projectileSize ? weaponType.projectileSize * 10 : 1.0;
+                this.mesh.scale.set(sizeMultiplier, sizeMultiplier, sizeMultiplier);
+                
+                // Force material update
                 this.mesh.material.needsUpdate = true;
             }
+            
+            // Log confirmation of projectile visibility
+            console.log(`Projectile appearance updated - visible: ${this.mesh.visible}, color: ${projectileColor.getHexString()}`);
         } catch (e) {
             console.error("Error updating projectile appearance:", e);
         }
