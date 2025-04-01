@@ -71,6 +71,75 @@ export class Weapon {
         this.reloadTimer = 0;
         this.damageMultiplier = 1.0;
         this.projectiles = [];
+        this._warnedAboutPool = false;
+
+        // Try to initialize the projectile pool early
+        this.ensureProjectilePool();
+    }
+    
+    // New method to ensure projectile pool exists
+    ensureProjectilePool() {
+        // Get game instance (may be passed or global)
+        const game = this.game || window.gameInstance;
+        
+        // Check if pool already exists
+        if (game && game.objectPools && game.objectPools.pools && game.objectPools.pools.has('projectiles')) {
+            return true; // Pool already exists
+        }
+        
+        // Skip if missing game or objectPools
+        if (!game || !game.objectPools) {
+            return false;
+        }
+        
+        // Show warning once
+        if (!this._warnedAboutPool) {
+            console.info("Creating projectiles pool on first use");
+            this._warnedAboutPool = true;
+        }
+        
+        // Try to initialize the pool
+        try {
+            // First try using the existing initObjectPools method
+            if (typeof game.initObjectPools === 'function') {
+                game.initObjectPools();
+            }
+            
+            // If pool still doesn't exist, create it directly
+            if (!game.objectPools.pools || !game.objectPools.pools.has('projectiles')) {
+                // Create projectile pool with simplified implementation
+                game.objectPools.createPool('projectiles', () => {
+                    // Safe projectile creation with error handling
+                    try {
+                        const projectile = new Projectile(game.scene);
+                        return projectile;
+                    } catch (e) {
+                        console.error("Error creating projectile for pool:", e);
+                        // Return a dummy projectile with required methods
+                        return {
+                            mesh: { position: new THREE.Vector3(), visible: false },
+                            direction: new THREE.Vector3(0, 0, 1),
+                            speed: 0.5,
+                            damage: 10,
+                            alive: false,
+                            setup: function(position, direction) { 
+                                if (position) this.mesh.position.copy(position);
+                                this.direction = direction || this.direction;
+                                this.alive = true;
+                                return this; 
+                            },
+                            update: function() { return false; },
+                            hide: function() { this.alive = false; },
+                            updateAppearance: function() {}
+                        };
+                    }
+                }, 20); // Create a pool with 20 projectiles
+            }
+            return true;
+        } catch (e) {
+            console.error("Failed to create projectiles pool:", e);
+            return false;
+        }
     }
     
     // Add the missing canShoot method to check if weapon can fire
@@ -110,50 +179,10 @@ export class Weapon {
             return null;
         }
         
-        // Ensure the projectiles pool exists
+        // Ensure the projectiles pool exists using the new method
         if (!game.objectPools.pools || !game.objectPools.pools.has('projectiles')) {
-            console.warn("Weapon.shoot: No projectiles pool found - creating one");
-            
-            // Attempt to initialize the pool if missing
-            try {
-                // First try using the existing initObjectPools method
-                if (typeof game.initObjectPools === 'function') {
-                    game.initObjectPools();
-                } 
-                
-                // If pool still doesn't exist, create it directly
-                if (!game.objectPools.pools || !game.objectPools.pools.has('projectiles')) {
-                    // Create projectile pool with simplified implementation
-                    game.objectPools.createPool('projectiles', () => {
-                        // Safe projectile creation with error handling
-                        try {
-                            const projectile = new Projectile(game.scene);
-                            return projectile;
-                        } catch (e) {
-                            console.error("Error creating projectile for pool:", e);
-                            // Return a dummy projectile with required methods
-                            return {
-                                mesh: { position: new THREE.Vector3(), visible: false },
-                                direction: new THREE.Vector3(0, 0, 1),
-                                speed: 0.5,
-                                damage: 10,
-                                alive: false,
-                                setup: function(position, direction) { 
-                                    if (position) this.mesh.position.copy(position);
-                                    this.direction = direction || this.direction;
-                                    this.alive = true;
-                                    return this; 
-                                },
-                                update: function() { return false; },
-                                hide: function() { this.alive = false; },
-                                updateAppearance: function() {}
-                            };
-                        }
-                    }, 20); // Create a pool with 20 projectiles
-                }
-            } catch (e) {
-                console.error("Failed to create projectiles pool:", e);
-                return null;
+            if (!this.ensureProjectilePool()) {
+                return null; // Failed to create pool
             }
         }
         
