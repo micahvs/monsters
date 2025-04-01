@@ -667,20 +667,23 @@ export class MonsterTruck {
         // Track the previous speed to detect state changes
         const wasMoving = Math.abs(this.speed) >= 0.05;
         
+        // Get audio manager reference safely
+        const audioManager = window.audioManager || this.audioManager;
+        
         // Acceleration and braking
         if (accelerating) {
             this.speed = Math.min(this.speed + this.acceleration, this.maxSpeed);
             // Only play sound at strategic moments, not every frame
-            if (window.audioManager && (!this._lastAccelSound || performance.now() - this._lastAccelSound > 500)) {
+            if (audioManager && (!this._lastAccelSound || performance.now() - this._lastAccelSound > 500)) {
                 this._lastAccelSound = performance.now();
-                window.audioManager.playSound('engine_rev');
+                audioManager.playSound('engine_rev');
             }
         } else if (braking) {
             this.speed = Math.max(this.speed - this.brakingForce, -this.maxSpeed * 0.5);
             // Only play sound at strategic moments, not every frame
-            if (window.audioManager && (!this._lastBrakeSound || performance.now() - this._lastBrakeSound > 500)) {
+            if (audioManager && (!this._lastBrakeSound || performance.now() - this._lastBrakeSound > 500)) {
                 this._lastBrakeSound = performance.now();
-                window.audioManager.playSound('engine_deceleration');
+                audioManager.playSound('engine_deceleration');
             }
         } else {
             // Natural deceleration
@@ -689,25 +692,25 @@ export class MonsterTruck {
             // Check if the vehicle is almost stopped (idle)
             if (Math.abs(this.speed) < 0.05) {
                 // Only play idle sound occasionally
-                if (window.audioManager && (!this._lastIdleSound || performance.now() - this._lastIdleSound > 2000)) {
+                if (audioManager && (!this._lastIdleSound || performance.now() - this._lastIdleSound > 2000)) {
                     this._lastIdleSound = performance.now();
-                    window.audioManager.playSound('engine_idle');
+                    audioManager.playSound('engine_idle');
                 }
             } 
             // Play engine deceleration sound during natural deceleration if speed is significant
-            else if (Math.abs(this.speed) > 0.1 && window.audioManager && 
+            else if (Math.abs(this.speed) > 0.1 && audioManager && 
                     (!this._lastDecelSound || performance.now() - this._lastDecelSound > 800)) {
                 this._lastDecelSound = performance.now();
-                window.audioManager.playSound('engine_deceleration');
+                audioManager.playSound('engine_deceleration');
             }
         }
         
         // State transition: Idle -> Moving (only play sound once when starting to move)
         const isMoving = Math.abs(this.speed) >= 0.05;
-        if (!wasMoving && isMoving && window.audioManager && 
+        if (!wasMoving && isMoving && audioManager && 
             (!this._lastStartSound || performance.now() - this._lastStartSound > 500)) {
             this._lastStartSound = performance.now();
-            window.audioManager.playSound('engine_rev');
+            audioManager.playSound('engine_rev');
         }
         
         // Turning (more effective at lower speeds)
@@ -863,8 +866,8 @@ export class MonsterTruck {
         this.ammo--;
         
         // Play weapon fire sound if projectiles were created (successful shot)
-        if (projectile && window.audioManager) {
-            window.audioManager.playSound('weapon_fire');
+        if (projectile && audioManager) {
+            audioManager.playSound('weapon_fire');
         }
     }
     

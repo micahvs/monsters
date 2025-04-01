@@ -38,9 +38,21 @@ export default class Multiplayer {
                 throw new Error('Socket.io not found when attempting to connect');
             }
             
-            // Always try to connect, even on mobile
-            console.log('🎮 [Multiplayer] Creating socket connection');
-            this.initializeSocketConnection(this.serverUrl);
+            // Test server connection first
+            this.testServerConnection()
+                .then(serverReachable => {
+                    if (serverReachable) {
+                        console.log('🎮 [Multiplayer] Server is reachable, creating socket connection');
+                        this.initializeSocketConnection(this.serverUrl);
+                    } else {
+                        console.log('🎮 [Multiplayer] Primary server not reachable, trying backup servers');
+                        this.tryBackupServers();
+                    }
+                })
+                .catch(error => {
+                    console.error('🎮 [Multiplayer] Server test error:', error);
+                    this.handleConnectionError(error);
+                });
             
         } catch (error) {
             console.error('🎮 [Multiplayer] Connection error:', error);
@@ -58,6 +70,7 @@ export default class Multiplayer {
             fetch(`${this.serverUrl}/healthcheck`, { 
                 method: 'GET',
                 mode: 'cors',
+                credentials: 'include',
                 cache: 'no-cache',
                 headers: { 'Content-Type': 'application/json' },
                 referrerPolicy: 'no-referrer',
@@ -95,7 +108,6 @@ export default class Multiplayer {
         // Alternative server URLs to try
         const backupServers = [
             'https://monster-truck-game-server.fly.dev',
-            'https://monster-truck-stadium.fly.dev',
             'http://localhost:3000'
         ];
         
@@ -115,6 +127,7 @@ export default class Multiplayer {
             fetch(`${serverUrl}/healthcheck`, { 
                 timeout: 3000,
                 mode: 'cors',
+                credentials: 'include',
                 cache: 'no-cache',
                 headers: { 'Content-Type': 'application/json' },
                 referrerPolicy: 'no-referrer'

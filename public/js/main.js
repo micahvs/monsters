@@ -50,6 +50,10 @@ function setupMobileAudioHandling() {
                 if (gameInstance.audioManager && gameInstance.camera) {
                     gameInstance.audioManager.camera = gameInstance.camera;
                 }
+                // Force game to update audio manager reference
+                if (gameInstance.monsterTruck) {
+                    gameInstance.monsterTruck.audioManager = window.audioManager;
+                }
             } else {
                 console.log("Game not yet started, will initialize when ready");
             }
@@ -744,6 +748,11 @@ class Game {
                     console.log("Using existing AudioManager");
                     this.audioManager = window.audioManager;
                     this.audioManager.camera = this.camera;
+                    
+                    // Update monster truck audio manager reference
+                    if (this.monsterTruck) {
+                        this.monsterTruck.audioManager = window.audioManager;
+                    }
                 }
             } else {
                 // On desktop, initialize normally

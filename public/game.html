@@ -665,14 +665,29 @@
     </script>
     <script>
         // Sound initialization status
-        document.addEventListener('click', function() {
-            console.log('User interaction detected - audio should be enabled now');
-            if (window.audioManager) {
-                console.log('Audio manager is available globally');
-            } else {
-                console.warn('Audio manager is not available globally yet');
+        let audioInitialized = false;
+        
+        function checkAudioStatus() {
+            if (!audioInitialized && window.audioManager) {
+                console.log('Audio manager is now available globally');
+                audioInitialized = true;
+                
+                // Update game instance if it exists
+                if (window.gameInstance) {
+                    window.gameInstance.audioManager = window.audioManager;
+                    if (window.gameInstance.camera) {
+                        window.audioManager.camera = window.gameInstance.camera;
+                    }
+                }
             }
-        });
+        }
+        
+        // Check on user interaction
+        document.addEventListener('click', checkAudioStatus);
+        document.addEventListener('touchstart', checkAudioStatus);
+        
+        // Also check periodically
+        setInterval(checkAudioStatus, 1000);
     </script>
 </body>
 </html> 
