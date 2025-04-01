@@ -269,8 +269,8 @@ export class Weapon {
                 game.createSimpleEffect(position, 0xffff00, 5);
             }
             
-            // Play sound
-            this.playSound('shoot');
+            // Play sound using better error handling
+            this.playWeaponSound('shoot');
         } else if (!allProjectilesCreated) {
             // If we failed to create projectiles due to pool issues but otherwise could shoot,
             // don't put weapon on cooldown - let the player try again
@@ -972,6 +972,26 @@ export class Weapon {
             };
             
             fadeImpact();
+        }
+    }
+
+    // Add safe sound playing method
+    playWeaponSound(soundName) {
+        try {
+            // Try to get audio manager from game
+            const game = this.game || window.gameInstance;
+            const audioManager = game?.audioManager || window.audioManager;
+            
+            // If we have a valid audio manager, play the sound
+            if (audioManager && typeof audioManager.playSound === 'function') {
+                audioManager.playSound(soundName);
+            } else {
+                // No audio manager available - just log and continue
+                console.log(`Would play sound: ${soundName} (audio manager not available)`);
+            }
+        } catch (e) {
+            // Silently ignore audio errors - they shouldn't stop gameplay
+            console.warn(`Error playing weapon sound ${soundName}:`, e);
         }
     }
 }
