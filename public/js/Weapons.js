@@ -73,6 +73,25 @@ export class Weapon {
         this.projectiles = [];
     }
     
+    // Add the missing canShoot method to check if weapon can fire
+    canShoot() {
+        // Check all conditions that would prevent shooting
+        if (this.cooldownTimer > 0) {
+            return false; // Still on cooldown
+        }
+        
+        if (this.ammo <= 0) {
+            return false; // Out of ammo
+        }
+        
+        if (this.isReloading) {
+            return false; // Currently reloading
+        }
+        
+        // If we passed all checks, we can shoot
+        return true;
+    }
+    
     shoot(position, direction, source = 'player', playerId = null) {
         // Check if can shoot (ammo, cooldown)
         if (!this.canShoot()) {

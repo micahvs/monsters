@@ -2131,15 +2131,45 @@ class Game {
                 // Ensure all geometries have proper element array buffers
                 if (obj.geometry && !obj.__geometryBufferChecked) {
                     try {
-                        // Force index buffer creation if needed
+                        // Create index buffer if none exists
                         if (!obj.geometry.index && obj.geometry.attributes.position) {
-                            // Simplify geometry to avoid buffer binding issues
-                            obj.geometry.setAttribute('position', obj.geometry.attributes.position);
-                            
-                            // Ensure normal attribute exists
-                            if (!obj.geometry.attributes.normal && obj.geometry.attributes.position) {
-                                THREE.BufferGeometryUtils.computeVertexNormals(obj.geometry);
+                            const positionAttr = obj.geometry.attributes.position;
+                            // Create a simple index buffer for triangle rendering
+                            // This fixes the "Must have element array buffer bound" error
+                            const indices = [];
+                            for (let i = 0; i < positionAttr.count; i++) {
+                                indices.push(i);
                             }
+                            obj.geometry.setIndex(indices);
+                            console.log("Created index buffer for geometry");
+                        }
+                        
+                        // Clean up unused attributes to reduce buffer size
+                        // Keep only essential attributes: position, normal, uv
+                        const keysToKeep = ['position', 'normal', 'uv'];
+                        if (obj.geometry.attributes) {
+                            for (const key in obj.geometry.attributes) {
+                                if (!keysToKeep.includes(key)) {
+                                    obj.geometry.deleteAttribute(key);
+                                }
+                            }
+                        }
+                        
+                        // Ensure position buffer is properly sized and has itemSize=3
+                        if (obj.geometry.attributes.position) {
+                            const positionAttr = obj.geometry.attributes.position;
+                            if (positionAttr.itemSize !== 3) {
+                                console.warn("Position attribute has incorrect itemSize:", positionAttr.itemSize);
+                                // Try to fix by recreating position attribute with correct itemSize
+                                const newArray = new Float32Array(positionAttr.array);
+                                obj.geometry.setAttribute('position', 
+                                    new THREE.BufferAttribute(newArray, 3));
+                            }
+                        }
+                        
+                        // Ensure normal attribute exists
+                        if (!obj.geometry.attributes.normal && obj.geometry.attributes.position) {
+                            THREE.BufferGeometryUtils.computeVertexNormals(obj.geometry);
                         }
                         
                         // Force buffer update
@@ -2177,9 +2207,25 @@ class Game {
                     const dummyBuffer = gl.createBuffer();
                     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, dummyBuffer);
                     
-                    // Fill with minimal data
-                    const dummyData = new Uint16Array([0, 1, 2]);
+                    // Fill with minimal data - larger buffer to avoid insufficient size errors
+                    const dummyData = new Uint16Array([0, 1, 2, 0, 2, 3, 0, 3, 1]); // Increased buffer size
                     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, dummyData, gl.STATIC_DRAW);
+                    
+                    // Also create dummy array buffer
+                    const dummyArrayBuffer = gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER, dummyArrayBuffer);
+                    const dummyVertexData = new Float32Array([
+                        0, 0, 0, 
+                        1, 0, 0,
+                        0, 1, 0,
+                        1, 1, 0
+                    ]); // Minimally sufficient vertex data
+                    gl.bufferData(gl.ARRAY_BUFFER, dummyVertexData, gl.STATIC_DRAW);
+                    
+                    // Setup a minimal attribute pointer
+                    const positionLocation = 0; // This works for most WebGL contexts
+                    gl.enableVertexAttribArray(positionLocation);
+                    gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
                 } catch (glErr) {
                     console.warn("WebGL buffer manipulation error:", glErr);
                 }
@@ -2188,8 +2234,12 @@ class Game {
             // Force renderer state reset
             this.renderer.state.reset();
             
-            // Clear buffers
+            // Clear buffers and reset viewport
             this.renderer.clear();
+            if (gl) {
+                const canvas = this.renderer.domElement;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            }
             
             // Simplify renderer settings further for compatibility
             this.renderer.shadowMap.enabled = false;
