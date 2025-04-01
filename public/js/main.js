@@ -675,16 +675,43 @@ class PowerUp {
 }
 
 class Game {
-    constructor(debug = false) {
+    constructor(debugOrCallback = false) {
         console.log("Game constructor");
+        
+        // Determine if first parameter is a callback or debug flag
+        if (typeof debugOrCallback === 'function') {
+            this.onLoadCallback = debugOrCallback;
+            this.debug = false;
+        } else {
+            this.debug = debugOrCallback;
+            this.onLoadCallback = function(success) {};
+        }
+        
+        // Track initialization status
+        this.isInitialized = false;
+        this.initializationFailed = false;
+        
+        // Set a timeout to fail initialization after 15 seconds
+        this.initializationTimeout = setTimeout(() => {
+            if (!this.isInitialized && !this.initializationFailed) {
+                console.error("Game initialization timed out after 15 seconds");
+                this.initializationFailed = true;
+                this.onLoadCallback(false);
+            }
+        }, 15000);
         
         // Store this instance globally
         gameInstance = this;
         
-        // Only create stats if the library is available
-        if (typeof Stats !== 'undefined') {
-            this.stats = new Stats();
-            document.body.appendChild(this.stats.dom);
+        try {
+            // Only create stats if the library is available
+            if (typeof Stats !== 'undefined') {
+                this.stats = new Stats();
+                document.body.appendChild(this.stats.dom);
+            }
+        } catch (e) {
+            console.error("Error initializing Stats:", e);
+            // Continue without Stats
         }
         
         this.speedFactor = 1.0; // Speed multiplier for vehicle movement
@@ -3636,6 +3663,19 @@ window.addEventListener('load', () => {
         }
         console.error("WebGL not supported on this device");
         return;
+    }
+    
+    // Ensure Stats is defined for mobile devices
+    if (typeof Stats === 'undefined') {
+        // Create a dummy Stats object to prevent errors
+        window.Stats = function() {
+            return {
+                dom: document.createElement('div'),
+                begin: function() {},
+                end: function() {}
+            };
+        };
+        console.log("Created dummy Stats object for mobile compatibility");
     }
     
     const preloader = new AssetPreloader(() => {
