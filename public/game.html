@@ -629,65 +629,196 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
     <script type="module" src="js/main.js"></script>
     <script>
-        // Update debug info
-        window.updateDebugInfo = function(position) {
-            const positionInfo = document.getElementById('positionInfo');
-            if (positionInfo && position) {
-                positionInfo.textContent = `Pos: X:${position.x.toFixed(1)} Y:${position.y.toFixed(1)} Z:${position.z.toFixed(1)}`;
+        // Create a global ready flag to synchronize all initialization
+        window.gameReadyState = {
+            audioInitialized: false,
+            gameInitialized: false,
+            overlayTapped: false
+        };
+        
+        // Simple logging for debugging
+        const logStatus = (message) => {
+            console.log(message);
+            if (window.gameReadyState.overlayTapped) {
+                document.getElementById('loading-text').textContent = message;
             }
         };
         
-        // Debug toggle functionality removed
-        
-        // Update health and ammo bars
-        window.updateStatBars = function(health, ammo, maxAmmo) {
-            const healthBarFill = document.querySelector('.health-bar-fill');
-            const ammoBarFill = document.querySelector('.ammo-bar-fill');
+        // Initialize the game
+        function initializeGame() {
+            // Only initialize game once
+            if (window.gameReadyState.gameInitialized) return;
             
-            if (healthBarFill && typeof health === 'number') {
-                healthBarFill.style.width = `${Math.max(0, Math.min(100, health))}%`;
-                
-                // Update color based on health percentage
-                if (health <= 20) {
-                    healthBarFill.style.backgroundColor = '#ff0000'; // Red
-                } else if (health <= 50) {
-                    healthBarFill.style.backgroundColor = '#ffff00'; // Yellow
-                } else {
-                    healthBarFill.style.backgroundColor = '#00ff00'; // Green
-                }
-            }
+            logStatus('Starting game initialization');
             
-            if (ammoBarFill && typeof ammo === 'number' && typeof maxAmmo === 'number') {
-                const ammoPercentage = Math.max(0, Math.min(100, (ammo / maxAmmo) * 100));
-                ammoBarFill.style.width = `${ammoPercentage}%`;
-            }
-        };
-    </script>
-    <script>
-        // Sound initialization status
-        let audioInitialized = false;
-        
-        function checkAudioStatus() {
-            if (!audioInitialized && window.audioManager) {
-                console.log('Audio manager is now available globally');
-                audioInitialized = true;
-                
-                // Update game instance if it exists
-                if (window.gameInstance) {
-                    window.gameInstance.audioManager = window.audioManager;
-                    if (window.gameInstance.camera) {
-                        window.audioManager.camera = window.gameInstance.camera;
+            try {
+                // Start the game initialization
+                window.gameInstance = new Game((success) => {
+                    if (success) {
+                        window.gameReadyState.gameInitialized = true;
+                        logStatus('Game successfully initialized');
+                        
+                        // Connect audio to game if both are ready
+                        connectAudioToGame();
+                    } else {
+                        logStatus('Game initialization failed');
                     }
-                }
+                });
+            } catch (err) {
+                logStatus('Error initializing game: ' + err.message);
             }
         }
         
-        // Check on user interaction
-        document.addEventListener('click', checkAudioStatus);
-        document.addEventListener('touchstart', checkAudioStatus);
+        // Start initialization as soon as the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create tap overlay for mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                logStatus('Mobile device detected, waiting for tap');
+                
+                // Create overlay if it doesn't exist
+                let overlay = document.getElementById('tap-to-start-overlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.id = 'tap-to-start-overlay';
+                    overlay.style.position = 'fixed';
+                    overlay.style.top = '0';
+                    overlay.style.left = '0';
+                    overlay.style.width = '100%';
+                    overlay.style.height = '100%';
+                    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+                    overlay.style.zIndex = '10000';
+                    overlay.style.display = 'flex';
+                    overlay.style.flexDirection = 'column';
+                    overlay.style.justifyContent = 'center';
+                    overlay.style.alignItems = 'center';
+                    overlay.style.color = '#ff00ff';
+                    overlay.style.fontFamily = 'Arial, sans-serif';
+                    overlay.innerHTML = `
+                        <div style="font-size: 28px; margin-bottom: 20px;">TAP TO START</div>
+                        <div id="loading-text" style="font-size: 16px; color: #aaa;">Waiting for user interaction...</div>
+                    `;
+                    document.body.appendChild(overlay);
+                }
+                
+                // Handle tap
+                overlay.addEventListener('click', function() {
+                    logStatus('Overlay tapped, initializing...');
+                    window.gameReadyState.overlayTapped = true;
+                    
+                    // Start by initializing audio
+                    initializeAudio();
+                    
+                    // Start game initialization
+                    initializeGame();
+                    
+                    // Hide overlay after a short delay to ensure we capture the interaction event
+                    setTimeout(function() {
+                        overlay.style.opacity = '0';
+                        overlay.style.transition = 'opacity 0.5s';
+                        
+                        // Remove completely after transition
+                        setTimeout(function() {
+                            overlay.remove();
+                        }, 500);
+                    }, 100);
+                });
+            } else {
+                // On desktop, just initialize directly
+                logStatus('Desktop device, initializing directly');
+                initializeGame();
+            }
+        });
         
-        // Also check periodically
-        setInterval(checkAudioStatus, 1000);
+        // Audio initialization
+        function initializeAudio() {
+            if (window.gameReadyState.audioInitialized) return;
+            
+            logStatus('Initializing audio...');
+            
+            try {
+                // Create audio manager if it doesn't exist
+                if (!window.audioManager) {
+                    window.audioManager = new AudioManager();
+                    
+                    // Explicitly trigger audio initialization
+                    if (typeof window.audioManager.handleUserInteraction === 'function') {
+                        window.audioManager.handleUserInteraction();
+                    }
+                    
+                    window.gameReadyState.audioInitialized = true;
+                    logStatus('Audio initialized successfully');
+                    
+                    // Connect audio to game if both are ready
+                    connectAudioToGame();
+                }
+            } catch (err) {
+                logStatus('Error initializing audio: ' + err.message);
+                
+                // Create dummy audio manager to prevent errors
+                window.audioManager = {
+                    playSound: () => {},
+                    stopSound: () => {},
+                    playMusic: () => {},
+                    stopMusic: () => {},
+                    handleUserInteraction: () => {}
+                };
+            }
+        }
+        
+        // Connect audio to game
+        function connectAudioToGame() {
+            if (!window.gameReadyState.audioInitialized || 
+                !window.gameReadyState.gameInitialized || 
+                !window.audioManager || 
+                !window.gameInstance) {
+                return;
+            }
+            
+            logStatus('Connecting audio to game...');
+            
+            try {
+                // Update references
+                window.gameInstance.audioManager = window.audioManager;
+                
+                if (window.gameInstance.camera) {
+                    window.audioManager.camera = window.gameInstance.camera;
+                }
+                
+                // Update truck's audio manager reference
+                if (window.gameInstance.truck) {
+                    window.gameInstance.truck.audioManager = window.audioManager;
+                }
+                
+                if (window.gameInstance.monsterTruck) {
+                    window.gameInstance.monsterTruck.audioManager = window.audioManager;
+                }
+                
+                logStatus('Game and audio fully connected');
+            } catch (err) {
+                logStatus('Error connecting audio to game: ' + err.message);
+            }
+        }
+        
+        // Check status periodically
+        setInterval(function() {
+            if (window.gameReadyState.overlayTapped && 
+                !window.gameReadyState.gameInitialized) {
+                
+                // If game initialization is taking too long, retry
+                if (!window.gameInstance && window.gameReadyState.overlayTapped) {
+                    logStatus('Game initialization delayed, retrying...');
+                    initializeGame();
+                }
+            }
+            
+            // Try connecting audio if needed
+            if (window.gameReadyState.audioInitialized && 
+                window.gameReadyState.gameInitialized) {
+                connectAudioToGame();
+            }
+        }, 2000);
     </script>
 </body>
 </html> 

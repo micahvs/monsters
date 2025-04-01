@@ -10,9 +10,14 @@ export class MonsterTruck {
         // Adjust scale for preview
         this.scale = this.isPreview ? 0.5 : 1;
         
+        // Initialize required properties to prevent null reference errors
         this.velocity = new THREE.Vector3();
         this.speed = 0;
-        this.rotation = 0;
+        this.rotation = new THREE.Euler(0, 0, 0);
+        this.steeringAngle = 0;
+        this.maxSteeringAngle = 0.5;
+        this.wheels = [];
+        this.friction = 0.98; // Default friction value
         
         // Get machine-specific values
         const machineType = config.machineType || 'neon-crusher';
@@ -22,12 +27,12 @@ export class MonsterTruck {
         this.ammo = 30;
         this.damageTimeout = 0; // Cooldown for damage visual effects
         
-        // Physics constants
-        this.maxSpeed = this.getMaxSpeedForMachine(machineType);
-        this.acceleration = this.getAccelerationForMachine(machineType);
-        this.turnSpeed = this.getTurnSpeedForMachine(machineType);
-        this.brakingForce = this.getBrakingForceForMachine(machineType);
-        this.deceleration = this.getDecelerationForMachine(machineType);
+        // Physics constants - with default fallbacks
+        this.maxSpeed = this.getMaxSpeedForMachine(machineType) || 1.0;
+        this.acceleration = this.getAccelerationForMachine(machineType) || 0.02;
+        this.turnSpeed = this.getTurnSpeedForMachine(machineType) || 0.03;
+        this.brakingForce = this.getBrakingForceForMachine(machineType) || 0.03;
+        this.deceleration = this.getDecelerationForMachine(machineType) || 0.01;
         
         // Validate position before creating truck
         if (!position || isNaN(position.x) || isNaN(position.y) || isNaN(position.z)) {
@@ -35,6 +40,13 @@ export class MonsterTruck {
             position = new THREE.Vector3(0, 0.5, 0);
         }
         
+        // Ensure audio manager reference exists
+        this.audioManager = window.audioManager || {
+            playSound: () => {},
+            stopSound: () => {}
+        };
+        
+        // Create the truck
         this.createTruck(position);
     }
     
@@ -643,7 +655,7 @@ export class MonsterTruck {
         
         // Reset rotation if it's NaN
         if (isNaN(this.rotation)) {
-            this.rotation = 0;
+            this.rotation = new THREE.Euler(0, 0, 0);
         }
         
         // Get the default values for this machine type
@@ -664,6 +676,11 @@ export class MonsterTruck {
     }
     
     handleControls(accelerating, braking, turningLeft, turningRight) {
+        // Initialize values if they don't exist
+        if (!this.rotation) this.rotation = new THREE.Euler(0, 0, 0);
+        if (this.speed === undefined) this.speed = 0;
+        if (this.body === undefined) return; // Can't control without a body
+        
         // Track the previous speed to detect state changes
         const wasMoving = Math.abs(this.speed) >= 0.05;
         
@@ -674,14 +691,16 @@ export class MonsterTruck {
         
         // Acceleration and braking
         if (accelerating) {
-            this.speed = Math.min(this.speed + this.acceleration, this.maxSpeed);
+            this.speed = Math.min(this.speed + (this.acceleration || 0.02), this.maxSpeed || 1.0);
             // Only play sound at strategic moments, not every frame
             if (audioManager && (!this._lastAccelSound || performance.now() - this._lastAccelSound > 500)) {
                 this._lastAccelSound = performance.now();
                 audioManager.playSound('engine_rev');
             }
         } else if (braking) {
-            this.speed = Math.max(this.speed - this.brakingForce, -this.maxSpeed * 0.5);
+            const brakeForce = this.brakingForce || 0.03;
+            const maxReverseSpeed = (this.maxSpeed || 1.0) * 0.5;
+            this.speed = Math.max(this.speed - brakeForce, -maxReverseSpeed);
             // Only play sound at strategic moments, not every frame
             if (audioManager && (!this._lastBrakeSound || performance.now() - this._lastBrakeSound > 500)) {
                 this._lastBrakeSound = performance.now();
@@ -689,7 +708,7 @@ export class MonsterTruck {
             }
         } else {
             // Apply natural deceleration (friction)
-            this.speed *= this.friction;
+            this.speed *= this.friction || 0.98;
             
             // Ensure speed gets to zero when very slow
             if (Math.abs(this.speed) < 0.005) {

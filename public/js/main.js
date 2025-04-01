@@ -728,188 +728,104 @@ class Game {
             this.onLoadCallback = function(success) {};
         }
         
-        // Track initialization status
-        this.isInitialized = false;
-        this.initializationFailed = false;
-        
-        // Set a timeout to fail initialization after 15 seconds
-        this.initializationTimeout = setTimeout(() => {
-            if (!this.isInitialized && !this.initializationFailed) {
-                console.error("Game initialization timed out after 15 seconds");
-                this.initializationFailed = true;
-                this.onLoadCallback(false);
-            }
-        }, 15000);
-        
         // Store this instance globally
         gameInstance = this;
         
         try {
-            // Only create stats if the library is available
-            if (typeof Stats !== 'undefined') {
-                this.stats = new Stats();
-                document.body.appendChild(this.stats.dom);
-            }
-        } catch (e) {
-            console.error("Error initializing Stats:", e);
-            // Continue without Stats
-        }
-        
-        this.speedFactor = 1.0; // Speed multiplier for vehicle movement
-        this.clockDelta = 0; // Initialize for first frame
-        
-        // Create the scene
-        this.scene = new THREE.Scene();
-        
-        // Setup camera
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.camera.position.set(0, 5, -10);
-        this.camera.lookAt(0, 0, 0);
-        
-        // Initialize audio manager with camera
-        try {
-            if (isMobileDevice) {
-                // On mobile, we wait for explicit user interaction via the overlay
-                console.log("Mobile device - waiting for audio interaction");
+            // Detect mobile for performance optimizations
+            this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            // Optimize settings for mobile while keeping multiplayer enabled
+            if (this.isMobile) {
+                console.log("Mobile device detected - using optimized settings");
+                this.drawDistance = 600;
+                this.maxParticles = 10;
+                this.shadowsEnabled = false;
+                this.effectsEnabled = false;
+                this.gridEnabled = true;
                 
-                // Use a silent audio manager until properly initialized
-                this.audioManager = {
-                    playSound: () => {},
-                    stopSound: () => {},
-                    playMusic: () => {},
-                    stopMusic: () => {},
-                    handleUserInteraction: () => {},
-                    camera: this.camera
-                };
-                
-                // If audio was already initialized through tap-to-start, update reference
-                if (window.audioManager) {
-                    console.log("Using existing AudioManager");
-                    this.audioManager = window.audioManager;
-                    this.audioManager.camera = this.camera;
-                    
-                    // Update monster truck audio manager reference
-                    if (this.monsterTruck) {
-                        this.monsterTruck.audioManager = window.audioManager;
-                    }
-                }
+                // Keep multiplayer enabled on mobile
+                window.multiplayerEnabled = true;
             } else {
-                // On desktop, initialize normally
-                if (!window.audioManager) {
-                    console.log("Creating new AudioManager instance");
-                    window.audioManager = new AudioManager(this.camera);
-                } else {
-                    console.log("Using existing AudioManager instance");
-                    window.audioManager.camera = this.camera;
-                }
-                this.audioManager = window.audioManager;
-                console.log("Audio manager initialized successfully");
+                this.drawDistance = 2000;
+                this.maxParticles = 30;
+                this.shadowsEnabled = false;
+                this.effectsEnabled = true;
+                this.gridEnabled = true;
+                
+                // Enable multiplayer by default on desktop
+                window.multiplayerEnabled = true;
             }
-        } catch (error) {
-            console.error("Error initializing audio manager:", error);
-            // Create a dummy audio manager to prevent null reference errors
+            
+            // Create a silent audio manager as a fallback before it's properly initialized
+            // This prevents null errors when methods are called
             this.audioManager = {
                 playSound: () => {},
                 stopSound: () => {},
                 playMusic: () => {},
                 stopMusic: () => {},
                 handleUserInteraction: () => {},
-                camera: this.camera
+                camera: null
             };
             
-            // Also set global reference to prevent null errors elsewhere
-            window.audioManager = this.audioManager;
-        }
-        
-        // Create shared geometries for better performance
-        this.sharedParticleGeometry = new THREE.SphereGeometry(1, 8, 6); // Higher quality than before
-        
-        // Initialize object pool manager for better performance
-        this.objectPools = new ObjectPoolManager();
-        
-        // Set up object pools
-        this.initObjectPools();
-        
-        // Detect mobile for performance optimizations
-        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        // Optimize settings for mobile while keeping multiplayer enabled
-        if (this.isMobile) {
-            console.log("Mobile device detected - using optimized settings");
-            this.drawDistance = 600;
-            this.maxParticles = 10;
-            this.shadowsEnabled = false;
-            this.effectsEnabled = false;
-            this.gridEnabled = true;
+            // If audioManager already exists, use it
+            if (window.audioManager) {
+                this.audioManager = window.audioManager;
+            }
             
-            // Keep multiplayer enabled on mobile
-            window.multiplayerEnabled = true;
-        } else {
-            this.drawDistance = 2000;
-            this.maxParticles = 30;
-            this.shadowsEnabled = false;
-            this.effectsEnabled = true;
-            this.gridEnabled = true;
+            // Track initialization status
+            this.isInitialized = false;
+            this.initializationFailed = false;
             
-            // Enable multiplayer by default on desktop
-            window.multiplayerEnabled = true;
-        }
-        
-        // Always use high quality mode
-        window.lowPerformanceMode = false;
-        this.applyHighPerformanceMode();
-        
-        // Essential controls only
-        this.keys = {
-            'ArrowUp': false,
-            'ArrowDown': false,
-            'ArrowLeft': false,
-            'ArrowRight': false,
-            ' ': false,
-            'M': false,
-            'r': false,
-            'R': false
-        }
-        
-        // Core game state
-        this.score = 0;
-        this.health = 100;
-        this.maxHealth = 100;
-        
-        // Add turrets array
-        this.turrets = [];
-        
-        // Add powerups array - reduced spawn rate by 50%
-        this.powerups = [];
-        this.powerupSpawnTimer = 0;
-        this.powerupSpawnInterval = 600; // Doubled from 300 (10 seconds instead of 5)
-        
-  
-        
-        // FPS tracking
-        this.lastTime = 0;
-        this.frameCount = 0;
-        this.fps = 0;
-        this.fpsUpdateInterval = 500; // Update FPS display every 500ms
-        this.lastFpsUpdate = 0;
-        
-        // FPS counter removed as requested
-        // We'll keep the FPS tracking logic for performance monitoring
-        
-        // Multiplayer initialization - only if enabled
-        if (window.multiplayerEnabled) {
-            // Add a toggle button to disable multiplayer if performance is poor
-            this.addMultiplayerToggle();
+            // Set a timeout to fail initialization after 15 seconds
+            this.initializationTimeout = setTimeout(() => {
+                if (!this.isInitialized && !this.initializationFailed) {
+                    console.error("Game initialization timed out after 15 seconds");
+                    this.initializationFailed = true;
+                    this.onLoadCallback(false);
+                }
+            }, 15000);
             
-            // Initialize the multiplayer system
-            this.multiplayer = new Multiplayer(this);
-            console.log("Multiplayer system initialized:", this.multiplayer);
+            // Initialize object pool manager for better performance
+            this.objectPools = new ObjectPoolManager();
+            
+            // Set up object pools
+            this.initObjectPools();
+            
+            // Always use high quality mode
+            window.lowPerformanceMode = false;
+            this.applyHighPerformanceMode();
+            
+            // Essential controls only
+            this.keys = {
+                'ArrowUp': false,
+                'ArrowDown': false,
+                'ArrowLeft': false,
+                'ArrowRight': false,
+                ' ': false,
+                'M': false,
+                'r': false,
+                'R': false,
+                'forward': false,  // For mobile controls
+                'backward': false, // For mobile controls
+                'left': false,     // For mobile controls
+                'right': false,    // For mobile controls
+                'shoot': false     // For mobile controls
+            }
+            
+            // Core game state
+            this.score = 0;
+            this.health = 100;
+            this.maxHealth = 100;
+            
+            // Continue the initialization process
+            this.init();
+        } catch (error) {
+            console.error("Critical error in Game constructor:", error);
+            if (typeof this.onLoadCallback === 'function') {
+                this.onLoadCallback(false);
+            }
         }
-        
-        // Performance toggle removed - always using high quality mode
-        
-        // Initialize the game
-        this.init();
     }
 
     // Add a method to let users disable multiplayer if performance is poor
@@ -1895,6 +1811,13 @@ class Game {
         // Basic update for truck movement
         if (!this.truck) return;
         
+        // Process keyboard/touch input for truck movement
+        const accelerating = this.keys['ArrowUp'] || this.keys['forward'];
+        const braking = this.keys['ArrowDown'] || this.keys['backward'];
+        const turningLeft = this.keys['ArrowLeft'] || this.keys['left'];
+        const turningRight = this.keys['ArrowRight'] || this.keys['right'];
+        const shooting = this.keys[' '] || this.keys['shoot'];
+        
         // Throttle updates for better performance
         const updateAll = this.frameCount % 2 === 0; // Update non-essential items at half rate
         
@@ -1922,12 +1845,12 @@ class Game {
         direction.x = Math.sin(this.truck.rotation.y);
         
         // Acceleration/braking
-        if (this.keys['ArrowUp']) {
+        if (accelerating) {
             this.truck.velocity += acceleration;
             if (this.truck.velocity > maxSpeed) {
                 this.truck.velocity = maxSpeed;
             }
-        } else if (this.keys['ArrowDown']) {
+        } else if (braking) {
             this.truck.velocity -= acceleration;
             if (this.truck.velocity < -maxSpeed/2) {  // Slower in reverse
                 this.truck.velocity = -maxSpeed/2;
@@ -1941,13 +1864,13 @@ class Game {
         }
         
         // Update steering angle based on input
-        if (this.keys['ArrowLeft']) {
+        if (turningLeft) {
             // Gradually increase steering angle
             this.truck.steeringAngle = Math.max(
                 -maxSteeringAngle,
                 this.truck.steeringAngle - steeringResponseSpeed
             );
-        } else if (this.keys['ArrowRight']) {
+        } else if (turningRight) {
             // Gradually increase steering angle
             this.truck.steeringAngle = Math.min(
                 maxSteeringAngle,
@@ -2181,7 +2104,7 @@ class Game {
         }
         
         // Handle shooting
-        if (this.keys[' '] && this.weapon) {
+        if (shooting && this.weapon) {
             const truckDirection = new THREE.Vector3(
                 Math.sin(this.truck.rotation.y),
                 0,
@@ -2195,9 +2118,9 @@ class Game {
             const projectiles = this.weapon.shoot(weaponPosition, truckDirection, 'player');
             
             // Play weapon fire sound if projectiles were created (successful shot)
-            if (projectiles && window.audioManager) {
-                console.log("Game: Playing weapon_fire sound");
-                window.audioManager.playSound('weapon_fire');
+            const audioManager = window.audioManager || this.audioManager || { playSound: () => {} };
+            if (projectiles && audioManager) {
+                audioManager.playSound('weapon_fire');
             }
             
             // Notify multiplayer system of new projectiles for network sync
