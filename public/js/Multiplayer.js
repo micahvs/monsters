@@ -73,17 +73,20 @@ export default class Multiplayer {
                     resolve(true);
                 } else {
                     console.error('🎮 [Multiplayer] Server healthcheck failed:', response.status);
+                    this.showNotification('Server connection failed. Retrying...', 'error');
                     resolve(false);
                 }
             })
             .catch(error => {
                 console.error('🎮 [Multiplayer] Server healthcheck error:', error);
+                this.showNotification('Unable to connect to server. Retrying...', 'error');
                 resolve(false);
             });
             
             // Set a backup timeout in case fetch doesn't resolve
             setTimeout(() => {
                 console.log('🎮 [Multiplayer] Server test timeout - assuming unreachable');
+                this.showNotification('Connection timeout. Retrying...', 'error');
                 resolve(false);
             }, 5000);
         });
@@ -95,8 +98,8 @@ export default class Multiplayer {
         
         // Alternative server URLs to try
         const backupServers = [
+            'https://monster-truck-game-server.fly.dev',
             'https://monster-truck-stadium.fly.dev',
-            'https://monster-truck-game.fly.dev',
             'http://localhost:3000'
         ];
         
@@ -104,6 +107,7 @@ export default class Multiplayer {
         const tryServer = (index) => {
             if (index >= backupServers.length) {
                 console.error('🎮 [Multiplayer] All servers failed, falling back to offline mode');
+                this.showNotification('Unable to connect to any servers. Playing in offline mode.', 'warning');
                 this.enableOfflineMode();
                 return;
             }
@@ -111,21 +115,28 @@ export default class Multiplayer {
             const serverUrl = backupServers[index];
             console.log(`🎮 [Multiplayer] Trying backup server ${index+1}/${backupServers.length}: ${serverUrl}`);
             
-            // Simple fetch test
-            fetch(`${serverUrl}/healthcheck`, { timeout: 3000 })
-                .then(response => {
-                    if (response.ok) {
-                        console.log(`🎮 [Multiplayer] Backup server ${serverUrl} is reachable!`);
-                        this.initializeSocketConnection(serverUrl);
-                    } else {
-                        console.log(`🎮 [Multiplayer] Backup server ${serverUrl} returned error status`);
-                        tryServer(index + 1);
-                    }
-                })
-                .catch(() => {
-                    console.log(`🎮 [Multiplayer] Backup server ${serverUrl} is not reachable`);
+            // Simple fetch test with better error handling
+            fetch(`${serverUrl}/healthcheck`, { 
+                timeout: 3000,
+                mode: 'cors',
+                cache: 'no-cache',
+                headers: { 'Content-Type': 'application/json' },
+                referrerPolicy: 'no-referrer'
+            })
+            .then(response => {
+                if (response.ok) {
+                    console.log(`🎮 [Multiplayer] Backup server ${serverUrl} is reachable!`);
+                    this.showNotification('Connected to backup server!', 'success');
+                    this.initializeSocketConnection(serverUrl);
+                } else {
+                    console.log(`🎮 [Multiplayer] Backup server ${serverUrl} returned error status`);
                     tryServer(index + 1);
-                });
+                }
+            })
+            .catch(() => {
+                console.log(`🎮 [Multiplayer] Backup server ${serverUrl} is not reachable`);
+                tryServer(index + 1);
+            });
         };
         
         // Start trying with the first backup server

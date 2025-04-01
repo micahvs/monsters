@@ -3634,16 +3634,10 @@ window.addEventListener('load', () => {
     // Check for mobile devices
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
-    // Set multiplayer based on device type
-    if (isMobile) {
-        window.multiplayerEnabled = false;
-        localStorage.setItem('monsterTruckMultiplayer', 'false');
-        console.log("Mobile device detected - multiplayer disabled for better performance");
-    } else {
-        window.multiplayerEnabled = true;
-        localStorage.setItem('monsterTruckMultiplayer', 'true');
-        console.log("Desktop device detected - multiplayer enabled");
-    }
+    // Enable multiplayer for all devices
+    window.multiplayerEnabled = true;
+    localStorage.setItem('monsterTruckMultiplayer', 'true');
+    console.log("Multiplayer enabled for all devices");
     
     // Check for WebGL support before proceeding
     const checkWebGLSupport = () => {
