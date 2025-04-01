@@ -1540,62 +1540,154 @@ class Game {
     }
 
     createMobileControls() {
-        // Check if controls already exist
-        if (document.getElementById('mobile-controls')) return;
+        if (!this.isMobile) return;
         
-        // Create mobile controls container
-        const mobileControls = document.createElement('div');
-        mobileControls.id = 'mobile-controls';
+        // Create container for mobile controls if it doesn't exist
+        let controlsContainer = document.getElementById('mobile-controls');
+        if (!controlsContainer) {
+            controlsContainer = document.createElement('div');
+            controlsContainer.id = 'mobile-controls';
+            document.body.appendChild(controlsContainer);
+        }
         
-        // Create directional pad
-        const dPad = document.createElement('div');
-        dPad.id = 'direction-pad';
-        dPad.innerHTML = `
-            <div id="pad-up" class="control-button"><i class="fas fa-chevron-up"></i></div>
-            <div id="pad-left" class="control-button"><i class="fas fa-chevron-left"></i></div>
-            <div id="pad-right" class="control-button"><i class="fas fa-chevron-right"></i></div>
-            <div id="pad-down" class="control-button"><i class="fas fa-chevron-down"></i></div>
-        `;
+        // Create movement pad
+        const movementPad = document.createElement('div');
+        movementPad.id = 'movement-pad';
+        movementPad.className = 'control-pad';
+        controlsContainer.appendChild(movementPad);
         
-        // Create action buttons (fire, weapon switch)
-        const actionButtons = document.createElement('div');
-        actionButtons.id = 'action-buttons';
-        actionButtons.innerHTML = `
-            <div id="fire-button" class="action-button"><i class="fas fa-crosshairs"></i></div>
-            <div id="weapon-button" class="action-button"><i class="fas fa-sync-alt"></i></div>
-        `;
+        // Create weapon button
+        const weaponButton = document.createElement('div');
+        weaponButton.id = 'weapon-button';
+        weaponButton.className = 'control-button';
+        weaponButton.innerHTML = '<i class="fas fa-crosshairs"></i>';
+        controlsContainer.appendChild(weaponButton);
         
-        // Add controls to the page
-        mobileControls.appendChild(dPad);
-        mobileControls.appendChild(actionButtons);
-        document.body.appendChild(mobileControls);
+        // Add touch event listeners with proper options
+        const touchOptions = {
+            passive: false // Important for iOS
+        };
         
-        // Hide desktop-only UI elements on mobile
-        this.updateMobileUI();
+        // Movement pad touch handling
+        movementPad.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.handleMovementTouch(e.touches[0]);
+            movementPad.classList.add('active');
+        }, touchOptions);
+        
+        movementPad.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            this.handleMovementTouch(e.touches[0]);
+        }, touchOptions);
+        
+        movementPad.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.resetMovementControls();
+            movementPad.classList.remove('active');
+        }, touchOptions);
+        
+        // Weapon button touch handling
+        weaponButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.keys.shoot = true;
+            weaponButton.classList.add('active');
+        }, touchOptions);
+        
+        weaponButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.keys.shoot = false;
+            weaponButton.classList.remove('active');
+        }, touchOptions);
+        
+        // Add styles if they don't exist
+        if (!document.getElementById('mobile-controls-style')) {
+            const style = document.createElement('style');
+            style.id = 'mobile-controls-style';
+            style.textContent = `
+                #mobile-controls {
+                    position: fixed;
+                    bottom: 20px;
+                    left: 0;
+                    right: 0;
+                    height: 180px;
+                    z-index: 1000;
+                    pointer-events: none;
+                }
+                
+                .control-pad {
+                    position: absolute;
+                    left: 20px;
+                    bottom: 20px;
+                    width: 120px;
+                    height: 120px;
+                    background: rgba(255, 0, 255, 0.2);
+                    border: 2px solid rgba(255, 0, 255, 0.5);
+                    border-radius: 50%;
+                    pointer-events: auto;
+                }
+                
+                .control-button {
+                    position: absolute;
+                    right: 20px;
+                    bottom: 20px;
+                    width: 80px;
+                    height: 80px;
+                    background: rgba(0, 255, 255, 0.2);
+                    border: 2px solid rgba(0, 255, 255, 0.5);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: rgba(0, 255, 255, 0.8);
+                    font-size: 24px;
+                    pointer-events: auto;
+                }
+                
+                .control-pad.active {
+                    background: rgba(255, 0, 255, 0.3);
+                    border-color: rgba(255, 0, 255, 0.8);
+                }
+                
+                .control-button.active {
+                    background: rgba(0, 255, 255, 0.3);
+                    border-color: rgba(0, 255, 255, 0.8);
+                }
+            `;
+            document.head.appendChild(style);
+        }
     }
     
-    updateMobileUI() {
-        // Check if we're on a mobile device
-        const isMobile = window.innerWidth <= 768;
+    handleMovementTouch(touch) {
+        if (!this.isMobile) return;
         
-        // Get elements to hide on mobile
-        const mobileControls = document.getElementById('mobile-controls');
-        const weaponLegend = document.getElementById('weapon-legend');
-        const debugPanel = document.getElementById('debug-panel');
+        const pad = document.getElementById('movement-pad');
+        if (!pad) return;
         
-        // Show/hide mobile controls based on screen size
-        if (mobileControls) {
-            mobileControls.style.display = isMobile ? 'block' : 'none';
-        }
+        const rect = pad.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
         
-        // Hide non-essential UI on mobile
-        if (weaponLegend) {
-            weaponLegend.style.display = isMobile ? 'none' : 'block';
-        }
+        // Calculate direction from center of pad
+        const deltaX = touch.clientX - centerX;
+        const deltaY = touch.clientY - centerY;
         
-        if (debugPanel) {
-            debugPanel.style.display = isMobile ? 'none' : null;
-        }
+        // Normalize the deltas
+        const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        const normalizedX = deltaX / length;
+        const normalizedY = deltaY / length;
+        
+        // Set movement based on touch position
+        this.keys.forward = normalizedY < -0.3;
+        this.keys.backward = normalizedY > 0.3;
+        this.keys.left = normalizedX < -0.3;
+        this.keys.right = normalizedX > 0.3;
+    }
+    
+    resetMovementControls() {
+        this.keys.forward = false;
+        this.keys.backward = false;
+        this.keys.left = false;
+        this.keys.right = false;
     }
     
     setupTouchListeners() {
@@ -1603,144 +1695,6 @@ class Game {
         let touchControls = {
             up: false,
             down: false,
-            left: false,
-            right: false,
-            fire: false
-        };
-        
-        // Touch throttling to improve performance
-        this.lastTouchTime = 0;
-        this.touchThrottleMs = 16; // ~60fps
-        
-        // Helper to update keys based on touch controls
-        const updateKeysFromTouch = () => {
-            // Throttle touch events for better performance
-            const now = performance.now();
-            if (now - this.lastTouchTime < this.touchThrottleMs) {
-                return;
-            }
-            this.lastTouchTime = now;
-            
-            this.keys['w'] = touchControls.up;
-            this.keys['s'] = touchControls.down;
-            this.keys['a'] = touchControls.left;
-            this.keys['d'] = touchControls.right;
-            this.keys[' '] = touchControls.fire; // Space for firing
-        };
-        
-        // Add touch event listeners for movement
-        const padUp = document.getElementById('pad-up');
-        const padDown = document.getElementById('pad-down');
-        const padLeft = document.getElementById('pad-left');
-        const padRight = document.getElementById('pad-right');
-        
-        // Add touch event listeners for actions
-        const fireButton = document.getElementById('fire-button');
-        const weaponButton = document.getElementById('weapon-button');
-        
-        // Use passive event listeners where possible for better performance
-        const touchOptions = { passive: false };
-        
-        // Movement controls
-        if (padUp) {
-            padUp.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                touchControls.up = true;
-                padUp.classList.add('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-            
-            padUp.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                touchControls.up = false;
-                padUp.classList.remove('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-        }
-        
-        if (padDown) {
-            padDown.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                touchControls.down = true;
-                padDown.classList.add('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-            
-            padDown.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                touchControls.down = false;
-                padDown.classList.remove('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-        }
-        
-        if (padLeft) {
-            padLeft.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                touchControls.left = true;
-                padLeft.classList.add('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-            
-            padLeft.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                touchControls.left = false;
-                padLeft.classList.remove('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-        }
-        
-        if (padRight) {
-            padRight.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                touchControls.right = true;
-                padRight.classList.add('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-            
-            padRight.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                touchControls.right = false;
-                padRight.classList.remove('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-        }
-        
-        // Fire button
-        if (fireButton) {
-            fireButton.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                touchControls.fire = true;
-                fireButton.classList.add('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-            
-            fireButton.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                touchControls.fire = false;
-                fireButton.classList.remove('active');
-                updateKeysFromTouch();
-            }, touchOptions);
-        }
-        
-        // Weapon switch button
-        if (weaponButton) {
-            weaponButton.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                weaponButton.classList.add('active');
-                
-                // Simulate pressing the 'q' key for weapon switching
-                if (this.weaponManager) {
-                    this.weaponManager.cycleWeapon();
-                } else if (this.truck && this.truck.cycleWeapon) {
-                    this.truck.cycleWeapon();
-                }
-            }, touchOptions);
-            
-            weaponButton.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                weaponButton.classList.remove('active');
-            }, touchOptions);
         }
         
         // Update mobile UI when window resizes
