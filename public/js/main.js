@@ -252,8 +252,6 @@ class Projectile {
             // Use a basic emissive material for better visibility
             const material = new THREE.MeshBasicMaterial({
                 color: 0x00ff00,
-                emissive: 0x00ff00,
-                emissiveIntensity: 1.0,
                 transparent: false,
                 opacity: 1.0
             });
