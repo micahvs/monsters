@@ -245,27 +245,31 @@ class Projectile {
                 return;
             }
             
-            // Use a larger, more visible geometry
-            const geometry = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 6); // Increased size and segments
+            // Use a MUCH larger, more visible geometry for better visibility
+            const geometry = new THREE.CylinderGeometry(1.0, 1.0, 5.0, 8); // Dramatically increased size
             geometry.rotateX(Math.PI / 2);
             
-            // Use brighter material with higher opacity - MeshBasicMaterial doesn't support emissive
+            // Use a very bright material with full opacity
             const material = new THREE.MeshBasicMaterial({
                 color: 0xff00ff,
                 transparent: true,
-                opacity: 1.0 // Full opacity
+                opacity: 1.0, // Full opacity
+                wireframe: false // Solid appearance
             });
             
             this.mesh = new THREE.Mesh(geometry, material);
-            this.mesh.visible = false; // Start invisible
+            this.mesh.visible = true; // Start visible for debugging
             
             // Ensure it's added to the scene
             if (this.scene && this.scene.add) {
                 this.scene.add(this.mesh);
-                console.log("✅ Projectile mesh added to scene successfully");
+                console.log("✅ EXTRA LARGE Projectile mesh added to scene successfully");
             } else {
                 console.error("⚠️ Could not add projectile mesh to scene - scene is invalid");
             }
+            
+            // Position far away initially to avoid seeing it at origin
+            this.mesh.position.set(0, -1000, 0);
         } catch (e) {
             console.error("Error creating projectile mesh:", e);
             this.mesh = { position: new THREE.Vector3(), visible: false };
@@ -280,28 +284,35 @@ class Projectile {
                 return this;
             }
             
+            // Store all properties
             this.mesh.position.copy(position);
             this.direction = direction.normalize();
-            this.speed = speed || 0.5;
+            this.speed = speed || 1.5; // Increased speed for more noticeable movement
             this.damage = damage || 10;
             this.source = source || 'player';
             this.playerId = playerId || null; // Store the shooter's ID
             this.weaponType = weaponType; // Store weapon type
             this.lifetime = lifetime || 200;
+            
+            // Force projectile to be alive and visible
             this.alive = true;
             this.mesh.visible = true;
-
-            // Reset scale in case it was changed (e.g., trails)
-            this.mesh.scale.set(1, 1, 1);
 
             // Update appearance based on source/type/color
             this.updateAppearance(this.weaponType, source === 'remote' ? null : undefined);
 
+            // Force scale to be large for better visibility
+            this.mesh.scale.set(1, 1, 1);
+            
             // Set rotation to match direction
             this.mesh.quaternion.setFromUnitVectors(
                 new THREE.Vector3(0, 0, 1),
                 this.direction
             );
+            
+            // Log projectile creation
+            console.log(`🚀 Projectile created at ${position.x.toFixed(1)},${position.y.toFixed(1)},${position.z.toFixed(1)} 
+                         heading ${direction.x.toFixed(1)},${direction.y.toFixed(1)},${direction.z.toFixed(1)}`);
         } catch (e) {
             console.error("Error setting up projectile:", e);
             this.alive = false;
@@ -317,43 +328,58 @@ class Projectile {
                 return;
             }
             
-            // Ensure mesh is visible
+            // ALWAYS force visibility
             this.mesh.visible = true;
             
-            // Get projectile color with fallbacks
-            let projectileColor;
+            // Use bright, high-contrast colors for maximum visibility
+            let projectileColor = new THREE.Color(0xff00ff); // Bright magenta default
             
+            // Apply weapon or source-specific colors if available
             if (colorOverride) {
                 projectileColor = new THREE.Color(colorOverride);
             } else if (weaponType && weaponType.color) {
                 projectileColor = new THREE.Color(weaponType.color);
-            } else {
-                // Default colors based on source if no weapon type
-                projectileColor = this.source === 'player' ? new THREE.Color(0xff00ff) : new THREE.Color(0x00ffff);
+            } else if (this.source === 'player') {
+                // Force player projectiles to be bright neon green for maximum visibility
+                projectileColor = new THREE.Color(0x00ff00);
             }
 
-            // Update color/emissive - with safeguards
-            if (projectileColor && this.mesh.material) {
-                // Safely set color if it exists
+            // Apply color to material with safeguards
+            if (this.mesh.material) {
+                // Set material color
                 if (this.mesh.material.color) {
                     this.mesh.material.color.copy(projectileColor);
                 } else {
                     this.mesh.material.color = projectileColor.clone();
                 }
                 
-                // Set high opacity to ensure visibility
-                this.mesh.material.opacity = 1.0;
+                // Force maximum visibility settings
+                this.mesh.material.opacity = 1.0;       // Full opacity
+                this.mesh.material.transparent = true;  // Enable transparency
+                this.mesh.material.depthTest = true;    // Ensure proper depth testing
+                this.mesh.material.wireframe = false;   // Solid appearance
                 
-                // Increase size based on weapon type
-                const sizeMultiplier = weaponType && weaponType.projectileSize ? weaponType.projectileSize * 10 : 1.0;
-                this.mesh.scale.set(sizeMultiplier, sizeMultiplier, sizeMultiplier);
+                // Make projectiles VERY large for better visibility
+                // Use different sizes based on weapon type
+                const baseSize = 2.0; // Large base size
+                const sizeMultiplier = weaponType && weaponType.projectileSize ? 
+                                      weaponType.projectileSize * 5 : 1.0;
+                
+                // Apply final scale - extra large!
+                this.mesh.scale.set(
+                    baseSize * sizeMultiplier,
+                    baseSize * sizeMultiplier,
+                    baseSize * sizeMultiplier
+                );
                 
                 // Force material update
                 this.mesh.material.needsUpdate = true;
             }
             
-            // Log confirmation of projectile visibility
-            console.log(`Projectile appearance updated - visible: ${this.mesh.visible}, color: ${projectileColor.getHexString()}`);
+            // Log confirmation of projectile visibility in a more noticeable way
+            console.log(`🔫 PROJECTILE READY - visible: ${this.mesh.visible}, 
+                         color: #${projectileColor.getHexString()}, 
+                         scale: ${this.mesh.scale.x.toFixed(1)}`);
         } catch (e) {
             console.error("Error updating projectile appearance:", e);
         }
