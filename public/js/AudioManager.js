@@ -78,18 +78,35 @@ export class AudioManager {
         console.log("User interaction detected - initializing audio");
         if (!this.poolsInitialized) {
             try {
+                // Create audio context first
+                if (!this.audioContext) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    this.audioContext = new AudioContextClass();
+                }
+                
+                // Resume audio context (needed for Safari/iOS)
+                if (this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+                
                 this.scanForMusicFiles();
                 this.unlockAudio();
                 this.initializeSoundPools();
                 this.poolsInitialized = true;
+                
+                // Try to play music after initialization
+                if (this.audioElement && this.musicTracks.length > 0) {
+                    this.audioElement.play().catch(e => {
+                        console.warn("Auto-play still prevented after interaction:", e);
+                    });
+                }
+                
                 console.log("Audio initialization complete");
                 
                 // Remove event listeners after successful initialization
-                if (this.boundHandleInteraction) {
-                    document.removeEventListener('click', this.boundHandleInteraction);
-                    document.removeEventListener('touchstart', this.boundHandleInteraction);
-                    document.removeEventListener('keydown', this.boundHandleInteraction);
-                }
+                document.removeEventListener('click', this.boundHandleInteraction);
+                document.removeEventListener('touchstart', this.boundHandleInteraction);
+                document.removeEventListener('keydown', this.boundHandleInteraction);
             } catch (error) {
                 console.error("Error during audio initialization:", error);
             }
@@ -97,39 +114,22 @@ export class AudioManager {
     }
     
     initializeSoundPaths() {
-        // Create a function to generate tone sounds programmatically
-        this.createSoundWithOscillator = (type) => {
-            // Create an audio element
-            const audio = new Audio();
-            
-            // If Web Audio API is supported, create an oscillator
-            if (window.AudioContext || window.webkitAudioContext) {
-                try {
-                    // Return a properly formatted silent WAV that's guaranteed to work
-                    return 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
-                } catch (e) {
-                    console.warn("Error creating oscillator sound:", e);
-                }
-            }
-            
-            // Fallback to a properly formatted silent WAV
-            return 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
+        // Set up sound paths with real audio files
+        this.sounds = {
+            'engine_rev': '/sounds/engine_rev.mp3',
+            'engine_deceleration': '/sounds/engine_deceleration.mp3',
+            'engine_idle': '/sounds/engine_idle.mp3',
+            'weapon_fire': '/sounds/weapon_fire.mp3',
+            'suspension_bounce': '/sounds/suspension_bounce.mp3',
+            'tire_screech': '/sounds/tire_screech.mp3',
+            'tire_dirt': '/sounds/tire_dirt.mp3',
+            'vehicle_hit': '/sounds/vehicle_hit.mp3',
+            'vehicle_explosion': '/sounds/vehicle_explosion.mp3',
+            'powerup_pickup': '/sounds/powerup_pickup.mp3',
+            'powerup_activate': '/sounds/powerup_activate.mp3'
         };
         
-        // Set up sound paths with oscillator-generated sounds
-        const allSounds = [
-            'engine_rev', 'engine_deceleration', 'engine_idle', 
-            'weapon_fire', 'suspension_bounce', 'tire_screech', 
-            'tire_dirt', 'vehicle_hit', 'vehicle_explosion', 
-            'powerup_pickup', 'powerup_activate'
-        ];
-        
-        // Set all sounds to use generated tones
-        allSounds.forEach(sound => {
-            this.sounds[sound] = this.createSoundWithOscillator(sound);
-        });
-        
-        console.log("Sound paths initialized with generated sounds for each type");
+        console.log("Sound paths initialized");
     }
     
     initControlListeners() {
@@ -293,22 +293,11 @@ export class AudioManager {
     
     // Music methods
     scanForMusicFiles() {
-        // Create oscillator-based music tracks
-        const createMusicTrack = (name, tone) => {
-            // Create a unique identifier for this track
-            return {
-                name: name,
-                // Create a valid minimal silent audio file
-                // This uses a proper WAV format that will actually play in browsers
-                url: 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA=='
-            };
-        };
-        
-        // Create music tracks with generated tones
+        // Use real music files instead of silent tracks
         const tracks = [
-            createMusicTrack('Ambient Background', 'low'),
-            createMusicTrack('Battle Theme', 'high'),
-            createMusicTrack('Menu Music', 'medium')
+            { name: 'Ambient Background', url: '/music/fallback.mp3' },
+            { name: 'Battle Theme', url: '/music/pattern_bar_live_part00.mp3' },
+            { name: 'Menu Music', url: '/music/pattern_bar_live_part01.mp3' }
         ];
         
         // Store track data
@@ -322,18 +311,11 @@ export class AudioManager {
             this.trackDisplay.textContent = tracks[0].name;
         }
         
-        console.log("Music tracks created with oscillator-based audio");
+        console.log("Music tracks loaded");
         
         // Load the first track
         if (this.musicTracks.length > 0) {
             this.loadTrack(0);
-            
-            // Try to play music automatically on desktop
-            if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                this.audioElement.play().catch(e => {
-                    console.warn("Auto-play prevented, waiting for user interaction:", e);
-                });
-            }
         }
     }
     
@@ -342,36 +324,27 @@ export class AudioManager {
         
         this.currentTrackIndex = ((index % this.musicTracks.length) + this.musicTracks.length) % this.musicTracks.length;
         
-        // Use a guaranteed valid silent audio file
-        const silentWav = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
-        
         try {
-            // First, remove any event listeners to prevent error cascades
-            const oldSrc = this.audioElement.src;
-            this.audioElement.src = '';
-            this.audioElement.removeAttribute('src');
-            
-            // Add error handler before setting source
-            const errorHandler = (e) => {
-                console.warn("Audio loading error, falling back to silent audio", e);
-                this.audioElement.src = silentWav;
-            };
-            
-            this.audioElement.addEventListener('error', errorHandler, { once: true });
-            
-            // Set the new source - use the silent WAV regardless of what's in the tracks array
-            this.audioElement.src = silentWav;
+            // Set the new source
+            this.audioElement.src = this.musicTracks[this.currentTrackIndex];
             this.audioElement.load();
             
-            console.log("Silent audio track loaded successfully");
+            // Update volume
+            this.updateMusicVolume();
+            
+            // If we're on desktop, try to play automatically
+            if (!/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                this.audioElement.play().catch(e => {
+                    console.warn("Auto-play prevented, waiting for user interaction:", e);
+                });
+            }
+            
+            console.log(`Loaded audio track: ${this.musicTrackInfo[this.currentTrackIndex].name}`);
         } catch (e) {
-            console.warn("Could not load audio track, using fallback:", e);
-            // Final fallback - direct assignment of silent audio
-            this.audioElement.src = silentWav;
+            console.warn("Could not load audio track:", e);
         }
         
         this.updateTrackDisplay();
-        this.updateMusicVolume();
     }
     
     updateTrackDisplay() {
@@ -601,7 +574,7 @@ export class AudioManager {
     // Utility methods
     unlockAudio() {
         try {
-            // Simple approach: just create the audio context if needed
+            // Make sure audio context exists
             if (!this.audioContext) {
                 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
                 if (!AudioContextClass) {
@@ -611,82 +584,25 @@ export class AudioManager {
                 
                 try {
                     this.audioContext = new AudioContextClass();
-                    console.log("Audio context created");
                 } catch (ctxErr) {
                     console.error("Failed to create audio context:", ctxErr);
                     return false;
                 }
             }
             
-            // Create and play a silent buffer (iOS/Safari unlock technique)
-            try {
-                const buffer = this.audioContext.createBuffer(1, 1, 22050);
-                const source = this.audioContext.createBufferSource();
-                source.buffer = buffer;
-                source.connect(this.audioContext.destination);
-                source.start(0);
-            } catch (bufferErr) {
-                console.warn("Silent buffer playback failed:", bufferErr);
-                // Continue anyway
-            }
-            
-            // Resume the audio context if it's suspended
+            // Resume the audio context
             if (this.audioContext.state === 'suspended') {
                 this.audioContext.resume().catch(e => {
                     console.warn("Could not resume audio context:", e);
                 });
             }
             
-            // Try to play audio
-            if (this.audioElement) {
-                this.audioElement.play().catch(e => {
-                    console.warn("Audio autoplay prevented, will require user interaction:", e);
-                    
-                    // Only create the button if it doesn't already exist
-                    if (!document.getElementById('audio-unlock-button')) {
-                        const unlockButton = document.createElement('div');
-                        unlockButton.id = 'audio-unlock-button';
-                        unlockButton.innerHTML = '<i class="fas fa-volume-up"></i>';
-                        unlockButton.style.position = 'fixed';
-                        unlockButton.style.bottom = '80px';
-                        unlockButton.style.right = '20px';
-                        unlockButton.style.width = '60px';
-                        unlockButton.style.height = '60px';
-                        unlockButton.style.borderRadius = '50%';
-                        unlockButton.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-                        unlockButton.style.color = '#ff00ff';
-                        unlockButton.style.display = 'flex';
-                        unlockButton.style.alignItems = 'center';
-                        unlockButton.style.justifyContent = 'center';
-                        unlockButton.style.fontSize = '24px';
-                        unlockButton.style.boxShadow = '0 0 15px rgba(255, 0, 255, 0.7)';
-                        unlockButton.style.zIndex = '1000';
-                        unlockButton.style.cursor = 'pointer';
-                        
-                        // Add click event listener
-                        unlockButton.addEventListener('click', () => {
-                            if (this.audioContext && this.audioContext.state === 'suspended') {
-                                this.audioContext.resume();
-                            }
-                            
-                            if (this.audioElement) {
-                                const playPromise = this.audioElement.play();
-                                if (playPromise !== undefined) {
-                                    playPromise.then(() => {
-                                        if (unlockButton.parentNode) {
-                                            unlockButton.parentNode.removeChild(unlockButton);
-                                        }
-                                    }).catch(e => {
-                                        console.error("Audio still blocked after click:", e);
-                                    });
-                                }
-                            }
-                        });
-                        
-                        document.body.appendChild(unlockButton);
-                    }
-                });
-            }
+            // Create a short silent buffer to unlock mobile audio
+            const buffer = this.audioContext.createBuffer(1, 1, 22050);
+            const source = this.audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(this.audioContext.destination);
+            source.start(0);
             
             return true;
         } catch (e) {
@@ -708,6 +624,35 @@ export class AudioManager {
     stopMusic() {
         if (this.audioElement) {
             this.audioElement.pause();
+        }
+    }
+    
+    // Debug helper method
+    debugAudio() {
+        console.log('AudioManager Debug Info:');
+        console.log('Audio Context State:', this.audioContext?.state);
+        console.log('Music Element:', this.audioElement);
+        console.log('Music Tracks:', this.musicTracks);
+        console.log('Sound Effects Paths:', this.sounds);
+        console.log('Pools Initialized:', this.poolsInitialized);
+        
+        // Test sound
+        try {
+            console.log('Attempting to play a test sound...');
+            this.playSound('powerup_pickup');
+        } catch (e) {
+            console.error('Test sound failed:', e);
+        }
+        
+        // Test audio element
+        try {
+            if (this.audioElement && this.musicTracks.length > 0) {
+                console.log('Attempting to play music...');
+                this.audioElement.src = this.musicTracks[0];
+                this.audioElement.play().catch(e => console.error('Music play failed:', e));
+            }
+        } catch (e) {
+            console.error('Test music failed:', e);
         }
     }
 } 

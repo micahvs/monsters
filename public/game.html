@@ -630,6 +630,13 @@
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
     
+    <!-- Import AudioManager -->
+    <script type="module">
+        import { AudioManager } from './js/AudioManager.js';
+        window.AudioManager = AudioManager;
+        console.log("AudioManager loaded and available globally");
+    </script>
+    
     <!-- Load main.js with proper fallback for older browsers and mobile -->
     <script type="text/javascript">
         // Global fallback variables
@@ -788,6 +795,14 @@
                     
                     window.gameReadyState.audioInitialized = true;
                     logStatus('Audio initialized successfully');
+                    
+                    // Debug audio setup
+                    setTimeout(() => {
+                        if (window.audioManager && typeof window.audioManager.debugAudio === 'function') {
+                            console.log('Running audio debug check...');
+                            window.audioManager.debugAudio();
+                        }
+                    }, 1000);
                     
                     // Connect audio to game if both are ready
                     connectAudioToGame();
