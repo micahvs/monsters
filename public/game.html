@@ -629,7 +629,20 @@
     <!-- Scripts -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"></script>
-    <script type="module" src="js/main.js"></script>
+    
+    <!-- Load main.js with proper fallback for older browsers and mobile -->
+    <script type="text/javascript">
+        // Global fallback variables
+        window.gameInitialized = false;
+    </script>
+    <script type="module">
+        // Import Game class properly for modern browsers
+        import { Game } from './js/main.js';
+        
+        // Make Game globally available for older browsers and mobile
+        window.Game = Game;
+        console.log("Game class loaded and exposed globally");
+    </script>
     <script>
         // Create a global ready flag to synchronize all initialization
         window.gameReadyState = {
@@ -672,8 +685,13 @@
             logStatus('Starting game initialization');
             
             try {
+                // Make sure Game is defined
+                if (typeof window.Game !== 'function') {
+                    throw new Error("Game class not found. Please refresh the page.");
+                }
+                
                 // Start the game initialization
-                window.gameInstance = new Game((success) => {
+                window.gameInstance = new window.Game((success) => {
                     if (success) {
                         window.gameReadyState.gameInitialized = true;
                         logStatus('Game successfully initialized');
@@ -686,6 +704,7 @@
                 });
             } catch (err) {
                 logStatus('Error initializing game: ' + err.message);
+                console.error("Game initialization error:", err);
             }
         }
         

@@ -772,6 +772,13 @@ class Game {
             // 3. Create shared geometries for better performance
             this.sharedParticleGeometry = new THREE.SphereGeometry(1, 8, 6);
             
+            // Initialize critical arrays and objects
+            this.turrets = [];
+            this.powerups = [];
+            this.powerupSpawnTimer = 0;
+            this.powerupSpawnInterval = 600; // 10 seconds at 60fps
+            this.obstacles = [];
+            
             // Store this instance globally
             gameInstance = this;
             
@@ -3939,4 +3946,11 @@ class ObjectPoolManager {
     }
 }
 
+// Export the Game class for ES modules
 export { Game }
+
+// Also make Game available globally for non-module contexts
+if (typeof window !== 'undefined') {
+    window.Game = Game;
+    console.log("Game class exported and made globally available");
+}
