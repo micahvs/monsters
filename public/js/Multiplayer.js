@@ -9,7 +9,7 @@ export default class Multiplayer {
         this.players = new Map();
         this.remoteProjectiles = new Map();
         this.localPlayerId = null;
-        this.serverUrl = 'https://monster-truck-game-server.fly.dev';
+        this.serverUrl = 'https://monster-truck-stadium.fly.dev';
         this.fallbackUrl = 'http://localhost:3000';
         this.isConnecting = false;
         this.isConnected = false;
