@@ -1508,47 +1508,67 @@ class Game {
     }
 
     setupControls() {
-        console.log("Setting up controls");
-        
-        // Set up keyboard controls
-        window.addEventListener('keydown', (e) => {
-            if (this.keys.hasOwnProperty(e.key)) {
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key in this.keys) {
                 this.keys[e.key] = true;
             }
-            
-            // Debug shortcut removed
         });
         
-        window.addEventListener('keyup', (e) => {
-            if (this.keys.hasOwnProperty(e.key)) {
+        document.addEventListener('keyup', (e) => {
+            if (e.key in this.keys) {
                 this.keys[e.key] = false;
             }
         });
         
+        // Mobile detection
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Create mobile controls if needed
+        if (this.isMobile) {
+            this.createMobileControls();
+        }
+        
         // Handle window resize
         window.addEventListener('resize', () => {
-            if (this.camera && this.renderer) {
+            // Update camera aspect ratio
+            if (this.camera) {
                 this.camera.aspect = window.innerWidth / window.innerHeight;
                 this.camera.updateProjectionMatrix();
+            }
+            
+            // Update renderer size
+            if (this.renderer) {
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
             }
-        });
-
-        // Set up mobile touch controls
-        this.createMobileControls();
-        this.setupTouchListeners();
+            
+            // Update mobile controls visibility
+            if (this.isMobile) {
+                this.updateMobileControlsVisibility();
+            }
+        }, { passive: true });
     }
-
+    
+    updateMobileControlsVisibility() {
+        const controls = document.getElementById('mobile-controls');
+        if (controls) {
+            controls.style.display = this.isMobile ? 'block' : 'none';
+        }
+    }
+    
     createMobileControls() {
         if (!this.isMobile) return;
         
-        // Create container for mobile controls if it doesn't exist
-        let controlsContainer = document.getElementById('mobile-controls');
-        if (!controlsContainer) {
-            controlsContainer = document.createElement('div');
-            controlsContainer.id = 'mobile-controls';
-            document.body.appendChild(controlsContainer);
+        // Remove any existing mobile controls
+        const existingControls = document.getElementById('mobile-controls');
+        if (existingControls) {
+            existingControls.remove();
         }
+        
+        // Create container for mobile controls
+        const controlsContainer = document.createElement('div');
+        controlsContainer.id = 'mobile-controls';
+        document.body.appendChild(controlsContainer);
         
         // Create movement pad
         const movementPad = document.createElement('div');
@@ -1569,92 +1589,98 @@ class Game {
         };
         
         // Movement pad touch handling
-        movementPad.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.handleMovementTouch(e.touches[0]);
-            movementPad.classList.add('active');
-        }, touchOptions);
-        
-        movementPad.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            this.handleMovementTouch(e.touches[0]);
-        }, touchOptions);
-        
-        movementPad.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            this.resetMovementControls();
-            movementPad.classList.remove('active');
-        }, touchOptions);
+        if (movementPad) {
+            movementPad.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (e.touches && e.touches[0]) {
+                    this.handleMovementTouch(e.touches[0]);
+                    movementPad.classList.add('active');
+                }
+            }, touchOptions);
+            
+            movementPad.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (e.touches && e.touches[0]) {
+                    this.handleMovementTouch(e.touches[0]);
+                }
+            }, touchOptions);
+            
+            movementPad.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                this.resetMovementControls();
+                movementPad.classList.remove('active');
+            }, touchOptions);
+        }
         
         // Weapon button touch handling
-        weaponButton.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            this.keys.shoot = true;
-            weaponButton.classList.add('active');
-        }, touchOptions);
-        
-        weaponButton.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            this.keys.shoot = false;
-            weaponButton.classList.remove('active');
-        }, touchOptions);
-        
-        // Add styles if they don't exist
-        if (!document.getElementById('mobile-controls-style')) {
-            const style = document.createElement('style');
-            style.id = 'mobile-controls-style';
-            style.textContent = `
-                #mobile-controls {
-                    position: fixed;
-                    bottom: 20px;
-                    left: 0;
-                    right: 0;
-                    height: 180px;
-                    z-index: 1000;
-                    pointer-events: none;
-                }
-                
-                .control-pad {
-                    position: absolute;
-                    left: 20px;
-                    bottom: 20px;
-                    width: 120px;
-                    height: 120px;
-                    background: rgba(255, 0, 255, 0.2);
-                    border: 2px solid rgba(255, 0, 255, 0.5);
-                    border-radius: 50%;
-                    pointer-events: auto;
-                }
-                
-                .control-button {
-                    position: absolute;
-                    right: 20px;
-                    bottom: 20px;
-                    width: 80px;
-                    height: 80px;
-                    background: rgba(0, 255, 255, 0.2);
-                    border: 2px solid rgba(0, 255, 255, 0.5);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: rgba(0, 255, 255, 0.8);
-                    font-size: 24px;
-                    pointer-events: auto;
-                }
-                
-                .control-pad.active {
-                    background: rgba(255, 0, 255, 0.3);
-                    border-color: rgba(255, 0, 255, 0.8);
-                }
-                
-                .control-button.active {
-                    background: rgba(0, 255, 255, 0.3);
-                    border-color: rgba(0, 255, 255, 0.8);
-                }
-            `;
-            document.head.appendChild(style);
+        if (weaponButton) {
+            weaponButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.keys.shoot = true;
+                weaponButton.classList.add('active');
+            }, touchOptions);
+            
+            weaponButton.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                this.keys.shoot = false;
+                weaponButton.classList.remove('active');
+            }, touchOptions);
         }
+        
+        // Add styles
+        const style = document.createElement('style');
+        style.textContent = `
+            #mobile-controls {
+                position: fixed;
+                bottom: 20px;
+                left: 0;
+                right: 0;
+                height: 180px;
+                z-index: 1000;
+                pointer-events: none;
+                display: ${this.isMobile ? 'block' : 'none'};
+            }
+            
+            .control-pad {
+                position: absolute;
+                left: 20px;
+                bottom: 20px;
+                width: 120px;
+                height: 120px;
+                background: rgba(255, 0, 255, 0.2);
+                border: 2px solid rgba(255, 0, 255, 0.5);
+                border-radius: 50%;
+                pointer-events: auto;
+            }
+            
+            .control-button {
+                position: absolute;
+                right: 20px;
+                bottom: 20px;
+                width: 80px;
+                height: 80px;
+                background: rgba(0, 255, 255, 0.2);
+                border: 2px solid rgba(0, 255, 255, 0.5);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: rgba(0, 255, 255, 0.8);
+                font-size: 24px;
+                pointer-events: auto;
+            }
+            
+            .control-pad.active {
+                background: rgba(255, 0, 255, 0.3);
+                border-color: rgba(255, 0, 255, 0.8);
+            }
+            
+            .control-button.active {
+                background: rgba(0, 255, 255, 0.3);
+                border-color: rgba(0, 255, 255, 0.8);
+            }
+        `;
+        document.head.appendChild(style);
     }
     
     handleMovementTouch(touch) {
